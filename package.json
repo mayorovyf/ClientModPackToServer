@@ -1,11 +1,20 @@
 {
   "name": "client-to-server",
   "version": "1.0.0",
-  "description": "Сортировщик клиентских модов | Создатель: F_aN | Алексей | t.me/F_aN_N",
+  "description": "Утилита для первичной очистки клиентского Minecraft-модпака перед сборкой серверной версии",
   "author": "F_aN | Алексей",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
+  "engines": {
+    "node": ">=20"
   },
-  "dependencies": {}
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "node --test --test-concurrency=1 --test-isolation=none",
+    "lint": "node -e \"console.log('Lint is not configured yet')\""
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "toml": "^3.0.0"
+  }
 }
