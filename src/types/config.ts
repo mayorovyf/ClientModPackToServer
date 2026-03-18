@@ -1,0 +1,79 @@
+export type RunMode = 'build' | 'analyze';
+export type OutputPolicy = 'unique-run-dir';
+export type DependencyValidationMode = 'conservative';
+export type ArbiterProfile = 'safe' | 'balanced' | 'aggressive';
+export type DeepCheckMode = 'auto' | 'off' | 'force';
+export type ValidationMode = 'off' | 'auto' | 'require' | 'force';
+export type RegistryMode = 'auto' | 'offline' | 'refresh' | 'pinned';
+ 
+
+export interface CliOptions {
+    inputPath?: string | null;
+    outputPath?: string | null;
+    serverDirName?: string | null;
+    reportDir?: string | null;
+    outputPolicy?: OutputPolicy | null;
+    runIdPrefix?: string | null;
+    mode?: RunMode | 'dry-run' | null;
+    registryFilePath?: string | null;
+    registryOverridesPath?: string | null;
+    registryMode?: RegistryMode | null;
+    registryManifestUrl?: string | null;
+    registryBundleUrl?: string | null;
+    arbiterProfile?: ArbiterProfile | null;
+    deepCheckMode?: DeepCheckMode | null;
+    validationMode?: ValidationMode | null;
+    validationTimeoutMs?: number | string | null;
+    validationEntrypointPath?: string | null;
+    validationSaveArtifacts?: boolean;
+    engineNames?: string[];
+    disabledEngineNames?: string[];
+    dryRun?: boolean;
+    help?: boolean;
+}
+
+export interface RuntimeConfig {
+    scriptDir: string;
+    historyDirName: string;
+    blockListRelativePath: string;
+    buildDirName: string;
+    reportDirName: string;
+    tmpDirName: string;
+    localRegistryFileName: string;
+    localRegistryDirName: string;
+    localOverridesFileName: string;
+    registryCacheDirName: string;
+    registryCacheSubDirName: string;
+    outputPolicy: OutputPolicy;
+    runIdPrefix: string;
+    logLevel: string;
+    useColors: boolean;
+    mode: RunMode;
+    outputFormat: 'text';
+    interactive: boolean;
+    dryRun: boolean;
+    inputPath: string | null;
+    outputRootDir: string;
+    serverDirName: string | null;
+    reportRootDir: string;
+    tmpRootDir: string;
+    enabledEngines: string[];
+    disabledEngines: string[];
+    dependencyValidationMode: DependencyValidationMode;
+    arbiterProfile: ArbiterProfile;
+    deepCheckMode: DeepCheckMode;
+    validationMode: ValidationMode;
+    validationTimeoutMs: number;
+    validationEntrypointPath: string | null;
+    validationSaveArtifacts: boolean;
+    registryMode: RegistryMode;
+    registryManifestUrl: string | null;
+    registryBundleUrl: string | null;
+    registryFetchTimeoutMs: number;
+    registryCacheDir: string;
+    registryFilePath: string;
+    registryFileRequired: boolean;
+    localOverridesPath: string;
+    blockListPath: string;
+    historyDir: string;
+}

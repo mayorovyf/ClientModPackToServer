@@ -1,0 +1,189 @@
+# ═══════════════════════════════════════════════════════════════
+#  CLIENT TO SERVER - Список клиентских модов
+#  Создатель: F_aN | Алексей
+#  Телеграм: t.me/F_aN_N
+# ═══════════════════════════════════════════════════════════════
+
+#easyshulkerboxes     # Лучше на обе стороны для полной функциональности
+#iceberg              # Если есть зависимые моды на сервере
+#notes                # Для заметок, видимых всем игрокам
+#toolstats            # Это серверный мод!
+#crashassistant       # Обычно серверный утилита
+# ══════════════ ⚠️ Моды, которые могут потребовать сервер ══════════════
+easyshulkerboxes
+iceberg
+notes
+toolstats
+crashassistant
+# ══════════════ ОПТИМИЗАЦИЯ ГРАФИКИ ══════════════
+embeddium
+rubidium
+oculus
+entityculling
+immediatelyfast
+badoptimizations
+dynamic_fps
+sodiumoptionsapi
+sodiumdynamiclights
+sodiumoptionsmodcompat
+super_resolution
+createbetterfps
+euphoriapatcher
+euphoria_patcher
+modernfix
+optileaves
+smoothchunk
+lightspeed
+gpumemleakfix
+betterbiomereblend
+separatedleaves
+flickerfix
+xenon
+fastboot
+fastpaintings
+fastitemframes
+fastsuite
+farsight
+fix_attack_lag
+narenderfix
+
+# ══════════════ МЕНЮ И ИНТЕРФЕЙС ══════════════
+fancymenu
+drippyloadingscreen
+panorama_screens
+obsidianui
+immersiveui
+bhmenu
+bettertitlescreen
+modernworldcreation
+gamemenumodoption
+configured
+konkrete
+melody
+searchables
+controlling
+betterf3
+
+# ══════════════ HUD, ПРОДВИЖЕНИЯ И ПОДСКАЗКИ ══════════════
+betteradvancements
+advancementplaques
+legendarytooltips
+adaptive_tooltips
+adaptivetooltips
+enchdesc
+enchantmentdescriptions
+appleskin
+itemborders
+durabilitytooltip
+foodeffecttooltips
+great_scrollable_tooltips
+jeed
+travelerstitles
+pickupnotifier
+overflowingbars
+leavemybarsalone
+leavesbegone
+moreoverlays
+toastcontrol
+stylisheffects
+expcounter
+raised
+rpg-hud
+clickadv
+chat_heads
+
+# ══════════════ ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ══════════════
+visuality
+particular
+particle_core
+fallingleaves
+betterclouds
+particlerain
+coolrain
+lucent
+transparent
+
+# ══════════════ АНИМАЦИИ ══════════════
+notenoughanimations
+chatanimation
+smoothswapping
+
+# ══════════════ КУРСОР И ПРИЦЕЛ ══════════════
+dynamiccrosshair
+dynamiccrosshairapi
+
+# ══════════════ МОДЕЛИ И ТЕКСТУРЫ ══════════════
+entity_model_features
+entity_texture_features
+entity_sound_features
+citresewn
+customskinloader
+
+# ══════════════ ФИЗИКА ПРЕДМЕТОВ ══════════════
+itemphysiclite
+
+# ══════════════ ПЕРСОНАЛИЗАЦИЯ ══════════════
+figura
+
+# ══════════════ ЗВУКИ ══════════════
+ambientsounds
+sound_physics_remastered
+sound-physics-remastered
+presencefootsteps
+extrasounds
+waterdripsound
+biomemusic
+extremesoundmuffler
+
+# ══════════════ УПРАВЛЕНИЕ И ВВОД ══════════════
+mousetweaks
+cameraoverhaul
+shouldersurfing
+betterthirdperson
+smoothscrollingrefurbished
+amecsapi
+inventoryprofilesnext
+libipn
+keybindspurger
+
+# ══════════════ УЛУЧШЕНИЯ ГЕЙМПЛЕЯ ══════════════
+spyglass_improvements
+okzoomer
+yeetusexperimentus
+cherishedworlds
+namepain
+highlighter
+
+# ══════════════ КАРТЫ И НАВИГАЦИЯ ══════════════
+jmi
+
+# ══════════════ ИНВЕНТАРЬ И ХРАНЕНИЕ ══════════════
+clientcrafting
+
+# ══════════════ СКРИНШОТЫ ══════════════
+screenshot_viewer
+screenshotviewer
+
+# ══════════════ ЗАГОЛОВОК ОКНА ══════════════
+titlebarchanger
+
+# ══════════════ ВИЗУАЛ ИНТЕРФЕЙСА ══════════════
+traveloptics
+tipthescales
+
+# ══════════════ УТИЛИТЫ ══════════════
+horseexpert
+simplediscordrichpresence
+quickboot
+quickpack
+
+# ══════════════ ЧАТ ══════════════
+nochatreports
+
+# ══════════════ ШЕЙДЕРЫ ══════════════
+iris
+irisshaders
+
+# ══════════════ ДОПОЛНИТЕЛЬНО ══════════════
+itemzoom
+fast-ip-ping
