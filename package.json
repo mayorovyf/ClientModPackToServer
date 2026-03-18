@@ -10,11 +10,25 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "test": "node --test --test-concurrency=1 --test-isolation=none",
+    "dev:cli": "tsx index.js",
+    "dev:backend": "tsx src/backend/headless-runner.ts",
+    "dev:tui": "node -e \"console.error('TUI entrypoint is not implemented yet'); process.exit(1)\"",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --require tsx/cjs --test --test-concurrency=1 --test-isolation=none",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "node -e \"console.log('Lint is not configured yet')\""
   },
   "dependencies": {
+    "@inkjs/ui": "^2.0.0",
+    "@types/react": "^19.2.14",
     "adm-zip": "^0.5.16",
+    "ink": "^6.8.0",
+    "react": "^19.2.4",
     "toml": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

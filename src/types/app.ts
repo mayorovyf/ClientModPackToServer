@@ -1,0 +1,108 @@
+import type { RegistryRuntimeState } from './registry';
+import type { RunReport } from './report';
+import type { RunContext } from './run';
+
+export interface ApplicationLogger {
+    raw: (message?: string) => void;
+    hint: (message: string) => void;
+    info: (message: string) => void;
+    warn: (message: string) => void;
+    error: (message: string) => void;
+    debug: (message: string) => void;
+    report: (message: string) => void;
+    success: (message: string, label?: string) => void;
+    paint: (text: string, color?: string) => string;
+    canLog: (level: string) => boolean;
+    withContext: (context: string) => ApplicationLogger;
+}
+
+export interface ProgressStageEvent {
+    stage: string;
+    [key: string]: unknown;
+}
+
+export interface ProgressModEvent {
+    fileName: string;
+    descriptor?: {
+        loader?: string;
+        modIds?: string[];
+        declaredSide?: string;
+        parsingWarnings?: unknown[];
+        parsingErrors?: unknown[];
+    } | null;
+    classification?: {
+        finalDecision?: string;
+        confidence?: string;
+        winningEngine?: string | null;
+        conflict?: {
+            hasConflict?: boolean;
+        } | null;
+    } | null;
+    [key: string]: unknown;
+}
+
+export interface ProgressBuildActionEvent {
+    fileName: string;
+    decision?: string;
+    actionStatus?: string | null;
+    finalSemanticDecision?: string | null;
+    finalConfidence?: string | null;
+    decisionOrigin?: string | null;
+    destinationPath?: string | null;
+    error?: {
+        code?: string | null;
+        message?: string | null;
+    } | null;
+    [key: string]: unknown;
+}
+
+export interface BuildProgressReporter {
+    onStageStarted: (event: ProgressStageEvent) => void;
+    onStageCompleted: (event: ProgressStageEvent) => void;
+    onModParsed: (event: ProgressModEvent) => void;
+    onBuildActionCompleted: (event: ProgressBuildActionEvent) => void;
+}
+
+export interface ClassificationContextLike {
+    enabledEngines: string[];
+    availableEngines?: string[];
+    blockList?: string[];
+    localRegistry?: {
+        filePath?: string | null;
+        rules?: unknown[];
+    } | null;
+}
+
+export interface RegistryRuntimeBundle {
+    registry: {
+        filePath?: string | null;
+        rules?: unknown[];
+    };
+    runtime: RegistryRuntimeState;
+}
+
+export interface LoadRuntimeStateResult {
+    blockList: string[];
+    registryRuntime: RegistryRuntimeBundle;
+    classificationContext: ClassificationContextLike;
+}
+
+export interface PreparedRun extends LoadRuntimeStateResult {
+    inputPath: string;
+    runContext: RunContext;
+    runLogger: ApplicationLogger;
+}
+
+export interface ReportFiles {
+    reportDir: string;
+    jsonReportPath: string;
+    runMetadataPath: string;
+    summaryPath: string;
+    eventsLogPath: string;
+}
+
+export interface FinalizedApplicationRun {
+    report: RunReport;
+    reportFiles: ReportFiles;
+    runContext: RunContext;
+}
