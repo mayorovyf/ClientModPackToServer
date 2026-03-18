@@ -7,12 +7,14 @@ export function Layout({
     sidebar,
     content,
     details,
+    showDetails = true,
     statusBar,
     layout
 }: {
     sidebar: React.ReactNode;
     content: React.ReactNode;
-    details: React.ReactNode;
+    details?: React.ReactNode;
+    showDetails?: boolean;
     statusBar: React.ReactNode;
     layout: TerminalLayout;
 }): React.JSX.Element {
@@ -43,7 +45,11 @@ export function Layout({
         </Box>
     );
 
-    const mainArea = layout.detailsInline ? (
+    const mainArea = !showDetails ? (
+        <Box width={layout.columns} height={layout.mainAreaHeight} minWidth={0}>
+            {contentWithSidebar}
+        </Box>
+    ) : layout.detailsInline ? (
         <Box
             flexDirection="row"
             alignItems="stretch"

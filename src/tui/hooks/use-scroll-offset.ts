@@ -3,10 +3,12 @@ import { useInput } from 'ink';
 
 export function useScrollOffset({
     itemCount,
-    viewportSize
+    viewportSize,
+    enabled = true
 }: {
     itemCount: number;
     viewportSize: number;
+    enabled?: boolean;
 }): {
     offset: number;
     maxOffset: number;
@@ -21,7 +23,7 @@ export function useScrollOffset({
     }, [maxOffset]);
 
     useInput((input, key) => {
-        if (maxOffset <= 0) {
+        if (!enabled || maxOffset <= 0) {
             return;
         }
 

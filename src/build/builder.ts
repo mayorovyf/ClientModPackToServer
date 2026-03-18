@@ -16,6 +16,7 @@ const { listJarFiles } = require('../io/mods-folder');
 const { buildParsingStats } = require('../metadata/parse-mod-file');
 const { createEmptyValidationReport } = require('../validation/report-model');
 const { runValidationStage } = require('../validation/run-validation');
+const { applyManualReviewOverrides, resolveReviewOverridesPath } = require('../review/manual-overrides');
 
 import type { ApplicationLogger, BuildProgressReporter, ClassificationContextLike } from '../types/app';
 import type { FinalClassification, SemanticDecision } from '../types/classification';
@@ -107,6 +108,10 @@ interface PipelineDecision extends ValidationDecisionLike {
     actionStatus: string;
     destinationPath: string | null;
     error: ValidationError | null;
+    manualReviewKey: string | null;
+    manualOverrideAction: 'keep' | 'exclude' | null;
+    manualOverrideReason: string | null;
+    manualOverrideUpdatedAt: string | null;
 }
 
 interface BuildPipelineReport extends RunReport {
@@ -343,13 +348,102 @@ function createNoopProgressReporter(): BuildProgressReporter {
     };
 }
 
+// Copy the whole instance into the server output, except explicit client-only data
+// and transient project/runtime directories. Everything else is treated as server-relevant
+// and copied as-is, including kubejs/scripts/configureddefaults/patchouli_books/etc.
+const INSTANCE_COPY_EXCLUDED_NAMES = new Set([
+    'mods',
+    'resourcepacks',
+    'shaderpacks',
+    'screenshots',
+    'saves',
+    'logs',
+    'crash-reports',
+    'downloads',
+    'build',
+    'reports',
+    'tmp',
+    'cache'
+]);
+
+const INSTANCE_COPY_EXCLUDED_FILE_NAMES = new Set([
+    'options.txt',
+    'optionsof.txt',
+    'optionsshaders.txt',
+    'options.amecsapi.txt',
+    'servers.dat',
+    'servers.dat_old',
+    'realms_persistence.json',
+    'launcher_profiles.json',
+    'launcher_accounts.json',
+    'usercache.json',
+    'usernamecache.json'
+]);
+
+function isSamePath(leftPath: string, rightPath: string): boolean {
+    return path.resolve(leftPath) === path.resolve(rightPath);
+}
+
+function shouldSkipInstanceEntry(sourcePath: string, entryName: string, runContext: RunContext): boolean {
+    if (INSTANCE_COPY_EXCLUDED_NAMES.has(entryName.toLowerCase())) {
+        return true;
+    }
+
+    if (INSTANCE_COPY_EXCLUDED_FILE_NAMES.has(entryName.toLowerCase())) {
+        return true;
+    }
+
+    return isSamePath(sourcePath, runContext.outputRootDir)
+        || isSamePath(sourcePath, runContext.reportRootDir)
+        || isSamePath(sourcePath, runContext.tmpRootDir);
+}
+
 function ensureBuildDirectories(runContext: RunContext): void {
     try {
         ensureDirectory(runContext.outputRootDir);
+
+        if (fs.existsSync(runContext.buildDir)) {
+            throw new ResultCollisionError(`Output directory already exists: ${runContext.buildDir}`);
+        }
+
         ensureDirectory(runContext.buildDir);
         ensureDirectory(runContext.buildModsDir);
     } catch (error) {
+        if (error instanceof ResultCollisionError) {
+            throw error;
+        }
+
         throw new OutputDirectoryError(`Failed to prepare output directory: ${runContext.buildDir}`, { cause: error });
+    }
+}
+
+function copyInstanceSkeleton(runContext: RunContext, record: RecordEvent): void {
+    if (isSamePath(runContext.instancePath, runContext.modsPath)) {
+        record('info', 'build', 'Skipping instance skeleton copy because input points directly to mods/');
+        return;
+    }
+
+    const entries = fs.readdirSync(runContext.instancePath, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const sourcePath = path.join(runContext.instancePath, entry.name);
+
+        if (shouldSkipInstanceEntry(sourcePath, entry.name, runContext)) {
+            continue;
+        }
+
+        const destinationPath = path.join(runContext.buildDir, entry.name);
+
+        try {
+            fs.cpSync(sourcePath, destinationPath, {
+                recursive: true,
+                force: false,
+                errorOnExist: true
+            });
+            record('info', 'build', `Copied instance entry: ${entry.name}`);
+        } catch (error) {
+            throw new FileCopyError(`Failed to copy instance entry: ${entry.name}`, { cause: error });
+        }
     }
 }
 
@@ -425,6 +519,7 @@ function applyBuildActions({
 
     if (!runContext.dryRun) {
         ensureBuildDirectories(runContext);
+        copyInstanceSkeleton(runContext, record);
     }
 
     for (const [index, decision] of decisions.entries()) {
@@ -813,13 +908,18 @@ async function runBuildPipeline({
     const effectiveClassificationContext = (classificationContext || createClassificationContext({ blockList })) as ClassificationContextLike;
     const collector = createEventCollector(logger);
     collector.record('info', 'analysis', `Run mode: ${runContext.mode}`);
-    collector.record('info', 'analysis', `Input directory: ${modsPath}`);
+    collector.record('info', 'analysis', `Input directory: ${runContext.inputPath}`);
+    collector.record('info', 'analysis', `Instance directory: ${runContext.instancePath}`);
+    collector.record('info', 'analysis', `Mods directory: ${modsPath}`);
     collector.record('info', 'analysis', `Build root: ${runContext.outputRootDir}`);
+    collector.record('info', 'analysis', `Server directory: ${runContext.buildDir}`);
     collector.record('info', 'analysis', `Report root: ${runContext.reportRootDir}`);
     collector.record('info', 'analysis', `Classification engines: ${effectiveClassificationContext.enabledEngines.join(', ')}`);
     collector.record('info', 'analysis', `Dependency validation mode: ${runContext.dependencyValidationMode}`);
     collector.record('info', 'analysis', `Arbiter profile: ${runContext.arbiterProfile}`);
     collector.record('info', 'analysis', `Deep-check mode: ${runContext.deepCheckMode}`);
+    const reviewOverridesPath = resolveReviewOverridesPath(process.cwd());
+    collector.record('info', 'analysis', `Manual review overrides: ${reviewOverridesPath}`);
 
     const jarFiles = listJarFiles(modsPath);
 
@@ -893,7 +993,12 @@ async function runBuildPipeline({
         status: deepCheckStage.deepCheck.status,
         summary: deepCheckStage.deepCheck.summary
     });
-    const decisions = deepCheckStage.decisions;
+    const manualReviewStage = applyManualReviewOverrides({
+        decisions: deepCheckStage.decisions,
+        overridesPath: reviewOverridesPath,
+        record: collector.record
+    });
+    const decisions = manualReviewStage.decisions;
 
     for (const decision of decisions) {
         const engine = decision.classification ? decision.classification.winningEngine || 'conservative-default' : 'unknown';
@@ -1014,9 +1119,12 @@ async function runBuildPipeline({
         run: {
             runId: runContext.runId,
             runIdPrefix: runContext.runIdPrefix,
+            serverDirName: runContext.serverDirName,
             startedAt: runContext.startedAt,
             completedAt,
-            inputPath: modsPath,
+            inputPath: runContext.inputPath,
+            instancePath: runContext.instancePath,
+            modsPath: runContext.modsPath,
             outputRootDir: runContext.outputRootDir,
             reportRootDir: runContext.reportRootDir,
             outputPolicy: runContext.outputPolicy,
@@ -1038,7 +1146,8 @@ async function runBuildPipeline({
             registryCacheDir: runContext.registryCacheDir,
             localOverridesPath: runContext.localOverridesPath,
             enabledEngines: effectiveClassificationContext.enabledEngines,
-            registryFilePath: effectiveClassificationContext.localRegistry ? effectiveClassificationContext.localRegistry.filePath : null
+            registryFilePath: effectiveClassificationContext.localRegistry ? effectiveClassificationContext.localRegistry.filePath : null,
+            reviewOverridesPath
         },
         stats,
         parsing: buildParsingStats(finalizedDecisions),
@@ -1047,6 +1156,7 @@ async function runBuildPipeline({
         arbiter: arbiterStage.arbiter,
         deepCheck: deepCheckStage.deepCheck,
         validation: validationStage.validation,
+        manualReview: manualReviewStage.summary,
         decisions: finalizedDecisions,
         events: collector.events,
         warnings: issues.warnings,

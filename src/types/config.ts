@@ -5,10 +5,12 @@ export type ArbiterProfile = 'safe' | 'balanced' | 'aggressive';
 export type DeepCheckMode = 'auto' | 'off' | 'force';
 export type ValidationMode = 'off' | 'auto' | 'require' | 'force';
 export type RegistryMode = 'auto' | 'offline' | 'refresh' | 'pinned';
+ 
 
 export interface CliOptions {
     inputPath?: string | null;
     outputPath?: string | null;
+    serverDirName?: string | null;
     reportDir?: string | null;
     outputPolicy?: OutputPolicy | null;
     runIdPrefix?: string | null;
@@ -52,6 +54,7 @@ export interface RuntimeConfig {
     dryRun: boolean;
     inputPath: string | null;
     outputRootDir: string;
+    serverDirName: string | null;
     reportRootDir: string;
     tmpRootDir: string;
     enabledEngines: string[];

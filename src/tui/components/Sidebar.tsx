@@ -20,20 +20,30 @@ function StatusPill({ status }: { status: RunSessionStatus }): React.JSX.Element
 export function Sidebar({
     items,
     activeScreen,
+    isFocused,
     uiMode,
     runStatus,
+    showHints,
     compact,
     width,
     height
 }: {
     items: NavigationItem[];
     activeScreen: ScreenId;
+    isFocused: boolean;
     uiMode: TuiMode;
     runStatus: RunSessionStatus;
+    showHints: boolean;
     compact: boolean;
     width?: number;
     height: number;
 }): React.JSX.Element {
+    const screenSpecificHints = showHints && activeScreen === 'build'
+        ? compact
+            ? ['Enter действие в центре']
+            : ['Enter редактирует или переключает в центре']
+        : [];
+
     return (
         <Box
             flexDirection="column"
@@ -41,7 +51,7 @@ export function Sidebar({
             width={width ?? '100%'}
             height={height}
             borderStyle="round"
-            borderColor="cyan"
+            borderColor={isFocused ? 'green' : 'cyan'}
             paddingX={1}
             paddingY={1}
             minWidth={0}
@@ -59,9 +69,18 @@ export function Sidebar({
 
                         return (
                             <Box key={item.id} marginBottom={1}>
-                                <Text color={isActive ? 'greenBright' : 'white'} wrap="truncate">
-                                    {isActive ? '▸' : ' '} {index + 1}. {item.label}
-                                </Text>
+                                <Box flexDirection="row" alignItems="center" minWidth={0}>
+                                    <Box width={2} minWidth={2}>
+                                        <Text color={isActive ? 'greenBright' : 'white'}>
+                                            {isActive ? '▸' : ' '}
+                                        </Text>
+                                    </Box>
+                                    <Box flexGrow={1} minWidth={0}>
+                                        <Text color={isActive ? 'greenBright' : 'white'} wrap="truncate">
+                                            {`${index + 1}. ${item.label}`}
+                                        </Text>
+                                    </Box>
+                                </Box>
                             </Box>
                         );
                     })}
@@ -69,10 +88,19 @@ export function Sidebar({
             </Box>
 
             <Box flexDirection="column" minWidth={0}>
-                <Text dimColor wrap="truncate">←/→ разделы</Text>
-                <Text dimColor wrap="truncate">m режим</Text>
-                <Text dimColor wrap="truncate">r запуск</Text>
-                <Text dimColor wrap="truncate">Ctrl+C выход</Text>
+                {showHints ? (
+                    <>
+                        {screenSpecificHints.map((hint) => (
+                            <Text key={hint} dimColor wrap="wrap">{hint}</Text>
+                        ))}
+                        {screenSpecificHints.length > 0 ? <Text dimColor wrap="truncate"> </Text> : null}
+                        <Text dimColor wrap="truncate">←/→ столбцы</Text>
+                        <Text dimColor wrap="truncate">↑/↓ пункты в активном столбце</Text>
+                        <Text dimColor wrap="truncate">m режим</Text>
+                        <Text dimColor wrap="truncate">r запуск</Text>
+                        <Text dimColor wrap="truncate">Ctrl+C выход</Text>
+                    </>
+                ) : null}
             </Box>
         </Box>
     );

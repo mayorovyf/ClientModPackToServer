@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import { Spinner, StatusMessage } from '@inkjs/ui';
 
 import type { RunSessionState } from '../state/app-state.js';
+import { useScrollOffset } from '../hooks/use-scroll-offset.js';
 
 function getStatusVariant(status: RunSessionState['status']): 'info' | 'success' | 'error' | 'warning' {
     switch (status) {
@@ -37,17 +38,26 @@ export function RunSummary({
     session,
     compact,
     eventLimit,
+    isFocused,
     height
 }: {
     session: RunSessionState;
     compact: boolean;
     eventLimit: number;
+    isFocused: boolean;
     height: number;
 }): React.JSX.Element {
     const reviewCount = session.lastReport?.arbiter?.summary.finalDecisions.review ?? 0;
     const keptCount = session.lastReport?.stats.kept ?? 0;
     const excludedCount = session.lastReport?.stats.excluded ?? 0;
     const validationStatus = session.lastReport?.validation?.status ?? 'n/a';
+    const visibleEventLimit = Math.max(1, Math.min(eventLimit, Math.max(height - 15, 1)));
+    const { offset, hasOverflow } = useScrollOffset({
+        itemCount: session.events.length,
+        viewportSize: visibleEventLimit,
+        enabled: isFocused
+    });
+    const visibleEvents = session.events.slice(offset, offset + visibleEventLimit);
 
     return (
         <Box
@@ -95,11 +105,17 @@ export function RunSummary({
             </Box>
             <Box flexDirection="column" minWidth={0}>
                 <Text color="cyan" wrap="wrap">Последние события</Text>
-                {session.events.slice(-eventLimit).map((event) => (
+                {hasOverflow ? (
+                    <Text dimColor wrap="truncate">
+                        {`↑/↓ события | ${offset + 1}-${Math.min(offset + visibleEvents.length, session.events.length)} из ${session.events.length}`}
+                    </Text>
+                ) : null}
+                {visibleEvents.map((event) => (
                     <Text key={`${event.timestamp}-${event.type}`} dimColor wrap="wrap">
                         {event.type}
                     </Text>
                 ))}
+                {visibleEvents.length === 0 ? <Text dimColor wrap="wrap">События ещё не поступали</Text> : null}
             </Box>
         </Box>
     );

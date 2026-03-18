@@ -2,8 +2,9 @@ import type { BackendEvent } from '../../types/events.js';
 import type { RunReport } from '../../types/report.js';
 
 export type TuiMode = 'simple' | 'expert';
-export type ScreenId = 'build' | 'registry' | 'reports' | 'review' | 'settings';
+export type ScreenId = 'build' | 'registry' | 'reports' | 'review' | 'settings' | 'authors';
 export type RunSessionStatus = 'idle' | 'running' | 'succeeded' | 'failed';
+export type FocusedColumn = 'sidebar' | 'content' | 'details';
 export type RegistryMode = 'auto' | 'offline' | 'refresh' | 'pinned';
 export type ProfileMode = 'safe' | 'balanced' | 'aggressive';
 export type DeepCheckMode = 'auto' | 'off' | 'force';
@@ -18,12 +19,23 @@ export interface NavigationItem {
 export interface RunFormState {
     inputPath: string;
     outputPath: string;
+    serverDirName: string;
     reportDir: string;
+    runIdPrefix: string;
     dryRun: boolean;
     profile: ProfileMode;
     deepCheckMode: DeepCheckMode;
     validationMode: ValidationMode;
+    validationTimeoutMs: string;
+    validationEntrypointPath: string;
+    validationSaveArtifacts: boolean;
     registryMode: RegistryMode;
+    registryManifestUrl: string;
+    registryBundleUrl: string;
+    registryFilePath: string;
+    registryOverridesPath: string;
+    enabledEngineNames: string;
+    disabledEngineNames: string;
 }
 
 export interface ReportPathsState {
@@ -48,23 +60,35 @@ export interface RunSessionState {
 }
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
-    { id: 'build', label: 'Сборка', description: 'Запуск pipeline и базовые настройки' },
+    { id: 'build', label: 'Запуск', description: 'Запуск pipeline и основные параметры' },
     { id: 'registry', label: 'Registry', description: 'Источник данных, кэш и bundle' },
     { id: 'reports', label: 'Отчёты', description: 'Артефакты последнего запуска' },
     { id: 'review', label: 'Спорные', description: 'Моды со статусом review' },
-    { id: 'settings', label: 'Настройки', description: 'Режим интерфейса и справка' }
+    { id: 'settings', label: 'Настройки', description: 'Режим интерфейса и справка' },
+    { id: 'authors', label: 'Авторы', description: 'Информация об авторах проекта' }
 ];
 
 export function createDefaultRunFormState(): RunFormState {
     return {
         inputPath: '',
         outputPath: '',
+        serverDirName: '',
         reportDir: '',
+        runIdPrefix: '',
         dryRun: false,
         profile: 'balanced',
         deepCheckMode: 'auto',
         validationMode: 'auto',
-        registryMode: 'auto'
+        validationTimeoutMs: '',
+        validationEntrypointPath: '',
+        validationSaveArtifacts: false,
+        registryMode: 'auto',
+        registryManifestUrl: '',
+        registryBundleUrl: '',
+        registryFilePath: '',
+        registryOverridesPath: '',
+        enabledEngineNames: '',
+        disabledEngineNames: ''
     };
 }
 
@@ -89,11 +113,10 @@ export function createInitialRunSessionState(): RunSessionState {
     };
 }
 
-export function createRunningSessionState(previousReport: RunReport | null = null): RunSessionState {
+export function createRunningSessionState(): RunSessionState {
     return {
         ...createInitialRunSessionState(),
-        status: 'running',
-        lastReport: previousReport
+        status: 'running'
     };
 }
 

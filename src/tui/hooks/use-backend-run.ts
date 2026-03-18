@@ -1,27 +1,98 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { BackendEvent } from '../../types/events.js';
 import { applyBackendEvent, createInitialRunSessionState, createRunningSessionState } from '../state/app-state.js';
 import type { RunFormState, RunSessionState } from '../state/app-state.js';
-import { runHeadlessBackend } from '../adapters/backend-client.js';
+import { createAbortError, runHeadlessBackend } from '../adapters/backend-client.js';
+import type { BackendRunResult } from '../adapters/backend-client.js';
+
+export function isAbortError(error: unknown): boolean {
+    return error instanceof Error && error.name === 'AbortError';
+}
+
+export function formatBackendExitMessage({
+    exitCode,
+    signal
+}: {
+    exitCode: number | null;
+    signal: NodeJS.Signals | null;
+}): string {
+    if (typeof exitCode === 'number') {
+        return `Backend exited with code ${exitCode}`;
+    }
+
+    if (signal) {
+        return `Backend exited with signal ${signal}`;
+    }
+
+    return 'Backend exited unexpectedly';
+}
+
+export function finalizeSessionAfterBackendRun(previous: RunSessionState, result: BackendRunResult): RunSessionState {
+    const exitedSuccessfully = result.exitCode === 0 && result.signal === null;
+    const alreadyFailed = previous.status === 'failed';
+    const status = !alreadyFailed && exitedSuccessfully ? 'succeeded' : 'failed';
+    const lastError = status === 'succeeded'
+        ? null
+        : previous.lastError || formatBackendExitMessage(result);
+
+    return {
+        ...previous,
+        status,
+        currentStage: null,
+        lastReport: result.report,
+        reportPaths: {
+            reportDir: result.reportDir,
+            jsonReportPath: result.reportPath,
+            summaryPath: result.summaryPath,
+            eventsLogPath: result.eventsLogPath
+        },
+        lastError
+    };
+}
 
 export function useBackendRun(): {
     session: RunSessionState;
     startRun: (form: RunFormState) => Promise<void>;
+    cancelRun: () => void;
     resetSession: () => void;
 } {
     const [session, setSession] = useState<RunSessionState>(createInitialRunSessionState);
+    const activeRunControllerRef = useRef<AbortController | null>(null);
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        return () => {
+            mountedRef.current = false;
+            activeRunControllerRef.current?.abort(createAbortError());
+        };
+    }, []);
 
     async function startRun(form: RunFormState): Promise<void> {
-        setSession((previous) => createRunningSessionState(previous.lastReport));
+        if (activeRunControllerRef.current && !activeRunControllerRef.current.signal.aborted) {
+            return;
+        }
+
+        const controller = new AbortController();
+        activeRunControllerRef.current = controller;
+        setSession(createRunningSessionState());
 
         try {
             const result = await runHeadlessBackend({
                 form,
+                signal: controller.signal,
                 onEvent(event: BackendEvent) {
+                    if (!mountedRef.current || activeRunControllerRef.current !== controller) {
+                        return;
+                    }
+
                     setSession((previous) => applyBackendEvent(previous, event));
                 },
                 onStderr(line: string) {
+                    if (!mountedRef.current || activeRunControllerRef.current !== controller) {
+                        return;
+                    }
+
                     setSession((previous) => ({
                         ...previous,
                         lastError: previous.lastError || line
@@ -29,26 +100,31 @@ export function useBackendRun(): {
                 }
             });
 
-            setSession((previous) => ({
-                ...previous,
-                status: result.exitCode === 0 && previous.status !== 'failed' ? 'succeeded' : previous.status,
-                lastReport: result.report,
-                reportPaths: {
-                    reportDir: result.reportDir,
-                    jsonReportPath: result.reportPath,
-                    summaryPath: result.summaryPath,
-                    eventsLogPath: previous.reportPaths.eventsLogPath
-                },
-                lastError: result.exitCode === 0 ? previous.lastError : previous.lastError || `Backend exited with code ${result.exitCode}`
-            }));
+            if (!mountedRef.current || activeRunControllerRef.current !== controller) {
+                return;
+            }
+
+            setSession((previous) => finalizeSessionAfterBackendRun(previous, result));
         } catch (error) {
+            if (!mountedRef.current || activeRunControllerRef.current !== controller || isAbortError(error)) {
+                return;
+            }
+
             setSession((previous) => ({
                 ...previous,
                 status: 'failed',
                 currentStage: null,
                 lastError: error instanceof Error ? error.message : String(error)
             }));
+        } finally {
+            if (activeRunControllerRef.current === controller) {
+                activeRunControllerRef.current = null;
+            }
         }
+    }
+
+    function cancelRun(): void {
+        activeRunControllerRef.current?.abort(createAbortError());
     }
 
     function resetSession(): void {
@@ -58,6 +134,7 @@ export function useBackendRun(): {
     return {
         session,
         startRun,
+        cancelRun,
         resetSession
     };
 }

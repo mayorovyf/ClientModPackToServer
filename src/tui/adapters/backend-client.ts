@@ -21,7 +21,20 @@ export interface BackendRunResult {
     reportPath: string | null;
     summaryPath: string | null;
     reportDir: string | null;
+    eventsLogPath: string | null;
     stderrLines: string[];
+}
+
+interface ParsedLineBuffer {
+    lines: string[];
+    remainder: string;
+}
+
+function parseMultiValueInput(value: string): string[] {
+    return String(value || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
 }
 
 export function buildHeadlessRunnerArgs(form: RunFormState): string[] {
@@ -37,8 +50,56 @@ export function buildHeadlessRunnerArgs(form: RunFormState): string[] {
         args.push('--output', form.outputPath.trim());
     }
 
+    if (form.serverDirName.trim()) {
+        args.push('--server-dir-name', form.serverDirName.trim());
+    }
+
     if (form.reportDir.trim()) {
         args.push('--report-dir', form.reportDir.trim());
+    }
+
+    if (form.runIdPrefix.trim()) {
+        args.push('--run-id-prefix', form.runIdPrefix.trim());
+    }
+
+    if (form.validationTimeoutMs.trim()) {
+        args.push('--validation-timeout-ms', form.validationTimeoutMs.trim());
+    }
+
+    if (form.validationEntrypointPath.trim()) {
+        args.push('--validation-entrypoint', form.validationEntrypointPath.trim());
+    }
+
+    if (form.validationSaveArtifacts) {
+        args.push('--validation-save-artifacts');
+    }
+
+    if (form.registryManifestUrl.trim()) {
+        args.push('--registry-manifest-url', form.registryManifestUrl.trim());
+    }
+
+    if (form.registryBundleUrl.trim()) {
+        args.push('--registry-bundle-url', form.registryBundleUrl.trim());
+    }
+
+    if (form.registryFilePath.trim()) {
+        args.push('--registry-file', form.registryFilePath.trim());
+    }
+
+    if (form.registryOverridesPath.trim()) {
+        args.push('--registry-overrides', form.registryOverridesPath.trim());
+    }
+
+    const enabledEngines = parseMultiValueInput(form.enabledEngineNames);
+
+    if (enabledEngines.length > 0) {
+        args.push('--engine', enabledEngines.join(','));
+    }
+
+    const disabledEngines = parseMultiValueInput(form.disabledEngineNames);
+
+    if (disabledEngines.length > 0) {
+        args.push('--disable-engine', disabledEngines.join(','));
     }
 
     if (form.dryRun) {
@@ -46,6 +107,22 @@ export function buildHeadlessRunnerArgs(form: RunFormState): string[] {
     }
 
     return args;
+}
+
+export function splitBufferedLines(buffer: string): ParsedLineBuffer {
+    const parts = buffer.split(/\r?\n/);
+    const remainder = parts.pop() || '';
+
+    return {
+        lines: parts.map((line) => line.trim()).filter(Boolean),
+        remainder
+    };
+}
+
+export function createAbortError(): Error {
+    const error = new Error('Backend run aborted');
+    error.name = 'AbortError';
+    return error;
 }
 
 async function readReport(reportPath: string | null): Promise<RunReport | null> {
@@ -64,12 +141,18 @@ async function readReport(reportPath: string | null): Promise<RunReport | null> 
 export async function runHeadlessBackend({
     form,
     onEvent,
-    onStderr
+    onStderr,
+    signal
 }: {
     form: RunFormState;
     onEvent?: (event: BackendEvent) => void;
     onStderr?: (line: string) => void;
+    signal?: AbortSignal;
 }): Promise<BackendRunResult> {
+    if (signal?.aborted) {
+        throw createAbortError();
+    }
+
     const args = buildHeadlessRunnerArgs(form);
     const child = spawn(process.execPath, [tsxCliPath, backendRunnerPath, ...args], {
         cwd: path.resolve(currentDirectory, '..', '..', '..'),
@@ -83,56 +166,80 @@ export async function runHeadlessBackend({
     let reportPath: string | null = null;
     let summaryPath: string | null = null;
     let reportDir: string | null = null;
+    let eventsLogPath: string | null = null;
+
+    function handleStdoutLine(trimmed: string): void {
+        try {
+            const event = JSON.parse(trimmed) as BackendEvent;
+
+            if (event.type === 'report.written') {
+                reportPath = typeof event.payload.jsonReportPath === 'string' ? event.payload.jsonReportPath : reportPath;
+                summaryPath = typeof event.payload.summaryPath === 'string' ? event.payload.summaryPath : summaryPath;
+                reportDir = typeof event.payload.reportDir === 'string' ? event.payload.reportDir : reportDir;
+                eventsLogPath = typeof event.payload.eventsLogPath === 'string' ? event.payload.eventsLogPath : eventsLogPath;
+            }
+
+            onEvent?.(event);
+        } catch {
+            onStderr?.(`Unparsed backend output: ${trimmed}`);
+        }
+    }
+
+    function handleStderrLine(trimmed: string): void {
+        stderrLines.push(trimmed);
+        onStderr?.(trimmed);
+    }
 
     child.stdout?.on('data', (chunk: Buffer) => {
         stdoutBuffer += chunk.toString('utf8');
-        const lines = stdoutBuffer.split(/\r?\n/);
-        stdoutBuffer = lines.pop() || '';
+        const parsed = splitBufferedLines(stdoutBuffer);
+        stdoutBuffer = parsed.remainder;
 
-        for (const line of lines) {
-            const trimmed = line.trim();
-
-            if (!trimmed) {
-                continue;
-            }
-
-            try {
-                const event = JSON.parse(trimmed) as BackendEvent;
-
-                if (event.type === 'report.written') {
-                    reportPath = typeof event.payload.jsonReportPath === 'string' ? event.payload.jsonReportPath : reportPath;
-                    summaryPath = typeof event.payload.summaryPath === 'string' ? event.payload.summaryPath : summaryPath;
-                    reportDir = typeof event.payload.reportDir === 'string' ? event.payload.reportDir : reportDir;
-                }
-
-                onEvent?.(event);
-            } catch {
-                onStderr?.(`Unparsed backend output: ${trimmed}`);
-            }
+        for (const line of parsed.lines) {
+            handleStdoutLine(line);
         }
     });
 
     child.stderr?.on('data', (chunk: Buffer) => {
         stderrBuffer += chunk.toString('utf8');
-        const lines = stderrBuffer.split(/\r?\n/);
-        stderrBuffer = lines.pop() || '';
+        const parsed = splitBufferedLines(stderrBuffer);
+        stderrBuffer = parsed.remainder;
 
-        for (const line of lines) {
-            const trimmed = line.trim();
-
-            if (!trimmed) {
-                continue;
-            }
-
-            stderrLines.push(trimmed);
-            onStderr?.(trimmed);
+        for (const line of parsed.lines) {
+            handleStderrLine(line);
         }
     });
+
+    const abortChild = () => {
+        if (!child.killed) {
+            child.kill();
+        }
+    };
+
+    signal?.addEventListener('abort', abortChild, { once: true });
 
     const closeResult = await new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
         child.on('error', reject);
         child.on('close', (exitCode, signal) => resolve({ exitCode, signal }));
     });
+
+    signal?.removeEventListener('abort', abortChild);
+
+    const pendingStdout = stdoutBuffer.trim();
+
+    if (pendingStdout) {
+        handleStdoutLine(pendingStdout);
+    }
+
+    const pendingStderr = stderrBuffer.trim();
+
+    if (pendingStderr) {
+        handleStderrLine(pendingStderr);
+    }
+
+    if (signal?.aborted) {
+        throw createAbortError();
+    }
 
     return {
         ...closeResult,
@@ -140,6 +247,7 @@ export async function runHeadlessBackend({
         reportPath,
         summaryPath,
         reportDir,
+        eventsLogPath,
         stderrLines
     };
 }

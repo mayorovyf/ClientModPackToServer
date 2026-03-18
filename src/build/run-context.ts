@@ -7,7 +7,9 @@ import type { RunContext } from '../types/run';
 
 interface CreateRunContextOptions {
     inputPath: string;
+    modsPath?: string;
     outputRootDir: string;
+    serverDirName?: string | null;
     reportRootDir: string;
     tmpRootDir?: string | null;
     dryRun?: boolean;
@@ -28,9 +30,21 @@ interface CreateRunContextOptions {
     localOverridesPath?: string | null;
 }
 
+function deriveDefaultServerDirName(sourcePath: string): string {
+    const normalizedSourcePath = path.resolve(sourcePath);
+    const preferredSourcePath = path.basename(normalizedSourcePath).toLowerCase() === 'mods'
+        ? path.dirname(normalizedSourcePath)
+        : normalizedSourcePath;
+    const baseName = path.basename(preferredSourcePath).trim() || 'server';
+    const sanitized = baseName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/\.+$/g, '').trim() || 'server';
+    return `${sanitized}-server`;
+}
+
 function createRunContext({
     inputPath,
+    modsPath = inputPath,
     outputRootDir,
+    serverDirName = null,
     reportRootDir,
     tmpRootDir = null,
     dryRun = false,
@@ -53,7 +67,8 @@ function createRunContext({
     const runId = createRunId({ prefix: runIdPrefix });
     const startedAt = new Date().toISOString();
     const resolvedMode = dryRun ? 'analyze' : mode;
-    const buildDir = path.join(outputRootDir, runId);
+    const resolvedServerDirName = serverDirName || deriveDefaultServerDirName(inputPath);
+    const buildDir = path.join(outputRootDir, resolvedServerDirName);
     const buildModsDir = path.join(buildDir, 'mods');
     const reportDir = path.join(reportRootDir, runId);
     const resolvedTmpRootDir = tmpRootDir || path.join(process.cwd(), 'tmp');
@@ -61,8 +76,11 @@ function createRunContext({
     return {
         runId,
         runIdPrefix,
+        serverDirName: resolvedServerDirName,
         startedAt,
         inputPath,
+        instancePath: inputPath,
+        modsPath,
         outputRootDir,
         reportRootDir,
         tmpRootDir: resolvedTmpRootDir,

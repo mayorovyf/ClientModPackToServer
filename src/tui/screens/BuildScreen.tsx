@@ -4,105 +4,27 @@ import { TextInput } from '@inkjs/ui';
 
 import { cycleOption } from '../state/app-state.js';
 import type { RunFormState, RunSessionState, TuiMode } from '../state/app-state.js';
+import {
+    DEEP_CHECK_VALUES,
+    getRunFieldDefinitions,
+    PROFILE_VALUES,
+    REGISTRY_VALUES,
+    VALIDATION_VALUES
+} from '../state/run-fields.js';
+import type { RunFieldDefinition, RunFieldKey } from '../state/run-fields.js';
 
-type EditableField =
-    | 'inputPath'
-    | 'outputPath'
-    | 'reportDir'
-    | 'dryRun'
-    | 'profile'
-    | 'deepCheckMode'
-    | 'validationMode'
-    | 'registryMode'
-    | 'run';
+type EditableTextField = 'inputPath' | 'outputPath' | 'serverDirName' | 'reportDir';
 
-interface FieldDefinition {
-    key: EditableField;
-    label: string;
-    value: string;
-    kind: 'text' | 'toggle' | 'enum' | 'action';
-    description: string;
-}
-
-const PROFILE_VALUES = ['safe', 'balanced', 'aggressive'] as const;
-const DEEP_CHECK_VALUES = ['auto', 'off', 'force'] as const;
-const VALIDATION_VALUES = ['off', 'auto', 'require', 'force'] as const;
-const REGISTRY_VALUES = ['auto', 'offline', 'refresh', 'pinned'] as const;
-
-function buildFields(form: RunFormState, uiMode: TuiMode, isRunning: boolean): FieldDefinition[] {
-    const baseFields: FieldDefinition[] = [
-        {
-            key: 'inputPath',
-            label: 'Папка mods',
-            value: form.inputPath || '<не указана>',
-            kind: 'text',
-            description: 'Главная входная директория с модами'
-        },
-        {
-            key: 'outputPath',
-            label: 'Папка build',
-            value: form.outputPath || '<по умолчанию>',
-            kind: 'text',
-            description: 'Куда писать серверную сборку'
-        },
-        {
-            key: 'reportDir',
-            label: 'Папка reports',
-            value: form.reportDir || '<по умолчанию>',
-            kind: 'text',
-            description: 'Куда писать отчёты run'
-        },
-        {
-            key: 'dryRun',
-            label: 'Dry-run',
-            value: form.dryRun ? 'on' : 'off',
-            kind: 'toggle',
-            description: 'Только анализ без создания build output'
-        }
-    ];
-
-    if (uiMode === 'expert') {
-        baseFields.push(
-            {
-                key: 'profile',
-                label: 'Arbiter profile',
-                value: form.profile,
-                kind: 'enum',
-                description: 'safe / balanced / aggressive'
-            },
-            {
-                key: 'deepCheckMode',
-                label: 'Deep-check',
-                value: form.deepCheckMode,
-                kind: 'enum',
-                description: 'auto / off / force'
-            },
-            {
-                key: 'validationMode',
-                label: 'Validation',
-                value: form.validationMode,
-                kind: 'enum',
-                description: 'off / auto / require / force'
-            },
-            {
-                key: 'registryMode',
-                label: 'Registry mode',
-                value: form.registryMode,
-                kind: 'enum',
-                description: 'auto / offline / refresh / pinned'
-            }
-        );
+function formatRunListValue(value: string, maxLength = 24): string {
+    if (value.length <= maxLength) {
+        return value;
     }
 
-    baseFields.push({
-        key: 'run',
-        label: isRunning ? 'Pipeline выполняется' : 'Запустить pipeline',
-        value: isRunning ? 'busy' : 'ready',
-        kind: 'action',
-        description: 'Enter запускает headless backend runner'
-    });
+    if (value.includes('\\') || value.includes('/') || value.startsWith('http')) {
+        return `...${value.slice(-(maxLength - 3))}`;
+    }
 
-    return baseFields;
+    return `${value.slice(0, maxLength - 3)}...`;
 }
 
 function getVisibleFieldWindow(total: number, selectedIndex: number, maxVisible: number): { start: number; end: number } {
@@ -129,6 +51,8 @@ export function BuildScreen({
     onChange,
     onRun,
     onInteractionChange,
+    onSelectedFieldChange,
+    isFocused,
     compact,
     height
 }: {
@@ -138,13 +62,15 @@ export function BuildScreen({
     onChange: (nextForm: RunFormState) => void;
     onRun: () => void;
     onInteractionChange: (isLocked: boolean) => void;
+    onSelectedFieldChange: (fieldKey: RunFieldKey) => void;
+    isFocused: boolean;
     compact: boolean;
     height: number;
 }): React.JSX.Element {
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [editingField, setEditingField] = useState<Exclude<EditableField, 'run' | 'dryRun' | 'profile' | 'deepCheckMode' | 'validationMode' | 'registryMode'> | null>(null);
+    const [editingField, setEditingField] = useState<EditableTextField | null>(null);
     const [draftValue, setDraftValue] = useState('');
-    const fields = buildFields(form, uiMode, session.status === 'running');
+    const fields = getRunFieldDefinitions(form, uiMode, session.status === 'running');
     const selectedField = fields[selectedIndex] || fields[0];
 
     useEffect(() => {
@@ -155,7 +81,17 @@ export function BuildScreen({
         setSelectedIndex((current) => Math.min(current, Math.max(fields.length - 1, 0)));
     }, [fields.length]);
 
+    useEffect(() => {
+        if (selectedField) {
+            onSelectedFieldChange(selectedField.key);
+        }
+    }, [onSelectedFieldChange, selectedField]);
+
     useInput((_input, key) => {
+        if (!isFocused) {
+            return;
+        }
+
         if (editingField) {
             if (key.escape) {
                 setEditingField(null);
@@ -182,6 +118,7 @@ export function BuildScreen({
         switch (selectedField.key) {
             case 'inputPath':
             case 'outputPath':
+            case 'serverDirName':
             case 'reportDir':
                 setEditingField(selectedField.key);
                 setDraftValue(form[selectedField.key]);
@@ -226,9 +163,9 @@ export function BuildScreen({
         }
     });
 
-    const contentLines = Math.max(6, height - 2);
+    const contentLines = Math.max(6, height - 4);
     const headerLines = 3;
-    const footerLines = (editingField ? 3 : 0) + (session.lastError ? 1 : 0);
+    const footerLines = editingField ? 4 : 0;
     const viewportLines = Math.max(2, contentLines - headerLines - footerLines);
     const linesPerField = 2;
     const visibleFieldCount = Math.max(1, Math.floor(viewportLines / linesPerField));
@@ -237,6 +174,7 @@ export function BuildScreen({
         [fields.length, selectedIndex, visibleFieldCount]
     );
     const visibleFields = fields.slice(windowRange.start, windowRange.end);
+    const listHeight = visibleFieldCount * linesPerField;
 
     return (
         <Box
@@ -244,62 +182,70 @@ export function BuildScreen({
             width="100%"
             height={height}
             borderStyle="round"
-            borderColor="yellow"
+            borderColor={isFocused ? 'green' : 'yellow'}
             paddingX={1}
             paddingY={1}
             minWidth={0}
         >
-            <Text color="yellowBright">Сборка</Text>
-            <Text dimColor wrap="truncate">
-                {compact ? '↑/↓ выбор, Enter действие' : '↑/↓ выбирают поле, Enter редактирует или переключает значение'}
-            </Text>
+            <Text color="yellowBright">Запуск</Text>
             <Text dimColor wrap="truncate">
                 {`Поля ${windowRange.start + 1}-${windowRange.end} из ${fields.length}`}
             </Text>
 
-            <Box marginTop={1} flexDirection="column" flexGrow={1} minWidth={0}>
+            <Box marginTop={1} flexDirection="column" height={listHeight} minWidth={0}>
                 {visibleFields.map((field, index) => {
                     const actualIndex = windowRange.start + index;
                     const isSelected = actualIndex === selectedIndex;
+                    const displayValue = formatRunListValue(field.value);
 
                     return (
                         <Box key={field.key} flexDirection="column" minWidth={0}>
-                            <Text color={isSelected ? 'greenBright' : 'white'} wrap="truncate">
-                                {isSelected ? '▸' : ' '} {field.label}: {field.value}
-                            </Text>
-                            <Text dimColor wrap="truncate">{field.description}</Text>
+                            <Box width="100%" minWidth={0}>
+                                <Box flexDirection="row" flexGrow={1} minWidth={0}>
+                                    <Box width={2} minWidth={2}>
+                                        <Text color={isSelected ? 'greenBright' : 'white'}>
+                                            {isSelected ? '▸' : ' '}
+                                        </Text>
+                                    </Box>
+                                    <Box flexGrow={1} minWidth={0}>
+                                        <Text color={isSelected ? 'greenBright' : 'white'} wrap="truncate">
+                                            {field.label}
+                                        </Text>
+                                    </Box>
+                                </Box>
+                                <Box marginLeft={1} flexShrink={0} minWidth={0}>
+                                    <Text color={isSelected ? 'cyanBright' : 'gray'} wrap="truncate">
+                                        {displayValue}
+                                    </Text>
+                                </Box>
+                            </Box>
+                            <Box paddingLeft={2} minWidth={0}>
+                                <Text dimColor wrap="truncate">{field.description}</Text>
+                            </Box>
                         </Box>
                     );
                 })}
             </Box>
 
-            {editingField || session.lastError ? (
+            {editingField ? (
                 <Box flexDirection="column" minWidth={0}>
-                    {editingField ? (
-                        <Box marginTop={1} flexDirection="column" minWidth={0}>
-                            <Text wrap="truncate">Введите новое значение для {editingField} и нажмите Enter:</Text>
-                            <TextInput
-                                defaultValue={draftValue}
-                                placeholder="Введите путь..."
-                                onChange={setDraftValue}
-                                onSubmit={(value) => {
-                                    onChange({
-                                        ...form,
-                                        [editingField]: value
-                                    });
-                                    setEditingField(null);
-                                    setDraftValue('');
-                                }}
-                            />
-                            <Text dimColor wrap="truncate">Esc отменяет редактирование</Text>
-                        </Box>
-                    ) : null}
-
-                    {session.lastError ? (
-                        <Box marginTop={1}>
-                            <Text color="red" wrap="truncate">Ошибка: {session.lastError}</Text>
-                        </Box>
-                    ) : null}
+                    <Box marginTop={1} flexDirection="column" minWidth={0}>
+                        <Text wrap="truncate">Введите новое значение и нажмите Enter:</Text>
+                        <TextInput
+                            defaultValue={draftValue}
+                            placeholder="Введите значение..."
+                            onChange={setDraftValue}
+                            onSubmit={(value) => {
+                                onChange({
+                                    ...form,
+                                    [editingField]: value
+                                });
+                                setEditingField(null);
+                                setDraftValue('');
+                            }}
+                        />
+                        <Text dimColor wrap="truncate">Esc отменяет редактирование</Text>
+                    </Box>
                 </Box>
             ) : null}
         </Box>

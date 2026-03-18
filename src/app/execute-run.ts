@@ -5,7 +5,7 @@ import type { RunReport } from '../types/report';
 import type { RunContext } from '../types/run';
 
 interface ExecuteRunParams {
-    inputPath: string;
+    modsPath: string;
     classificationContext: ClassificationContextLike;
     runContext: RunContext;
     runLogger: PreparedRun['runLogger'];
@@ -13,14 +13,14 @@ interface ExecuteRunParams {
 }
 
 async function executeRun({
-    inputPath,
+    modsPath,
     classificationContext,
     runContext,
     runLogger,
     progressReporter = null
 }: ExecuteRunParams): Promise<RunReport> {
     return runBuildPipeline({
-        modsPath: inputPath,
+        modsPath,
         classificationContext,
         runContext,
         logger: runLogger,

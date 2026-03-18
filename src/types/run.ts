@@ -10,6 +10,8 @@ import type {
 
 export interface RunPaths {
     inputPath: string;
+    instancePath: string;
+    modsPath: string;
     outputRootDir: string;
     reportRootDir: string;
     tmpRootDir: string;
@@ -25,6 +27,7 @@ export interface RunPaths {
 export interface RunContext extends RunPaths {
     runId: string;
     runIdPrefix: string;
+    serverDirName: string | null;
     startedAt: string;
     dryRun: boolean;
     mode: RunMode;

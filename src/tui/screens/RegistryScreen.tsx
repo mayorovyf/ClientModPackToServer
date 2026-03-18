@@ -8,11 +8,13 @@ export function RegistryScreen({
     form,
     session,
     compact,
+    isFocused,
     height
 }: {
     form: RunFormState;
     session: RunSessionState;
     compact: boolean;
+    isFocused: boolean;
     height: number;
 }): React.JSX.Element {
     const registry = session.lastReport?.registry || null;
@@ -24,7 +26,7 @@ export function RegistryScreen({
             width="100%"
             height={height}
             borderStyle="round"
-            borderColor="blue"
+            borderColor={isFocused ? 'green' : 'blue'}
             paddingX={1}
             paddingY={1}
             minWidth={0}
@@ -52,10 +54,18 @@ export function RegistryScreen({
             </Box>
             <Box marginTop={1} flexDirection={compact ? 'column' : 'row'}>
                 <Badge color="cyan">{`Rules ${registry?.effectiveRuleCount || 0}`}</Badge>
-                {!compact ? <Text> </Text> : null}
-                <Badge color="yellow">{`Warnings ${registry?.warnings.length || 0}`}</Badge>
-                {!compact ? <Text> </Text> : null}
-                <Badge color="red">{`Errors ${registry?.errors.length || 0}`}</Badge>
+                {compact ? null : (
+                    <Box marginLeft={1}>
+                        <Badge color="yellow">{`Warnings ${registry?.warnings.length || 0}`}</Badge>
+                    </Box>
+                )}
+                {compact ? null : (
+                    <Box marginLeft={1}>
+                        <Badge color="red">{`Errors ${registry?.errors.length || 0}`}</Badge>
+                    </Box>
+                )}
+                {compact ? <Badge color="yellow">{`Warnings ${registry?.warnings.length || 0}`}</Badge> : null}
+                {compact ? <Badge color="red">{`Errors ${registry?.errors.length || 0}`}</Badge> : null}
             </Box>
         </Box>
     );

@@ -89,6 +89,8 @@ export interface LoadRuntimeStateResult {
 
 export interface PreparedRun extends LoadRuntimeStateResult {
     inputPath: string;
+    instancePath: string;
+    modsPath: string;
     runContext: RunContext;
     runLogger: ApplicationLogger;
 }

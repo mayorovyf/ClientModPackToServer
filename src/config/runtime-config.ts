@@ -56,6 +56,7 @@ interface DefaultConfigShape {
     deepCheckMode: DeepCheckMode;
     validationMode: ValidationMode;
     validationTimeoutMs: number;
+    serverDirName: string | null;
     registryMode: RegistryMode;
     registryManifestUrl: string | null;
     registryBundleUrl: string | null;
@@ -93,6 +94,7 @@ const DEFAULT_CONFIG: Readonly<DefaultConfigShape> = Object.freeze({
     deepCheckMode: DEEP_CHECK_MODES.auto,
     validationMode: 'auto',
     validationTimeoutMs: DEFAULT_VALIDATION_TIMEOUT_MS,
+    serverDirName: null,
     registryMode: REGISTRY_RUNTIME_MODES.auto,
     registryManifestUrl: process.env.CLIENT_TO_SERVER_REGISTRY_MANIFEST_URL || null,
     registryBundleUrl: process.env.CLIENT_TO_SERVER_REGISTRY_BUNDLE_URL || null,
@@ -224,6 +226,32 @@ function normalizeValidationTimeout(value: number | string | null | undefined): 
     return normalized;
 }
 
+function normalizeServerDirName(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
+    const normalized = String(value).trim();
+
+    if (!normalized) {
+        return null;
+    }
+
+    if (normalized === '.' || normalized === '..') {
+        throw new RunConfigurationError('Имя серверной папки не может быть "." или ".."');
+    }
+
+    if (/[\\/]/.test(normalized)) {
+        throw new RunConfigurationError('Имя серверной папки должно быть именем каталога, а не путём');
+    }
+
+    if (/[<>:"|?*\x00-\x1f]/.test(normalized)) {
+        throw new RunConfigurationError('Имя серверной папки содержит недопустимые символы');
+    }
+
+    return normalized;
+}
+
 function createRuntimeConfig({
     scriptDir = process.cwd(),
     cliOptions = {}
@@ -235,6 +263,7 @@ function createRuntimeConfig({
     const dryRun = Boolean(cliOptions.dryRun || mode === 'analyze');
     const inputPath = resolveOptionalPath(cliOptions.inputPath);
     const outputRootDir = resolveOptionalPath(cliOptions.outputPath) || path.join(scriptDir, DEFAULT_CONFIG.buildDirName);
+    const serverDirName = normalizeServerDirName(cliOptions.serverDirName || DEFAULT_CONFIG.serverDirName);
     const reportRootDir = resolveOptionalPath(cliOptions.reportDir) || path.join(scriptDir, DEFAULT_CONFIG.reportDirName);
     const outputPolicy = normalizeOutputPolicy(cliOptions.outputPolicy || DEFAULT_CONFIG.outputPolicy);
     const runIdPrefix = normalizeRunIdPrefix(cliOptions.runIdPrefix || DEFAULT_CONFIG.runIdPrefix);
@@ -284,6 +313,7 @@ function createRuntimeConfig({
         interactive: !inputPath,
         inputPath,
         outputRootDir,
+        serverDirName,
         reportRootDir,
         tmpRootDir,
         outputPolicy,
@@ -318,6 +348,7 @@ module.exports = {
     normalizeMode,
     normalizeOutputPolicy,
     normalizeProfile,
+    normalizeServerDirName,
     normalizeValidation,
     normalizeOptionalUrl,
     normalizeRunIdPrefix

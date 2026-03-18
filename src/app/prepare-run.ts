@@ -1,4 +1,5 @@
 const { createRunContext } = require('../build/run-context');
+const { resolveInstanceLayout } = require('../io/instance-folder');
 const { loadRuntimeState } = require('./load-runtime-state');
 
 import type { PreparedRun, ApplicationLogger, ClassificationContextLike, RegistryRuntimeBundle } from '../types/app';
@@ -7,6 +8,8 @@ import type { RunContext } from '../types/run';
 
 interface LogPreparedRunParams {
     inputPath: string;
+    instancePath: string;
+    modsPath: string;
     runContext: RunContext;
     classificationContext: ClassificationContextLike;
     registryRuntime: RegistryRuntimeBundle;
@@ -21,12 +24,16 @@ interface PrepareRunParams {
 
 function logPreparedRun({
     inputPath,
+    instancePath,
+    modsPath,
     runContext,
     classificationContext,
     registryRuntime,
     logger
 }: LogPreparedRunParams): void {
-    logger.info(`Путь: ${inputPath}`);
+    logger.info(`Вход: ${inputPath}`);
+    logger.info(`Инстанс: ${instancePath}`);
+    logger.info(`Папка mods: ${modsPath}`);
     logger.info(`Режим: ${runContext.mode}`);
     logger.info(`Build output: ${runContext.buildDir}`);
     logger.info(`Report output: ${runContext.reportDir}`);
@@ -44,9 +51,12 @@ function logPreparedRun({
 }
 
 async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Promise<PreparedRun> {
+    const instanceLayout = resolveInstanceLayout(inputPath);
     const runContext = createRunContext({
-        inputPath,
+        inputPath: instanceLayout.instancePath,
+        modsPath: instanceLayout.modsPath,
         outputRootDir: config.outputRootDir,
+        serverDirName: config.serverDirName,
         reportRootDir: config.reportRootDir,
         tmpRootDir: config.tmpRootDir,
         dryRun: config.dryRun,
@@ -75,6 +85,8 @@ async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Prom
 
     logPreparedRun({
         inputPath,
+        instancePath: instanceLayout.instancePath,
+        modsPath: instanceLayout.modsPath,
         runContext,
         classificationContext: runtimeState.classificationContext,
         registryRuntime: runtimeState.registryRuntime,
@@ -83,6 +95,8 @@ async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Prom
 
     return {
         inputPath,
+        instancePath: instanceLayout.instancePath,
+        modsPath: instanceLayout.modsPath,
         runContext,
         runLogger,
         ...runtimeState

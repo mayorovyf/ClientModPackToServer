@@ -23,11 +23,25 @@ export interface ReportEvent {
 
 export interface ReportDecisionSummary {
     fileName: string;
+    displayName?: string | null;
+    modIds?: string[];
     reason: string;
     decisionOrigin: string | null;
     requiresReview: boolean;
     finalSemanticDecision: string | null;
     finalConfidence: string | null;
+    finalDecisionOrigin?: string | null;
+    manualReviewKey?: string | null;
+    manualOverrideAction?: 'keep' | 'exclude' | null;
+    manualOverrideReason?: string | null;
+    manualOverrideUpdatedAt?: string | null;
+    descriptor?: {
+        fileName?: string;
+        loader?: string;
+        modIds?: string[];
+        displayName?: string | null;
+        version?: string | null;
+    } | null;
 }
 
 export interface RunReport {
@@ -36,6 +50,7 @@ export interface RunReport {
         registrySource?: string;
         registryVersion?: string;
         registryFilePath?: string | null;
+        reviewOverridesPath?: string | null;
     };
     stats: {
         totalJarFiles: number;
@@ -83,6 +98,13 @@ export interface RunReport {
     };
     validation?: ValidationResult;
     registry?: RegistryRuntimeState;
+    manualReview?: {
+        overridesPath: string | null;
+        totalEntries: number;
+        appliedOverrides: number;
+        kept: number;
+        excluded: number;
+    };
     decisions?: ReportDecisionSummary[];
     warnings: ReportIssue[];
     errors: ReportIssue[];

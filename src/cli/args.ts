@@ -5,7 +5,9 @@ import type { CliOptions } from '../types/config';
 type ValueFlag =
     | '--input'
     | '--output'
+    | '--server-dir-name'
     | '--report-dir'
+    | '--run-id-prefix'
     | '--mode'
     | '--registry-file'
     | '--registry-overrides'
@@ -24,7 +26,9 @@ type BooleanFlag = '--dry-run' | '--help' | '--validation-save-artifacts';
 interface ParsedCliOptions {
     inputPath: string | null;
     outputPath: string | null;
+    serverDirName: string | null;
     reportDir: string | null;
+    runIdPrefix: string | null;
     mode: CliOptions['mode'];
     registryFilePath: string | null;
     registryOverridesPath: string | null;
@@ -46,7 +50,9 @@ interface ParsedCliOptions {
 const VALUE_FLAGS = new Set<ValueFlag>([
     '--input',
     '--output',
+    '--server-dir-name',
     '--report-dir',
+    '--run-id-prefix',
     '--mode',
     '--registry-file',
     '--registry-overrides',
@@ -89,7 +95,9 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
     const options: ParsedCliOptions = {
         inputPath: null,
         outputPath: null,
+        serverDirName: null,
         reportDir: null,
+        runIdPrefix: null,
         mode: null,
         registryFilePath: null,
         registryOverridesPath: null,
@@ -164,8 +172,14 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
             case '--output':
                 options.outputPath = resolvedValue;
                 break;
+            case '--server-dir-name':
+                options.serverDirName = resolvedValue;
+                break;
             case '--report-dir':
                 options.reportDir = resolvedValue;
+                break;
+            case '--run-id-prefix':
+                options.runIdPrefix = resolvedValue;
                 break;
             case '--mode':
                 options.mode = resolvedValue as ParsedCliOptions['mode'];
@@ -210,7 +224,7 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
 
 function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('Usage:');
-    logger.raw('  node index.js [--input <path>] [--output <dir>] [--report-dir <dir>] [--dry-run] [--mode <build|analyze>]');
+    logger.raw('  node index.js [--input <instance-path>] [--output <build-root>] [--server-dir-name <name>] [--report-dir <dir>] [--run-id-prefix <prefix>] [--dry-run] [--mode <build|analyze>]');
     logger.raw('                [--engine <name>] [--disable-engine <name>] [--registry-file <path>] [--registry-overrides <path>]');
     logger.raw('                [--registry-mode <auto|offline|refresh|pinned>] [--registry-manifest-url <url>] [--registry-bundle-url <url>]');
     logger.raw('                [--profile <safe|balanced|aggressive>] [--deep-check <auto|off|force>]');
@@ -218,9 +232,11 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('                [--validation-save-artifacts]');
     logger.raw('');
     logger.raw('Options:');
-    logger.raw('  --input            Path to the mods directory');
-    logger.raw('  --output           Root directory for build results');
+    logger.raw('  --input            Path to the instance directory that contains mods/');
+    logger.raw('  --output           Root directory where server build folders are created');
+    logger.raw('  --server-dir-name  Name of the final server build directory');
     logger.raw('  --report-dir       Root directory for run reports');
+    logger.raw('  --run-id-prefix    Prefix for generated run identifiers and report folders');
     logger.raw('  --dry-run          Analyze only and write reports without creating build output');
     logger.raw('  --mode             build or analyze');
     logger.raw('  --engine           Enable a classification engine (repeatable)');
