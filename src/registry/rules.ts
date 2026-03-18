@@ -180,8 +180,10 @@ function normalizeRegistryDocument(parsed: unknown, {
         }))
         : [];
 
+    const schemaVersion = normalizedDocument.schemaVersion;
+
     return createRegistrySnapshot({
-        schemaVersion: normalizedDocument.schemaVersion as number | string | undefined,
+        ...(schemaVersion !== undefined ? { schemaVersion: schemaVersion as number | string } : {}),
         registryVersion: String(normalizedDocument.registryVersion || registryVersion || 'unversioned'),
         generatedAt: normalizedDocument.generatedAt ? String(normalizedDocument.generatedAt) : generatedAt,
         filePath,

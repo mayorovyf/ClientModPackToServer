@@ -33,7 +33,7 @@ export interface CliOptions {
 export interface RuntimeConfig {
     scriptDir: string;
     historyDirName: string;
-    blockListFileName: string;
+    blockListRelativePath: string;
     buildDirName: string;
     reportDirName: string;
     tmpDirName: string;

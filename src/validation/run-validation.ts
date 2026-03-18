@@ -241,9 +241,10 @@ async function runValidationStage({
 
     if (!policy.shouldRun) {
         const report = policy.report || createSkippedValidation(runContext.validationMode, 'Validation skipped by runtime policy');
+        const firstError = report.errors[0];
 
         if (report.status === VALIDATION_STATUSES.error) {
-            record('error', 'validation-error', report.errors[0].message);
+            record('error', 'validation-error', firstError ? firstError.message : 'Validation stage failed');
         } else {
             record('warn', 'validation-skip', report.skipReason || 'Validation skipped');
         }

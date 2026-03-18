@@ -21,7 +21,7 @@ type ValueFlag =
 type MultiValueFlag = '--engine' | '--disable-engine';
 type BooleanFlag = '--dry-run' | '--help' | '--validation-save-artifacts';
 
-interface ParsedCliOptions extends CliOptions {
+interface ParsedCliOptions {
     inputPath: string | null;
     outputPath: string | null;
     reportDir: string | null;
@@ -110,6 +110,11 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
 
     for (let index = 0; index < argv.length; index += 1) {
         const token = argv[index];
+
+        if (!token) {
+            continue;
+        }
+
         const { key, value } = splitFlag(token);
 
         if (BOOLEAN_FLAGS.has(key as BooleanFlag)) {

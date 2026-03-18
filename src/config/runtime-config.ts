@@ -32,7 +32,7 @@ import type {
 
 interface DefaultConfigShape {
     historyDirName: string;
-    blockListFileName: string;
+    blockListRelativePath: string;
     buildDirName: string;
     reportDirName: string;
     tmpDirName: string;
@@ -69,7 +69,7 @@ type RuntimeCliOptions = CliOptions & {
 
 const DEFAULT_CONFIG: Readonly<DefaultConfigShape> = Object.freeze({
     historyDirName: 'history',
-    blockListFileName: 'block.txt',
+    blockListRelativePath: path.join('data', 'block.txt'),
     buildDirName: 'build',
     reportDirName: 'reports',
     tmpDirName: 'tmp',
@@ -305,7 +305,7 @@ function createRuntimeConfig({
         registryFilePath,
         registryFileRequired: Boolean(cliOptions.registryFilePath),
         localOverridesPath,
-        blockListPath: path.join(scriptDir, DEFAULT_CONFIG.blockListFileName),
+        blockListPath: path.join(scriptDir, DEFAULT_CONFIG.blockListRelativePath),
         historyDir: path.join(scriptDir, DEFAULT_CONFIG.historyDirName)
     };
 }

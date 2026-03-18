@@ -10,9 +10,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "dev:cli": "tsx index.js",
+    "dev:cli": "tsx src/cli/main.ts",
     "dev:backend": "tsx src/backend/headless-runner.ts",
-    "dev:tui": "node -e \"console.error('TUI entrypoint is not implemented yet'); process.exit(1)\"",
+    "dev:tui": "tsx src/tui/main.tsx",
     "build": "tsc -p tsconfig.build.json",
     "test": "node --require tsx/cjs --test --test-concurrency=1 --test-isolation=none",
     "typecheck": "tsc -p tsconfig.json --noEmit",

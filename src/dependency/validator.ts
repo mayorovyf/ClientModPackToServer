@@ -21,9 +21,14 @@ function createFindingStore(decisions: Array<Record<string, any>>) {
 
     return {
         add(fileName: string, finding: DependencyFinding) {
-            if (!findingsByFile[fileName]) {
+            let fileFindings = findingsByFile[fileName];
+            let seenKeys = seenByFile[fileName];
+
+            if (!fileFindings || !seenKeys) {
                 findingsByFile[fileName] = [];
                 seenByFile[fileName] = new Set();
+                fileFindings = findingsByFile[fileName];
+                seenKeys = seenByFile[fileName];
             }
 
             const key = [
@@ -35,12 +40,16 @@ function createFindingStore(decisions: Array<Record<string, any>>) {
                 finding.requiredByFileName
             ].join('|');
 
-            if (seenByFile[fileName].has(key)) {
+            if (!fileFindings || !seenKeys) {
                 return;
             }
 
-            seenByFile[fileName].add(key);
-            findingsByFile[fileName].push(finding);
+            if (seenKeys.has(key)) {
+                return;
+            }
+
+            seenKeys.add(key);
+            fileFindings.push(finding);
         },
         all() {
             return Object.values(findingsByFile).flat();
@@ -107,6 +116,11 @@ function buildPreservationReason(findings: DependencyFinding[]): string | null {
 
     if (preservedFindings.length === 1) {
         const finding = preservedFindings[0];
+
+        if (!finding) {
+            return null;
+        }
+
         return `Dependency validation preserved this jar because ${finding.requiredByFileName} requires ${finding.modId}`;
     }
 
@@ -225,6 +239,10 @@ function runDependencyValidation({
             if (edge.resolution === GRAPH_RESOLUTIONS.unique) {
                 const providerFileName = edge.providerFileNames[0];
 
+                if (!providerFileName) {
+                    continue;
+                }
+
                 if (effectiveDecisionByFile[providerFileName] !== 'keep') {
                     findings.add(
                         node.fileName,
@@ -285,6 +303,10 @@ function runDependencyValidation({
 
             if (edge.resolution === GRAPH_RESOLUTIONS.unique) {
                 const providerFileName = edge.providerFileNames[0];
+
+                if (!providerFileName) {
+                    continue;
+                }
 
                 if (effectiveDecisionByFile[providerFileName] !== 'keep') {
                     findings.add(

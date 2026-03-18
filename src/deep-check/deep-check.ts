@@ -160,13 +160,15 @@ function applyMixins(state: any, mixins: DeepCheckResult['analysis']['mixins']):
         return;
     }
 
-    if (mixins.clientTargetHits.length > 0) {
+    const firstClientTargetHit = mixins.clientTargetHits[0];
+
+    if (firstClientTargetHit) {
         addScore(
             state,
             'remove',
             3,
             'Mixin analysis found explicit client-side targets',
-            buildEvidence('mixins', mixins.clientTargetHits[0], 'mixin-target')
+            buildEvidence('mixins', firstClientTargetHit, 'mixin-target')
         );
     }
 
@@ -196,43 +198,48 @@ function applyArchiveContent(state: any, archiveContent: DeepCheckResult['analys
         return;
     }
 
-    if (archiveContent.strongClientNamespaceHits.length > 0) {
+    const firstStrongClientHit = archiveContent.strongClientNamespaceHits[0];
+    const firstWeakClientHit = archiveContent.weakClientPathHits[0];
+    const firstClientResourceHit = archiveContent.clientResourceHits[0];
+    const firstServerSafeHit = archiveContent.serverSafeHits[0];
+
+    if (firstStrongClientHit) {
         addScore(
             state,
             'remove',
             4,
             'Archive entries reference strong client namespaces',
-            buildEvidence('archive', archiveContent.strongClientNamespaceHits[0], 'archive-content')
+            buildEvidence('archive', firstStrongClientHit, 'archive-content')
         );
     }
 
-    if (archiveContent.weakClientPathHits.length > 0) {
+    if (firstWeakClientHit) {
         addScore(
             state,
             'remove',
             1,
             'Archive entries contain weak client-oriented paths',
-            buildEvidence('archive', archiveContent.weakClientPathHits[0], 'archive-content')
+            buildEvidence('archive', firstWeakClientHit, 'archive-content')
         );
     }
 
-    if (archiveContent.clientResourceHits.length > 0) {
+    if (firstClientResourceHit) {
         addScore(
             state,
             'remove',
             1,
             'Archive resources include client-facing assets',
-            buildEvidence('archive-resource', archiveContent.clientResourceHits[0], 'archive-content')
+            buildEvidence('archive-resource', firstClientResourceHit, 'archive-content')
         );
     }
 
-    if (archiveContent.serverSafeHits.length > 0) {
+    if (firstServerSafeHit) {
         addScore(
             state,
             'keep',
             2,
             'Archive entries include dedicated/server-safe paths',
-            buildEvidence('archive', archiveContent.serverSafeHits[0], 'archive-content')
+            buildEvidence('archive', firstServerSafeHit, 'archive-content')
         );
     }
 }

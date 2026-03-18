@@ -1,21 +1,40 @@
-﻿.idea/
-.vscode/
-node_modules/
-history/
-dist/
-build/
-!src/build
-docs/
-tests/
-.cache/
+# Состояние IDE и редакторов
+/.idea/
+/.vscode/
+
+# Зависимости
+/node_modules/
+
+# Сгенерированные артефакты сборки и рантайма
+/build/
+/dist/
+/history/
+/cache/
+/reports/
+/tmp/
+/.cache/
+/docs/
+/tests/
+
+# Кеши TypeScript и инструментов
+*.tsbuildinfo
+coverage/
+
+# Логи и временные файлы
 *.log
 *.tmp
 *.bak
+*.orig
+*.rej
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Служебные файлы ОС
 Thumbs.db
 .DS_Store
-cache/
-reports/
-tmp/
 
-data/*.local.*
-data/local-overrides.json
+# Локальные и приватные переопределения данных
+/data/*.local.*
+/data/local-overrides.json

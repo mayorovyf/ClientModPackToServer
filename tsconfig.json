@@ -4,10 +4,13 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
     "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "useUnknownInCatchVariables": true,
     "noEmitOnError": true,
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
@@ -16,12 +19,8 @@
     "types": ["node"]
   },
   "include": [
-    "index.js",
-    "src/**/*.js",
     "src/**/*.ts",
-    "src/**/*.tsx",
-    "tests/**/*.js",
-    "tests/**/*.ts"
+    "src/**/*.tsx"
   ],
   "exclude": [
     "dist",

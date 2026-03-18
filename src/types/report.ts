@@ -21,6 +21,15 @@ export interface ReportEvent {
     message: string;
 }
 
+export interface ReportDecisionSummary {
+    fileName: string;
+    reason: string;
+    decisionOrigin: string | null;
+    requiresReview: boolean;
+    finalSemanticDecision: string | null;
+    finalConfidence: string | null;
+}
+
 export interface RunReport {
     run: RunContext & {
         enabledEngines?: string[];
@@ -74,6 +83,7 @@ export interface RunReport {
     };
     validation?: ValidationResult;
     registry?: RegistryRuntimeState;
+    decisions?: ReportDecisionSummary[];
     warnings: ReportIssue[];
     errors: ReportIssue[];
     events: ReportEvent[];

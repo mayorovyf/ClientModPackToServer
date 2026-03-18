@@ -79,9 +79,9 @@ async function runCli(config: RuntimeConfig, logger: ApplicationLogger) {
     });
 }
 
-async function main(): Promise<void> {
+async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     const scriptDir = path.resolve(__dirname, '..', '..');
-    const cliOptions = parseCliArgs(process.argv.slice(2));
+    const cliOptions = parseCliArgs(argv);
     const config = createRuntimeConfig({ scriptDir, cliOptions });
     const logger = createLogger({
         useColors: config.useColors,
@@ -109,3 +109,7 @@ module.exports = {
     resolveInputPath,
     runCli
 };
+
+if (require.main === module) {
+    void main();
+}

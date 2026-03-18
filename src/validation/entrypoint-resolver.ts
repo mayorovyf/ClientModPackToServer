@@ -174,6 +174,10 @@ function resolveValidationEntrypoint({
 
     const bestCandidate = candidates[0];
 
+    if (!bestCandidate) {
+        return null;
+    }
+
     return {
         path: bestCandidate.path,
         originalPath: bestCandidate.path,

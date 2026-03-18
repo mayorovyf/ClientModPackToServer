@@ -38,12 +38,21 @@ function runClassificationEngines({
         let result: EngineResult;
 
         try {
-            result = createEngineResult({
-                engine: engine.name,
-                ...(engine.classify({
+            const classificationInput = runContext === undefined
+                ? {
+                    descriptor,
+                    classificationContext
+                }
+                : {
                     descriptor,
                     runContext,
                     classificationContext
+                };
+
+            result = createEngineResult({
+                engine: engine.name,
+                ...(engine.classify({
+                    ...classificationInput
                 }) || {})
             });
         } catch (error: unknown) {

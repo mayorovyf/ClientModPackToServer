@@ -188,16 +188,19 @@ function buildClassificationStats(
         }
 
         for (const result of classification.results) {
-            if (!summary.byEngine[result.engine]) {
-                summary.byEngine[result.engine] = {
+            let engineSummary = summary.byEngine[result.engine];
+
+            if (!engineSummary) {
+                engineSummary = {
                     keep: 0,
                     remove: 0,
                     unknown: 0,
                     error: 0
                 };
+                summary.byEngine[result.engine] = engineSummary;
             }
 
-            summary.byEngine[result.engine][result.decision] += 1;
+            engineSummary[result.decision] += 1;
         }
     }
 
