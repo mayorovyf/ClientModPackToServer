@@ -905,6 +905,7 @@ async function runBuildPipeline({
     logger?: PipelineLogger | null;
     progressReporter?: BuildProgressReporter;
 }) {
+    const effectiveProgressReporter = progressReporter || createNoopProgressReporter();
     const effectiveClassificationContext = (classificationContext || createClassificationContext({ blockList })) as ClassificationContextLike;
     const collector = createEventCollector(logger);
     collector.record('info', 'analysis', `Run mode: ${runContext.mode}`);
@@ -923,7 +924,7 @@ async function runBuildPipeline({
 
     const jarFiles = listJarFiles(modsPath);
 
-    progressReporter.onStageStarted({
+    effectiveProgressReporter.onStageStarted({
         stage: 'classification',
         total: jarFiles.length
     });
@@ -932,10 +933,10 @@ async function runBuildPipeline({
         effectiveClassificationContext,
         runContext,
         collector.record,
-        progressReporter,
+        effectiveProgressReporter,
         jarFiles
     );
-    progressReporter.onStageCompleted({
+    effectiveProgressReporter.onStageCompleted({
         stage: 'classification',
         total: classifiedDecisions.length,
         summary: {
@@ -944,7 +945,7 @@ async function runBuildPipeline({
     });
     collector.record('info', 'analysis', `Discovered .jar files: ${classifiedDecisions.length}`);
 
-    progressReporter.onStageStarted({
+    effectiveProgressReporter.onStageStarted({
         stage: 'dependency',
         total: classifiedDecisions.length
     });
@@ -953,14 +954,14 @@ async function runBuildPipeline({
         runContext,
         record: collector.record
     });
-    progressReporter.onStageCompleted({
+    effectiveProgressReporter.onStageCompleted({
         stage: 'dependency',
         total: dependencyStage.decisions.length,
         status: dependencyStage.dependencyGraph.status,
         summary: dependencyStage.dependencyGraph.summary
     });
 
-    progressReporter.onStageStarted({
+    effectiveProgressReporter.onStageStarted({
         stage: 'arbiter',
         total: dependencyStage.decisions.length,
         profile: runContext.arbiterProfile
@@ -970,14 +971,14 @@ async function runBuildPipeline({
         runContext,
         record: collector.record
     });
-    progressReporter.onStageCompleted({
+    effectiveProgressReporter.onStageCompleted({
         stage: 'arbiter',
         total: arbiterStage.decisions.length,
         status: arbiterStage.arbiter.status,
         summary: arbiterStage.arbiter.summary
     });
 
-    progressReporter.onStageStarted({
+    effectiveProgressReporter.onStageStarted({
         stage: 'deep-check',
         total: arbiterStage.decisions.length,
         mode: runContext.deepCheckMode
@@ -987,7 +988,7 @@ async function runBuildPipeline({
         runContext,
         record: collector.record
     });
-    progressReporter.onStageCompleted({
+    effectiveProgressReporter.onStageCompleted({
         stage: 'deep-check',
         total: deepCheckStage.decisions.length,
         status: deepCheckStage.deepCheck.status,
@@ -1011,7 +1012,7 @@ async function runBuildPipeline({
         );
     }
 
-    progressReporter.onStageStarted({
+    effectiveProgressReporter.onStageStarted({
         stage: 'build',
         total: decisions.length,
         dryRun: runContext.dryRun
@@ -1020,10 +1021,10 @@ async function runBuildPipeline({
         decisions,
         runContext,
         record: collector.record,
-        progressReporter
+        progressReporter: effectiveProgressReporter
     });
     const stats = buildStats(finalizedDecisions);
-    progressReporter.onStageCompleted({
+    effectiveProgressReporter.onStageCompleted({
         stage: 'build',
         total: finalizedDecisions.length,
         dryRun: runContext.dryRun,
@@ -1033,7 +1034,7 @@ async function runBuildPipeline({
         validation: createEmptyValidation(runContext.validationMode)
     };
 
-    progressReporter.onStageStarted({
+    effectiveProgressReporter.onStageStarted({
         stage: 'validation',
         total: finalizedDecisions.length,
         mode: runContext.validationMode
@@ -1055,7 +1056,7 @@ async function runBuildPipeline({
             validation: createEmptyValidation(runContext.validationMode, serializedError)
         };
     }
-    progressReporter.onStageCompleted({
+    effectiveProgressReporter.onStageCompleted({
         stage: 'validation',
         total: finalizedDecisions.length,
         status: validationStage.validation.status,

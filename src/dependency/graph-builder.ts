@@ -1,5 +1,6 @@
 const { GRAPH_RESOLUTIONS } = require('./constants');
 const { buildProviderIndex, collectProvidedIds, lookupProviders } = require('./provider-index');
+const { isPlatformDependency } = require('./platform-dependencies');
 
 import type {
     DependencyEdge,
@@ -28,7 +29,9 @@ function buildEdge({
 
     let resolution: DependencyEdge['resolution'] = GRAPH_RESOLUTIONS.missing;
 
-    if (providerFileNames.length === 1) {
+    if (isPlatformDependency(dependency.modId)) {
+        resolution = GRAPH_RESOLUTIONS.platform;
+    } else if (providerFileNames.length === 1) {
         resolution = providerFileNames[0] === decision.fileName ? GRAPH_RESOLUTIONS.self : GRAPH_RESOLUTIONS.unique;
     } else if (providerFileNames.length > 1) {
         resolution = GRAPH_RESOLUTIONS.ambiguous;

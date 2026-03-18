@@ -157,8 +157,8 @@ const SETTINGS_FIELD_DETAILS: Record<SettingsFieldKey, SettingsFieldDetails> = {
         title: 'Registry manifest URL',
         overview: 'URL удалённого manifest.json для загрузки реестра.',
         options: [
-            { label: 'Не задано', description: 'Используется стандартный источник проекта или локальный fallback.' },
-            { label: 'Указано', description: 'Remote registry будет читать manifest по указанному URL.' }
+            { label: 'GitHub default', description: 'По умолчанию используется опубликованный manifest из ClientModPackRegistry.' },
+            { label: 'Свой URL', description: 'Remote registry будет читать manifest по указанному пользователем адресу.' }
         ]
     },
     registryBundleUrl: {

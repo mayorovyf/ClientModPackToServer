@@ -17,9 +17,35 @@ function StatusPill({ status }: { status: RunSessionStatus }): React.JSX.Element
     }
 }
 
+function getScreenSpecificHints(activeScreen: ScreenId, compact: boolean): string[] {
+    switch (activeScreen) {
+        case 'build':
+            return compact
+                ? ['Enter edits or toggles the selected run field']
+                : ['Enter edits a field or toggles the selected run option'];
+        case 'presets':
+            return [
+                'Enter applies preset',
+                'n saves current form',
+                'u updates selected preset',
+                'd deletes selected preset'
+            ];
+        case 'server':
+            return [
+                'Enter edits a field or runs a server action',
+                'Use latest build to bind the newest build dir',
+                'Use for validation copies launcher into pipeline validation'
+            ];
+        default:
+            return [];
+    }
+}
+
 export function Sidebar({
     items,
     activeScreen,
+    activePageLabel,
+    hasMultiplePages,
     isFocused,
     uiMode,
     runStatus,
@@ -30,6 +56,8 @@ export function Sidebar({
 }: {
     items: NavigationItem[];
     activeScreen: ScreenId;
+    activePageLabel: string;
+    hasMultiplePages: boolean;
     isFocused: boolean;
     uiMode: TuiMode;
     runStatus: RunSessionStatus;
@@ -38,11 +66,7 @@ export function Sidebar({
     width?: number;
     height: number;
 }): React.JSX.Element {
-    const screenSpecificHints = showHints && activeScreen === 'build'
-        ? compact
-            ? ['Enter действие в центре']
-            : ['Enter редактирует или переключает в центре']
-        : [];
+    const screenSpecificHints = showHints ? getScreenSpecificHints(activeScreen, compact) : [];
 
     return (
         <Box
@@ -58,7 +82,8 @@ export function Sidebar({
         >
             <Box flexDirection="column" minWidth={0}>
                 <Text color="cyanBright" wrap="truncate">{compact ? 'CMPTS' : 'ClientModPackToServer'}</Text>
-                <Text dimColor wrap="truncate">{uiMode === 'simple' ? 'Простой режим' : 'Экспертный режим'}</Text>
+                <Text dimColor wrap="truncate">{uiMode === 'simple' ? 'Simple mode' : 'Expert mode'}</Text>
+                <Text dimColor wrap="truncate">{`Page: ${activePageLabel}`}</Text>
                 <Box marginTop={1}>
                     <StatusPill status={runStatus} />
                 </Box>
@@ -72,7 +97,7 @@ export function Sidebar({
                                 <Box flexDirection="row" alignItems="center" minWidth={0}>
                                     <Box width={2} minWidth={2}>
                                         <Text color={isActive ? 'greenBright' : 'white'}>
-                                            {isActive ? '▸' : ' '}
+                                            {isActive ? '>' : ' '}
                                         </Text>
                                     </Box>
                                     <Box flexGrow={1} minWidth={0}>
@@ -93,12 +118,14 @@ export function Sidebar({
                         {screenSpecificHints.map((hint) => (
                             <Text key={hint} dimColor wrap="wrap">{hint}</Text>
                         ))}
+                        {hasMultiplePages ? <Text dimColor wrap="truncate">Tab/Shift+Tab switches pages</Text> : null}
                         {screenSpecificHints.length > 0 ? <Text dimColor wrap="truncate"> </Text> : null}
-                        <Text dimColor wrap="truncate">←/→ столбцы</Text>
-                        <Text dimColor wrap="truncate">↑/↓ пункты в активном столбце</Text>
-                        <Text dimColor wrap="truncate">m режим</Text>
-                        <Text dimColor wrap="truncate">r запуск</Text>
-                        <Text dimColor wrap="truncate">Ctrl+C выход</Text>
+                        <Text dimColor wrap="truncate">Left/Right switches columns</Text>
+                        <Text dimColor wrap="truncate">Up/Down moves inside active column</Text>
+                        <Text dimColor wrap="truncate">1-8 opens screens</Text>
+                        <Text dimColor wrap="truncate">m toggles UI mode</Text>
+                        <Text dimColor wrap="truncate">r runs pipeline</Text>
+                        <Text dimColor wrap="truncate">Ctrl+C exits</Text>
                     </>
                 ) : null}
             </Box>

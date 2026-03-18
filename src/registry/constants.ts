@@ -31,8 +31,10 @@ export const DEFAULT_LOCAL_REGISTRY_FILE_NAME = 'local-registry.json';
 export const DEFAULT_LOCAL_OVERRIDES_FILE_NAME = 'local-overrides.json';
 export const DEFAULT_LOCAL_OVERRIDE_PRIORITY = 1000;
 export const FORCE_LOCAL_OVERRIDE_PRIORITY = 10000;
+export const DEFAULT_REMOTE_REGISTRY_MANIFEST_URL = 'https://raw.githubusercontent.com/mayorovyf/ClientModPackRegistry/master/bundles/latest/manifest.json';
 
 module.exports = {
+    DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
     DEFAULT_LOCAL_OVERRIDE_PRIORITY,
     DEFAULT_LOCAL_OVERRIDES_FILE_NAME,
     DEFAULT_LOCAL_REGISTRY_DIR_NAME,

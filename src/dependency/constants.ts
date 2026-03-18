@@ -1,5 +1,6 @@
 const GRAPH_RESOLUTIONS = Object.freeze({
     missing: 'missing',
+    platform: 'platform',
     unique: 'unique',
     ambiguous: 'ambiguous',
     self: 'self'

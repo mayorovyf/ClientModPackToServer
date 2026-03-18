@@ -1,35 +1,33 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useApp } from 'ink';
 
+import entrypointApi from '../server/entrypoint.js';
 import manualReviewOverridesApi from '../review/manual-overrides.js';
 import type { ManualReviewAction } from '../review/manual-overrides.js';
-import { AuthorsDetails } from './components/AuthorsDetails.js';
 import { Layout } from './components/Layout.js';
-import { ReportsDetails } from './components/ReportsDetails.js';
-import { ReviewDetails } from './components/ReviewDetails.js';
-import { RunFieldDetails } from './components/RunFieldDetails.js';
-import { RunSummary } from './components/RunSummary.js';
-import { SettingsDetails } from './components/SettingsDetails.js';
+import { SectionShell } from './components/SectionShell.js';
 import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { useBackendRun } from './hooks/use-backend-run.js';
 import { getColumnOrder, useHotkeys } from './hooks/use-hotkeys.js';
+import { useServerManager } from './hooks/use-server-manager.js';
 import { useTerminalLayout } from './hooks/use-terminal-layout.js';
-import { AuthorsScreen } from './screens/AuthorsScreen.js';
-import { BuildScreen } from './screens/BuildScreen.js';
-import { RegistryScreen } from './screens/RegistryScreen.js';
-import { ReportsScreen } from './screens/ReportsScreen.js';
-import { ReviewScreen } from './screens/ReviewScreen.js';
-import { SettingsScreen } from './screens/SettingsScreen.js';
+import { createSectionRegistry } from './sections/registry.js';
 import { NAVIGATION_ITEMS } from './state/app-state.js';
 import { AUTHOR_PROFILES } from './state/authors.js';
 import { loadPersistedTuiState, savePersistedTuiState } from './state/persisted-state.js';
+import { deleteRunPreset, loadRunPresets, saveRunPreset } from './state/presets.js';
 import { loadReportHistory, resolveReportRootDir } from './state/report-history.js';
 import { buildReviewItems } from './state/review-items.js';
-import type { FocusedColumn, RunFormState, ScreenId, TuiMode } from './state/app-state.js';
+import { buildServerDoctorState } from './state/server-doctor.js';
+
+import type { ActivePageByScreen, FocusedColumn, RunFormState, ScreenId, ServerFormState, TuiMode } from './state/app-state.js';
 import type { ReportHistoryState } from './state/report-history.js';
+import type { RunPreset } from './state/presets.js';
 import type { RunFieldKey } from './state/run-fields.js';
+import type { ServerFieldKey } from './state/server-fields.js';
 import type { SettingsFieldKey } from './state/settings-fields.js';
+import type { SectionRegistryContext } from './sections/types.js';
 
 const {
     loadManualReviewOverrides,
@@ -37,138 +35,15 @@ const {
     resolveReviewOverridesPath,
     setManualReviewOverride
 } = manualReviewOverridesApi;
+const { resolveManagedServerEntrypoint } = entrypointApi;
 
-function renderScreen({
-    activeScreen,
-    form,
-    uiMode,
-    session,
-    compact,
-    eventLimit,
-    height,
-    setForm,
-    startRun,
-    setInteractionLocked,
-    focusedColumn,
-    setSelectedRunField,
-    selectedAuthorId,
-    setSelectedAuthorId,
-    reportHistory,
-    selectedReportRunId,
-    setSelectedReportRunId,
-    reviewItems,
-    selectedReviewItemId,
-    setSelectedReviewItemId,
-    saveReviewOverride,
-    clearReviewOverride,
-    showHints,
-    setShowHints,
-    setSelectedSettingsField,
-    setUiMode
-}: {
-    activeScreen: ScreenId;
-    form: RunFormState;
-    uiMode: TuiMode;
-    session: ReturnType<typeof useBackendRun>['session'];
-    compact: boolean;
-    eventLimit: number;
-    height: number;
-    setForm: (nextForm: RunFormState) => void;
-    startRun: () => void;
-    setInteractionLocked: (locked: boolean) => void;
-    focusedColumn: FocusedColumn;
-    setSelectedRunField: (fieldKey: RunFieldKey) => void;
-    selectedAuthorId: string;
-    setSelectedAuthorId: (authorId: string) => void;
-    reportHistory: ReportHistoryState;
-    selectedReportRunId: string;
-    setSelectedReportRunId: (runId: string) => void;
-    reviewItems: ReturnType<typeof buildReviewItems>;
-    selectedReviewItemId: string;
-    setSelectedReviewItemId: (itemId: string) => void;
-    saveReviewOverride: (action: ManualReviewAction) => void;
-    clearReviewOverride: () => void;
-    showHints: boolean;
-    setShowHints: (nextValue: boolean) => void;
-    setSelectedSettingsField: (fieldKey: SettingsFieldKey) => void;
-    setUiMode: (nextMode: TuiMode) => void;
-}): React.JSX.Element {
-    switch (activeScreen) {
-        case 'registry':
-            return (
-                <RegistryScreen
-                    form={form}
-                    session={session}
-                    compact={compact}
-                    isFocused={focusedColumn === 'content'}
-                    height={height}
-                />
-            );
-        case 'reports':
-            return (
-                <ReportsScreen
-                    entries={reportHistory.entries}
-                    reportRootDir={reportHistory.reportRootDir}
-                    loadError={reportHistory.error}
-                    selectedRunId={selectedReportRunId}
-                    onSelectedRunIdChange={setSelectedReportRunId}
-                    isFocused={focusedColumn === 'content'}
-                    height={height}
-                />
-            );
-        case 'review':
-            return (
-                <ReviewScreen
-                    items={reviewItems}
-                    selectedItemId={selectedReviewItemId}
-                    onSelectedItemChange={setSelectedReviewItemId}
-                    onSaveOverride={saveReviewOverride}
-                    onClearOverride={clearReviewOverride}
-                    isFocused={focusedColumn === 'content'}
-                    height={height}
-                />
-            );
-        case 'settings':
-            return (
-                <SettingsScreen
-                    form={form}
-                    uiMode={uiMode}
-                    showHints={showHints}
-                    onChange={setForm}
-                    onUiModeChange={setUiMode}
-                    onShowHintsChange={setShowHints}
-                    onInteractionChange={setInteractionLocked}
-                    onSelectedFieldChange={setSelectedSettingsField}
-                    isFocused={focusedColumn === 'content'}
-                    height={height}
-                />
-            );
-        case 'authors':
-            return (
-                <AuthorsScreen
-                    selectedAuthorId={selectedAuthorId}
-                    onSelectedAuthorChange={setSelectedAuthorId}
-                    isFocused={focusedColumn === 'content'}
-                    height={height}
-                />
-            );
-        case 'build':
-        default:
-            return (
-                <BuildScreen
-                    form={form}
-                    uiMode={uiMode}
-                    session={session}
-                    onChange={setForm}
-                    onRun={startRun}
-                    onInteractionChange={setInteractionLocked}
-                    onSelectedFieldChange={setSelectedRunField}
-                    isFocused={focusedColumn === 'content'}
-                    compact={compact}
-                    height={height}
-                />
-            );
-    }
+interface NoticeState {
+    level: 'success' | 'error';
+    message: string;
+}
+
+function getLatestBuildDir(reportHistory: ReportHistoryState): string | null {
+    return reportHistory.entries.find((entry) => typeof entry.buildDir === 'string' && entry.buildDir.trim())?.buildDir ?? null;
 }
 
 export function App(): React.JSX.Element {
@@ -176,24 +51,28 @@ export function App(): React.JSX.Element {
     const layout = useTerminalLayout();
     const [persistedState] = useState(loadPersistedTuiState);
     const [activeScreen, setActiveScreen] = useState<ScreenId>(persistedState.activeScreen);
+    const [activePageByScreen, setActivePageByScreen] = useState<ActivePageByScreen>(persistedState.activePageByScreen);
     const [uiMode, setUiMode] = useState<TuiMode>(persistedState.uiMode);
     const [form, setForm] = useState<RunFormState>(persistedState.form);
+    const [serverForm, setServerForm] = useState<ServerFormState>(persistedState.serverForm);
     const [focusedColumn, setFocusedColumn] = useState<FocusedColumn>('content');
     const [interactionLocked, setInteractionLocked] = useState(false);
     const [selectedRunField, setSelectedRunField] = useState<RunFieldKey>('inputPath');
+    const [selectedServerField, setSelectedServerField] = useState<ServerFieldKey>('targetDir');
     const [selectedAuthorId, setSelectedAuthorId] = useState<string>(AUTHOR_PROFILES[0]?.id ?? '');
     const [selectedReportRunId, setSelectedReportRunId] = useState('');
     const [selectedReviewItemId, setSelectedReviewItemId] = useState('');
     const [selectedSettingsField, setSelectedSettingsField] = useState<SettingsFieldKey>('uiMode');
+    const [selectedPresetId, setSelectedPresetId] = useState('');
     const [showHints, setShowHints] = useState(persistedState.showHints);
     const [reviewOverridesRevision, setReviewOverridesRevision] = useState(0);
-    const [reviewNotice, setReviewNotice] = useState<{
-        level: 'success' | 'error';
-        message: string;
-    } | null>(null);
+    const [presetRevision, setPresetRevision] = useState(0);
+    const [reviewNotice, setReviewNotice] = useState<NoticeState | null>(null);
+    const [appNotice, setAppNotice] = useState<NoticeState | null>(null);
     const [persistenceError, setPersistenceError] = useState<string | null>(null);
     const { session, startRun, cancelRun } = useBackendRun();
-    const activeScreenLabel = NAVIGATION_ITEMS.find((item) => item.id === activeScreen)?.label || activeScreen;
+    const serverManager = useServerManager();
+
     const reportRootDir = useMemo(
         () => resolveReportRootDir(form.reportDir, session.reportPaths.reportDir),
         [form.reportDir, session.reportPaths.reportDir]
@@ -202,9 +81,21 @@ export function App(): React.JSX.Element {
         () => loadReportHistory(reportRootDir),
         [reportRootDir, session.reportPaths.jsonReportPath, session.reportPaths.reportDir, session.status]
     );
+    const presets = useMemo(
+        () => loadRunPresets(),
+        [presetRevision]
+    );
+    const selectedPreset: RunPreset | null = useMemo(
+        () => presets.find((preset) => preset.id === selectedPresetId) ?? presets[0] ?? null,
+        [presets, selectedPresetId]
+    );
     const selectedReportEntry = reportHistory.entries.find((entry) => entry.runId === selectedReportRunId)
         || reportHistory.entries[0]
         || null;
+    const latestBuildDir = useMemo(
+        () => session.lastReport?.run.buildDir || getLatestBuildDir(reportHistory),
+        [reportHistory, session.lastReport]
+    );
     const reviewOverridesPath = useMemo(
         () => session.lastReport?.run.reviewOverridesPath || resolveReviewOverridesPath(process.cwd()),
         [session.lastReport?.run.reviewOverridesPath]
@@ -220,29 +111,122 @@ export function App(): React.JSX.Element {
     const selectedReviewItem = reviewItems.find((item) => item.id === selectedReviewItemId)
         || reviewItems[0]
         || null;
+    const serverDoctor = useMemo(() => {
+        if (activeScreen !== 'server' || activePageByScreen.server !== 'doctor') {
+            return null;
+        }
+
+        return buildServerDoctorState(serverForm);
+    }, [
+        activeScreen,
+        activePageByScreen.server,
+        serverForm,
+        serverManager.state.installStatus,
+        serverManager.state.launchStatus,
+        serverManager.state.lastInstall?.installedAt,
+        serverManager.state.resolvedEntrypointPath
+    ]);
+    const sectionContext: SectionRegistryContext = {
+        form,
+        setForm,
+        uiMode,
+        setUiMode,
+        showHints,
+        setShowHints,
+        session,
+        compact: layout.compact,
+        latestBuildDir,
+        selectedRunField,
+        setSelectedRunField,
+        serverForm,
+        setServerForm,
+        serverState: serverManager.state,
+        serverDoctor,
+        installServerCore: () => {
+            setAppNotice(null);
+            void serverManager.installCore(serverForm);
+        },
+        useLatestBuildForServer: useLatestBuildForServer,
+        applyServerEntrypointToValidation,
+        launchServer: () => {
+            setAppNotice(null);
+            void serverManager.launchServer(serverForm);
+        },
+        stopServer: serverManager.stopServer,
+        clearServerLogs: serverManager.clearLogs,
+        selectedServerField,
+        setSelectedServerField,
+        presets,
+        selectedPreset,
+        selectedPresetId,
+        setSelectedPresetId,
+        applySelectedPreset,
+        createPreset,
+        updateSelectedPreset,
+        deleteSelectedPreset,
+        selectedReportRunId,
+        setSelectedReportRunId,
+        selectedReportEntry,
+        reportHistory,
+        reviewItems,
+        selectedReviewItem,
+        selectedReviewItemId,
+        setSelectedReviewItemId,
+        saveReviewOverride,
+        clearReviewOverride,
+        reviewOverridesPath,
+        reviewNotice,
+        selectedSettingsField,
+        setSelectedSettingsField,
+        selectedAuthorId,
+        setSelectedAuthorId,
+        onInteractionChange: setInteractionLocked,
+        onRun: handleRun
+    };
+    const sectionRegistry = createSectionRegistry(sectionContext);
+    const activeSection = sectionRegistry[activeScreen];
+    const activePageId = activePageByScreen[activeScreen];
+    const activePage = activeSection.pages.find((page) => page.id === activePageId) ?? activeSection.pages[0]!;
+    const activePageIds = activeSection.pages.map((page) => page.id);
+    const activeScreenLabel = activeSection?.label || NAVIGATION_ITEMS.find((item) => item.id === activeScreen)?.label || activeScreen;
+    const activePageLabel = activePage?.label || String(activePageId || '');
+    const showDetails = Boolean(activePage?.hasDetails && activePage.renderDetails);
 
     useEffect(() => {
-        const allowedColumns = getColumnOrder(activeScreen);
+        const allowedColumns = getColumnOrder(showDetails);
 
         if (!allowedColumns.includes(focusedColumn)) {
             setFocusedColumn(allowedColumns.includes('content') ? 'content' : (allowedColumns[0] ?? 'content'));
         }
-    }, [activeScreen, focusedColumn]);
+    }, [focusedColumn, showDetails]);
+
+    useEffect(() => {
+        if (!activePage || activePage.id === activePageId) {
+            return;
+        }
+
+        setActivePageByScreen((current) => ({
+            ...current,
+            [activeScreen]: activeSection.defaultPage
+        }));
+    }, [activePage, activePageId, activeScreen, activeSection.defaultPage]);
 
     useEffect(() => {
         try {
             savePersistedTuiState({
-                version: 1,
+                version: 2,
                 activeScreen,
+                activePageByScreen,
                 uiMode,
                 showHints,
-                form
+                form,
+                serverForm
             });
             setPersistenceError(null);
         } catch (error) {
             setPersistenceError(error instanceof Error ? error.message : String(error));
         }
-    }, [activeScreen, form, showHints, uiMode]);
+    }, [activePageByScreen, activeScreen, form, serverForm, showHints, uiMode]);
 
     useEffect(() => {
         if (!selectedReportRunId && reportHistory.entries[0]?.runId) {
@@ -266,6 +250,152 @@ export function App(): React.JSX.Element {
         }
     }, [reviewItems, selectedReviewItemId]);
 
+    useEffect(() => {
+        if (presets.length === 0) {
+            if (selectedPresetId) {
+                setSelectedPresetId('');
+            }
+            return;
+        }
+
+        if (!selectedPresetId || !presets.some((preset) => preset.id === selectedPresetId)) {
+            setSelectedPresetId(presets[0]?.id ?? '');
+        }
+    }, [presets, selectedPresetId]);
+
+    useEffect(() => {
+        const targetDir = serverForm.targetDir.trim();
+        const explicitEntrypointPath = serverForm.explicitEntrypointPath.trim();
+
+        if (!targetDir && !explicitEntrypointPath) {
+            serverManager.setResolvedEntrypointPath(null);
+            return;
+        }
+
+        try {
+            const entrypoint = resolveManagedServerEntrypoint({
+                serverDir: targetDir,
+                explicitEntrypointPath: explicitEntrypointPath || null
+            });
+
+            serverManager.setResolvedEntrypointPath(entrypoint?.path ?? null);
+        } catch {
+            serverManager.setResolvedEntrypointPath(null);
+        }
+        // The setter comes from a local hook and is intentionally treated as stable here.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [serverForm.explicitEntrypointPath, serverForm.targetDir]);
+
+    function handleRun(): void {
+        if (!form.inputPath.trim()) {
+            setAppNotice({
+                level: 'error',
+                message: 'Input instance path is required before running the pipeline'
+            });
+            return;
+        }
+
+        setAppNotice(null);
+        void startRun(form);
+    }
+
+    function refreshPresets(nextSelectedPresetId?: string): void {
+        setPresetRevision((current) => current + 1);
+
+        if (typeof nextSelectedPresetId === 'string') {
+            setSelectedPresetId(nextSelectedPresetId);
+        }
+    }
+
+    function setActivePage<S extends ScreenId>(screenId: S, pageId: ActivePageByScreen[S]): void {
+        setActivePageByScreen((current) => ({
+            ...current,
+            [screenId]: pageId
+        }));
+    }
+
+    function applySelectedPreset(): void {
+        if (!selectedPreset) {
+            return;
+        }
+
+        setForm(selectedPreset.form);
+        setActiveScreen('build');
+        setActivePage('build', 'inputs');
+        setFocusedColumn('content');
+        setAppNotice({
+            level: 'success',
+            message: `Preset applied: ${selectedPreset.name}`
+        });
+    }
+
+    function createPreset(name: string): void {
+        try {
+            const preset = saveRunPreset({
+                name,
+                form
+            });
+
+            refreshPresets(preset.id);
+            setAppNotice({
+                level: 'success',
+                message: `Preset saved: ${preset.name}`
+            });
+        } catch (error) {
+            setAppNotice({
+                level: 'error',
+                message: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    function updateSelectedPreset(): void {
+        if (!selectedPreset) {
+            return;
+        }
+
+        try {
+            const preset = saveRunPreset({
+                id: selectedPreset.id,
+                name: selectedPreset.name,
+                form
+            });
+
+            refreshPresets(preset.id);
+            setAppNotice({
+                level: 'success',
+                message: `Preset updated: ${preset.name}`
+            });
+        } catch (error) {
+            setAppNotice({
+                level: 'error',
+                message: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    function deleteSelectedPreset(): void {
+        if (!selectedPreset) {
+            return;
+        }
+
+        const deleted = deleteRunPreset(selectedPreset.id);
+
+        if (!deleted) {
+            setAppNotice({
+                level: 'error',
+                message: `Preset was not found: ${selectedPreset.name}`
+            });
+            return;
+        }
+
+        refreshPresets();
+        setAppNotice({
+            level: 'success',
+            message: `Preset deleted: ${selectedPreset.name}`
+        });
+    }
+
     function saveReviewOverride(action: ManualReviewAction): void {
         if (!selectedReviewItem) {
             return;
@@ -281,7 +411,7 @@ export function App(): React.JSX.Element {
             setReviewOverridesRevision((current) => current + 1);
             setReviewNotice({
                 level: 'success',
-                message: `Сохранено: ${selectedReviewItem.decision.fileName} -> ${action}`
+                message: `Saved manual decision: ${selectedReviewItem.decision.fileName} -> ${action}`
             });
         } catch (error) {
             setReviewNotice({
@@ -304,7 +434,7 @@ export function App(): React.JSX.Element {
             setReviewOverridesRevision((current) => current + 1);
             setReviewNotice({
                 level: 'success',
-                message: `Удалено ручное решение для ${selectedReviewItem.decision.fileName}`
+                message: `Cleared manual decision for ${selectedReviewItem.decision.fileName}`
             });
         } catch (error) {
             setReviewNotice({
@@ -314,49 +444,94 @@ export function App(): React.JSX.Element {
         }
     }
 
+    function useLatestBuildForServer(): void {
+        if (!latestBuildDir) {
+            setAppNotice({
+                level: 'error',
+                message: 'No built server directory is available yet'
+            });
+            return;
+        }
+
+        setServerForm((current) => ({
+            ...current,
+            targetDir: latestBuildDir
+        }));
+        setAppNotice({
+            level: 'success',
+            message: `Target server dir set to latest build: ${latestBuildDir}`
+        });
+    }
+
+    function applyServerEntrypointToValidation(): void {
+        const entrypointPath = serverManager.state.resolvedEntrypointPath || serverForm.explicitEntrypointPath.trim();
+
+        if (!entrypointPath) {
+            setAppNotice({
+                level: 'error',
+                message: 'No resolved server launcher is available yet'
+            });
+            return;
+        }
+
+        setForm((current) => ({
+            ...current,
+            validationEntrypointPath: entrypointPath
+        }));
+        setAppNotice({
+            level: 'success',
+            message: 'Validation entrypoint updated from the managed server launcher'
+        });
+    }
+
     useHotkeys({
         activeScreen,
         setActiveScreen,
+        activePageId: String(activePage?.id || ''),
+        activePageIds: activePageIds.map((pageId) => String(pageId)),
+        onActivePageChange: (nextPageId) => {
+            if (activePageIds.includes(nextPageId as never)) {
+                setActivePage(activeScreen, nextPageId as ActivePageByScreen[typeof activeScreen]);
+            }
+        },
         focusedColumn,
         setFocusedColumn,
         uiMode,
         setUiMode: (nextMode) => setUiMode(nextMode),
+        showDetails,
         allowGlobalHotkeys: !interactionLocked,
         isRunning: session.status === 'running',
-        onRun: () => {
-            if (form.inputPath.trim()) {
-                void startRun(form);
-            }
-        },
+        onRun: handleRun,
         onExit: () => {
             cancelRun();
+            serverManager.stopServer();
             exit();
         }
     });
 
-    const statusMessage = reviewNotice?.message
+    const pageStatusMessage = activePage?.getStatusMessage?.() || null;
+    const fallbackStatusMessage = serverManager.state.lastError
+        || session.lastError
+        || (session.status === 'running'
+            ? 'Pipeline is running'
+            : form.inputPath.trim()
+                ? 'Ready to run'
+                : 'Set the instance path before starting the pipeline');
+    const statusMessage = appNotice?.message
+        || reviewNotice?.message
         || persistenceError
-        || (activeScreen === 'review'
-            ? reviewItems.length > 0
-                ? 'K keep, X exclude, C снять override'
-                : 'После нового запуска здесь появятся спорные моды'
-            : session.lastError
-                ? session.lastError
-                : session.status === 'running'
-                    ? 'Pipeline выполняется'
-                    : form.inputPath.trim()
-                        ? 'Готово к запуску'
-                        : 'Сначала укажите папку инстанса');
+        || pageStatusMessage
+        || fallbackStatusMessage;
 
     if (!layout.sizeSupported) {
         const warnings: string[] = [];
 
         if (!layout.widthSupported) {
-            warnings.push(`Увеличьте ширину окна минимум до ${layout.minimumThreeColumnWidth} символов.`);
+            warnings.push(`Increase terminal width to at least ${layout.minimumThreeColumnWidth} characters.`);
         }
 
         if (!layout.heightSupported) {
-            warnings.push(`Увеличьте высоту окна минимум до ${layout.minimumRootHeight} строк.`);
+            warnings.push(`Increase terminal height to at least ${layout.minimumRootHeight} rows.`);
         }
 
         return (
@@ -377,11 +552,11 @@ export function App(): React.JSX.Element {
                     paddingX={1}
                     minWidth={0}
                 >
-                    <Text color="yellowBright" wrap="wrap">Окно слишком маленькое</Text>
+                    <Text color="yellowBright" wrap="wrap">Terminal window is too small</Text>
                     {warnings.map((warning) => (
                         <Text key={warning} wrap="wrap">{warning}</Text>
                     ))}
-                    <Text dimColor wrap="wrap">{`Сейчас: ${layout.columns} x ${layout.rows}`}</Text>
+                    <Text dimColor wrap="wrap">{`Current size: ${layout.columns} x ${layout.rows}`}</Text>
                 </Box>
             </Box>
         );
@@ -390,6 +565,29 @@ export function App(): React.JSX.Element {
     const sidebarHeight = layout.sidebarInline ? layout.mainAreaHeight : layout.sidebarHeight;
     const screenHeight = layout.sidebarInline ? layout.mainAreaHeight : layout.screenAreaHeight;
     const detailsHeight = layout.detailsInline ? layout.mainAreaHeight : layout.detailsHeight;
+    const content = (
+        <SectionShell
+            section={activeSection}
+            activePageId={activePage.id}
+            height={screenHeight}
+            isFocused={focusedColumn === 'content'}
+            content={(contentHeight) => activePage.renderContent({
+                contentHeight,
+                detailsHeight,
+                isContentFocused: focusedColumn === 'content',
+                isDetailsFocused: focusedColumn === 'details'
+            })}
+        />
+    );
+
+    const details = showDetails && activePage.renderDetails
+        ? activePage.renderDetails({
+            contentHeight: screenHeight,
+            detailsHeight,
+            isContentFocused: focusedColumn === 'content',
+            isDetailsFocused: focusedColumn === 'details'
+        })
+        : undefined;
 
     return (
         <Layout
@@ -398,6 +596,8 @@ export function App(): React.JSX.Element {
                 <Sidebar
                     items={NAVIGATION_ITEMS}
                     activeScreen={activeScreen}
+                    activePageLabel={activePageLabel}
+                    hasMultiplePages={activeSection.pages.length > 1}
                     isFocused={focusedColumn === 'sidebar'}
                     uiMode={uiMode}
                     runStatus={session.status}
@@ -409,93 +609,15 @@ export function App(): React.JSX.Element {
             }
             content={
                 <Box flexDirection="column" width="100%" height={screenHeight} flexGrow={1} minWidth={0}>
-                    {renderScreen({
-                        activeScreen,
-                        form,
-                        uiMode,
-                        session,
-                        compact: layout.compact,
-                        eventLimit: layout.eventLimit,
-                        height: screenHeight,
-                        setForm,
-                        startRun: () => {
-                            if (form.inputPath.trim()) {
-                                void startRun(form);
-                            }
-                        },
-                        setInteractionLocked,
-                        focusedColumn,
-                        setSelectedRunField,
-                        selectedAuthorId,
-                        setSelectedAuthorId,
-                        reportHistory,
-                        selectedReportRunId,
-                        setSelectedReportRunId,
-                        reviewItems,
-                        selectedReviewItemId,
-                        setSelectedReviewItemId,
-                        saveReviewOverride,
-                        clearReviewOverride,
-                        showHints,
-                        setShowHints,
-                        setSelectedSettingsField,
-                        setUiMode
-                    })}
+                    {content}
                 </Box>
             }
-            details={
-                activeScreen === 'build' ? (
-                    <RunFieldDetails
-                        fieldKey={selectedRunField}
-                        form={form}
-                        uiMode={uiMode}
-                        isRunning={session.status === 'running'}
-                        isFocused={false}
-                        height={detailsHeight}
-                    />
-                ) : activeScreen === 'authors' ? (
-                    <AuthorsDetails
-                        selectedAuthorId={selectedAuthorId}
-                        isFocused={focusedColumn === 'details'}
-                        height={detailsHeight}
-                    />
-                ) : activeScreen === 'reports' ? (
-                    <ReportsDetails
-                        entry={selectedReportEntry}
-                        reportRootDir={reportHistory.reportRootDir}
-                        loadError={reportHistory.error}
-                        isFocused={focusedColumn === 'details'}
-                        height={detailsHeight}
-                    />
-                ) : activeScreen === 'review' ? (
-                    <ReviewDetails
-                        item={selectedReviewItem}
-                        overridesPath={reviewOverridesPath}
-                        notice={reviewNotice}
-                        isFocused={focusedColumn === 'details'}
-                        height={detailsHeight}
-                    />
-                ) : activeScreen === 'settings' ? (
-                    <SettingsDetails
-                        fieldKey={selectedSettingsField}
-                        form={form}
-                        uiMode={uiMode}
-                        showHints={showHints}
-                        height={detailsHeight}
-                    />
-                ) : (
-                    <RunSummary
-                        session={session}
-                        compact={layout.compact}
-                        eventLimit={layout.eventLimit}
-                        isFocused={focusedColumn === 'details'}
-                        height={detailsHeight}
-                    />
-                )
-            }
+            showDetails={showDetails}
+            details={details}
             statusBar={
                 <StatusBar
                     activeScreenLabel={activeScreenLabel}
+                    activePageLabel={activePageLabel}
                     focusedColumn={focusedColumn}
                     uiMode={uiMode}
                     runStatus={session.status}

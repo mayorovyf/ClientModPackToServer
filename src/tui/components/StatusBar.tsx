@@ -30,6 +30,7 @@ function StatusCell({
 
 export function StatusBar({
     activeScreenLabel,
+    activePageLabel,
     focusedColumn,
     uiMode,
     runStatus,
@@ -37,6 +38,7 @@ export function StatusBar({
     statusMessage
 }: {
     activeScreenLabel: string;
+    activePageLabel: string;
     focusedColumn: FocusedColumn;
     uiMode: TuiMode;
     runStatus: string;
@@ -53,6 +55,7 @@ export function StatusBar({
                 <StatusCell label="Раздел" value={activeScreenLabel} color="cyan" />
                 <StatusCell label="Фокус" value={focusLabel} color="green" />
                 <StatusCell label="Режим" value={uiMode} color="yellow" />
+                <StatusCell label="Page" value={activePageLabel} color="cyan" />
                 <StatusCell label="Run" value={runStatus} color={runColor} />
                 <StatusCell label="Stage" value={currentStage || 'n/a'} />
             </Box>

@@ -1,4 +1,5 @@
 const { DEEP_CHECK_MODES } = require('./constants');
+const { confidenceRank } = require('../classification/engine-result');
 
 import type { DeepCheckInput, DeepCheckTrigger } from '../types/deep-check';
 import type { EngineResult, FinalClassification } from '../types/classification';
@@ -31,6 +32,33 @@ function hasDependencyCaution(input: DeepCheckInput): boolean {
     ].includes(finding.type));
 }
 
+function hasStrongKeepConsensus(classification: FinalClassification | null): boolean {
+    const metadata = getEngineResult(classification, 'metadata-engine');
+    const registry = getEngineResult(classification, 'registry-engine');
+
+    if (!metadata || !registry) {
+        return false;
+    }
+
+    if (metadata.decision !== 'keep' || registry.decision !== 'keep') {
+        return false;
+    }
+
+    return confidenceRank(metadata.confidence) >= 2 && confidenceRank(registry.confidence) >= 2;
+}
+
+function hasStrongActionableConflict(classification: FinalClassification | null): boolean {
+    const results = classification && Array.isArray(classification.results) ? classification.results : [];
+    const strongKeepSignals = results.filter(
+        (result) => result.decision === 'keep' && confidenceRank(result.confidence) >= 2
+    );
+    const strongRemoveSignals = results.filter(
+        (result) => result.decision === 'remove' && confidenceRank(result.confidence) >= 2
+    );
+
+    return strongKeepSignals.length > 0 && strongRemoveSignals.length > 0;
+}
+
 function evaluateDeepCheckTrigger(input: DeepCheckInput): DeepCheckTrigger {
     const mode = input.deepCheckMode || DEEP_CHECK_MODES.auto;
 
@@ -53,6 +81,19 @@ function evaluateDeepCheckTrigger(input: DeepCheckInput): DeepCheckTrigger {
     }
 
     const triggerReasons: string[] = [];
+    const dependencyCaution = hasDependencyCaution(input);
+    const hasStrongConflict = hasStrongActionableConflict(input.classification);
+    const registryMetadataDisagreement = hasRegistryMetadataDisagreement(input.classification);
+    const strongKeepConsensus = hasStrongKeepConsensus(input.classification);
+
+    if (strongKeepConsensus && !dependencyCaution && !hasStrongConflict && !registryMetadataDisagreement) {
+        return {
+            mode,
+            shouldRun: false,
+            mandatory: false,
+            triggerReasons: ['metadata-engine and registry-engine already agree on a strong keep signal']
+        };
+    }
 
     if (input.requiresDeepCheck) {
         triggerReasons.push('arbiter explicitly requested deep-check');
@@ -62,7 +103,7 @@ function evaluateDeepCheckTrigger(input: DeepCheckInput): DeepCheckTrigger {
         triggerReasons.push('arbiter escalated the mod to review');
     }
 
-    if (input.classification && input.classification.conflict && input.classification.conflict.hasConflict) {
+    if (hasStrongConflict) {
         triggerReasons.push('classification engines produced conflicting actionable signals');
     }
 
@@ -70,18 +111,18 @@ function evaluateDeepCheckTrigger(input: DeepCheckInput): DeepCheckTrigger {
         triggerReasons.push('review decision has low confidence');
     }
 
-    if (hasRegistryMetadataDisagreement(input.classification)) {
+    if (registryMetadataDisagreement) {
         triggerReasons.push('metadata-engine and registry-engine disagree');
     }
 
-    if (hasDependencyCaution(input)) {
+    if (dependencyCaution) {
         triggerReasons.push('dependency validation requires extra caution');
     }
 
     return {
         mode,
         shouldRun: triggerReasons.length > 0,
-        mandatory: input.requiresDeepCheck || hasDependencyCaution(input),
+        mandatory: input.requiresDeepCheck || dependencyCaution,
         triggerReasons
     };
 }

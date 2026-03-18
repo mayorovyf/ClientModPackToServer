@@ -11,8 +11,8 @@ export const AUTHOR_PROFILES: AuthorProfile[] = [
         id: 'kristallik',
         nickname: 'KPuCTaJluK | mayorovyf',
         role: 'главный разработчик',
-        description: 'Отвечает за основную архитектуру проекта, ключевые решения по интерфейсу и развитие главного pipeline.',
-        contact: 'mayorovyf'
+        description: 'Представитель студии LightFall. В данном проекте отвечает за основную архитектуру, ключевые решения по развитию и интерфейсу.',
+        contact: 'LightFall: t.me/LightFallst\nTelegram: t.me/KPuCTaJl_Valley\nGithub: github.com/mayorovyf'
     },
     {
         id: 'fan',

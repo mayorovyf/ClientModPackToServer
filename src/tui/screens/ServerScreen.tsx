@@ -3,19 +3,21 @@ import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 
 import { cycleOption } from '../state/app-state.js';
-import type { RunFormState, RunSessionState, TuiMode } from '../state/app-state.js';
-import {
-    DEEP_CHECK_VALUES,
-    getRunFieldDefinitions,
-    PROFILE_VALUES,
-    REGISTRY_VALUES,
-    VALIDATION_VALUES
-} from '../state/run-fields.js';
-import type { RunFieldDefinition, RunFieldKey } from '../state/run-fields.js';
+import { getServerFieldDefinitions, SERVER_CORE_VALUES } from '../state/server-fields.js';
+import type { ServerFieldDefinition, ServerFieldKey } from '../state/server-fields.js';
 
-type EditableTextField = 'inputPath' | 'outputPath' | 'serverDirName' | 'reportDir';
+import type { ServerFormState } from '../state/app-state.js';
+import type { ServerManagerState } from '../hooks/use-server-manager.js';
 
-function formatRunListValue(value: string, maxLength = 24): string {
+type EditableServerField =
+    | 'targetDir'
+    | 'minecraftVersion'
+    | 'loaderVersion'
+    | 'javaPath'
+    | 'jvmArgs'
+    | 'explicitEntrypointPath';
+
+function formatServerFieldValue(value: string, maxLength = 28): string {
     if (value.length <= maxLength) {
         return value;
     }
@@ -44,36 +46,47 @@ function getVisibleFieldWindow(total: number, selectedIndex: number, maxVisible:
     return { start, end };
 }
 
-export function BuildScreen({
+export function ServerScreen({
     form,
-    uiMode,
-    session,
+    serverState,
+    latestBuildDir,
     fieldKeys,
     onChange,
-    onRun,
+    onUseLatestBuild,
+    onInstallCore,
+    onApplyEntrypointToValidation,
+    onLaunchServer,
+    onStopServer,
+    onClearLogs,
     onInteractionChange,
     onSelectedFieldChange,
     isFocused,
-    compact,
     height
 }: {
-    form: RunFormState;
-    uiMode: TuiMode;
-    session: RunSessionState;
-    fieldKeys?: RunFieldKey[];
-    onChange: (nextForm: RunFormState) => void;
-    onRun: () => void;
-    onInteractionChange: (isLocked: boolean) => void;
-    onSelectedFieldChange: (fieldKey: RunFieldKey) => void;
+    form: ServerFormState;
+    serverState: ServerManagerState;
+    latestBuildDir: string | null;
+    fieldKeys?: ServerFieldKey[];
+    onChange: (nextForm: ServerFormState) => void;
+    onUseLatestBuild: () => void;
+    onInstallCore: () => void;
+    onApplyEntrypointToValidation: () => void;
+    onLaunchServer: () => void;
+    onStopServer: () => void;
+    onClearLogs: () => void;
+    onInteractionChange: (locked: boolean) => void;
+    onSelectedFieldChange: (fieldKey: ServerFieldKey) => void;
     isFocused: boolean;
-    compact: boolean;
     height: number;
 }): React.JSX.Element {
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [editingField, setEditingField] = useState<EditableTextField | null>(null);
+    const [editingField, setEditingField] = useState<EditableServerField | null>(null);
     const [draftValue, setDraftValue] = useState('');
-    const fields = getRunFieldDefinitions(form, uiMode, session.status === 'running')
-        .filter((field) => !fieldKeys || fieldKeys.includes(field.key));
+    const fields = getServerFieldDefinitions({
+        form,
+        serverState,
+        hasLatestBuild: Boolean(latestBuildDir)
+    }).filter((field) => !fieldKeys || fieldKeys.includes(field.key));
     const selectedField = fields[selectedIndex] || fields[0];
 
     useEffect(() => {
@@ -119,47 +132,44 @@ export function BuildScreen({
         }
 
         switch (selectedField.key) {
-            case 'inputPath':
-            case 'outputPath':
-            case 'serverDirName':
-            case 'reportDir':
+            case 'targetDir':
+            case 'minecraftVersion':
+            case 'loaderVersion':
+            case 'javaPath':
+            case 'jvmArgs':
+            case 'explicitEntrypointPath':
                 setEditingField(selectedField.key);
                 setDraftValue(form[selectedField.key]);
                 return;
-            case 'dryRun':
+            case 'coreType':
                 onChange({
                     ...form,
-                    dryRun: !form.dryRun
+                    coreType: cycleOption(form.coreType, SERVER_CORE_VALUES)
                 });
                 return;
-            case 'profile':
+            case 'acceptEula':
                 onChange({
                     ...form,
-                    profile: cycleOption(form.profile, PROFILE_VALUES)
+                    acceptEula: !form.acceptEula
                 });
                 return;
-            case 'deepCheckMode':
-                onChange({
-                    ...form,
-                    deepCheckMode: cycleOption(form.deepCheckMode, DEEP_CHECK_VALUES)
-                });
+            case 'useLatestBuild':
+                onUseLatestBuild();
                 return;
-            case 'validationMode':
-                onChange({
-                    ...form,
-                    validationMode: cycleOption(form.validationMode, VALIDATION_VALUES)
-                });
+            case 'installCore':
+                onInstallCore();
                 return;
-            case 'registryMode':
-                onChange({
-                    ...form,
-                    registryMode: cycleOption(form.registryMode, REGISTRY_VALUES)
-                });
+            case 'applyEntrypointToValidation':
+                onApplyEntrypointToValidation();
                 return;
-            case 'run':
-                if (session.status !== 'running') {
-                    onRun();
-                }
+            case 'launchServer':
+                onLaunchServer();
+                return;
+            case 'stopServer':
+                onStopServer();
+                return;
+            case 'clearLogs':
+                onClearLogs();
                 return;
             default:
                 return;
@@ -168,7 +178,7 @@ export function BuildScreen({
 
     const contentLines = Math.max(6, height - 4);
     const headerLines = 3;
-    const footerLines = editingField ? 4 : 0;
+    const footerLines = editingField ? 4 : 2;
     const viewportLines = Math.max(2, contentLines - headerLines - footerLines);
     const linesPerField = 2;
     const visibleFieldCount = Math.max(1, Math.floor(viewportLines / linesPerField));
@@ -185,12 +195,12 @@ export function BuildScreen({
             width="100%"
             height={height}
             borderStyle="round"
-            borderColor={isFocused ? 'green' : 'yellow'}
+            borderColor={isFocused ? 'green' : 'cyan'}
             paddingX={1}
             paddingY={1}
             minWidth={0}
         >
-            <Text color="yellowBright">Запуск</Text>
+            <Text color="cyanBright">Server</Text>
             <Text dimColor wrap="truncate">
                 {`Поля ${windowRange.start + 1}-${windowRange.end} из ${fields.length}`}
             </Text>
@@ -199,7 +209,7 @@ export function BuildScreen({
                 {visibleFields.map((field, index) => {
                     const actualIndex = windowRange.start + index;
                     const isSelected = actualIndex === selectedIndex;
-                    const displayValue = formatRunListValue(field.value);
+                    const displayValue = formatServerFieldValue(field.value);
 
                     return (
                         <Box key={field.key} flexDirection="column" minWidth={0}>
@@ -232,25 +242,27 @@ export function BuildScreen({
 
             {editingField ? (
                 <Box flexDirection="column" minWidth={0}>
-                    <Box marginTop={1} flexDirection="column" minWidth={0}>
-                        <Text wrap="truncate">Введите новое значение и нажмите Enter:</Text>
-                        <TextInput
-                            defaultValue={draftValue}
-                            placeholder="Введите значение..."
-                            onChange={setDraftValue}
-                            onSubmit={(value) => {
-                                onChange({
-                                    ...form,
-                                    [editingField]: value
-                                });
-                                setEditingField(null);
-                                setDraftValue('');
-                            }}
-                        />
-                        <Text dimColor wrap="truncate">Esc отменяет редактирование</Text>
-                    </Box>
+                    <Text wrap="truncate">Введите новое значение и нажмите Enter:</Text>
+                    <TextInput
+                        defaultValue={draftValue}
+                        placeholder="Введите значение..."
+                        onChange={setDraftValue}
+                        onSubmit={(value) => {
+                            onChange({
+                                ...form,
+                                [editingField]: value
+                            });
+                            setEditingField(null);
+                            setDraftValue('');
+                        }}
+                    />
+                    <Text dimColor wrap="truncate">Esc отменяет редактирование</Text>
                 </Box>
-            ) : null}
+            ) : (
+                <Box flexDirection="column" minWidth={0}>
+                    <Text dimColor wrap="truncate">Enter редактирует поле или выполняет действие</Text>
+                </Box>
+            )}
         </Box>
     );
 }
