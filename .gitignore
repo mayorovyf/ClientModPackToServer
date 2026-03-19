@@ -39,5 +39,5 @@ Thumbs.db
 # Локальные и приватные переопределения данных
 /data/*.local.*
 /data/local-overrides.json
-cache/run-presets.json
+data/run-presets.json
 tui-settings.json
