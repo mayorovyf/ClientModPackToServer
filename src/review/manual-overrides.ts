@@ -18,6 +18,7 @@ export interface ManualReviewOverrideEntry extends ManualReviewSubject {
     action: ManualReviewAction;
     reason: string;
     updatedAt: string;
+    confirmedAt?: string | null;
 }
 
 export interface ManualReviewOverridesFile {
@@ -135,7 +136,8 @@ export function loadManualReviewOverrides(overridesPath: string | null): ManualR
                         loader: typeof entry.loader === 'string' ? entry.loader : null,
                         action: entry.action === 'exclude' ? 'exclude' : 'keep',
                         reason: typeof entry.reason === 'string' ? entry.reason : '',
-                        updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : ''
+                        updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : '',
+                        confirmedAt: typeof entry.confirmedAt === 'string' ? entry.confirmedAt : null
                     }))
                 : []
         };
@@ -195,12 +197,16 @@ export function setManualReviewOverride({
     reason?: string;
 }): ManualReviewOverridesFile {
     const overrides = loadManualReviewOverrides(overridesPath);
+    const previousMatch = findManualReviewOverride(overrides, subject);
     const updatedAt = new Date().toISOString();
     const nextEntry: ManualReviewOverrideEntry = {
         ...subject,
         action,
         reason: String(reason || '').trim(),
-        updatedAt
+        updatedAt,
+        confirmedAt: previousMatch?.entry.action === action
+            ? previousMatch.entry.confirmedAt || null
+            : null
     };
     const filteredEntries = overrides.entries.filter((entry) => (
         entry.key !== subject.key && normalizeFileName(entry.fileName) !== normalizeFileName(subject.fileName)
@@ -209,6 +215,39 @@ export function setManualReviewOverride({
         version: 1,
         updatedAt,
         entries: [...filteredEntries, nextEntry].sort((left, right) => left.fileName.localeCompare(right.fileName))
+    };
+
+    writeManualReviewOverrides(overridesPath, nextOverrides);
+    return nextOverrides;
+}
+
+export function confirmManualReviewOverride({
+    overridesPath,
+    subject
+}: {
+    overridesPath: string;
+    subject: ManualReviewSubject;
+}): ManualReviewOverridesFile {
+    const overrides = loadManualReviewOverrides(overridesPath);
+    const match = findManualReviewOverride(overrides, subject);
+
+    if (!match) {
+        return overrides;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const nextOverrides: ManualReviewOverridesFile = {
+        version: 1,
+        updatedAt,
+        entries: overrides.entries
+            .map((entry) => entry.key === match.entry.key
+                ? {
+                    ...entry,
+                    updatedAt,
+                    confirmedAt: updatedAt
+                }
+                : entry)
+            .sort((left, right) => left.fileName.localeCompare(right.fileName))
     };
 
     writeManualReviewOverrides(overridesPath, nextOverrides);
@@ -343,6 +382,7 @@ const manualReviewOverridesApi = {
     loadManualReviewOverrides,
     findManualReviewOverride,
     setManualReviewOverride,
+    confirmManualReviewOverride,
     removeManualReviewOverride,
     applyManualReviewOverrides
 };

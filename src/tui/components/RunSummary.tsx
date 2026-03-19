@@ -5,6 +5,16 @@ import { Spinner, StatusMessage } from '@inkjs/ui';
 import { useT } from '../i18n/use-t.js';
 import type { RunSessionState } from '../state/app-state.js';
 import { useScrollOffset } from '../hooks/use-scroll-offset.js';
+import type { RunReport } from '../../types/report.js';
+import type { ReportHistoryEntry } from '../state/report-history.js';
+
+function getEventKey(event: RunReport['events'][number] | RunSessionState['events'][number]): string {
+    return 'type' in event ? event.type : `${event.kind}:${event.message}`;
+}
+
+function getEventLabel(event: RunReport['events'][number] | RunSessionState['events'][number]): string {
+    return 'type' in event ? event.type : event.kind;
+}
 
 function getStatusVariant(status: RunSessionState['status']): 'info' | 'success' | 'error' | 'warning' {
     switch (status) {
@@ -37,29 +47,43 @@ function StatPill({
 
 export function RunSummary({
     session,
+    report = null,
+    reportEntry = null,
     compact,
     eventLimit,
     isFocused,
     height
 }: {
     session: RunSessionState;
+    report?: RunReport | null;
+    reportEntry?: ReportHistoryEntry | null;
     compact: boolean;
     eventLimit: number;
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
     const t = useT();
-    const reviewCount = session.lastReport?.arbiter?.summary.finalDecisions.review ?? 0;
-    const keptCount = session.lastReport?.stats.kept ?? 0;
-    const excludedCount = session.lastReport?.stats.excluded ?? 0;
-    const validationStatus = session.lastReport?.validation?.status ?? t('common.placeholder.na');
+    const sourceReport = report || session.lastReport;
+    const isHistorical = Boolean(report);
+    const historicalError = sourceReport?.errors[0]?.message || t('common.value.unknown');
+    const reviewCount = sourceReport?.arbiter?.summary.finalDecisions.review ?? 0;
+    const keptCount = sourceReport?.stats.kept ?? 0;
+    const excludedCount = sourceReport?.stats.excluded ?? 0;
+    const validationStatus = sourceReport?.validation?.status ?? t('common.placeholder.na');
+    const summaryStatus: RunSessionState['status'] = isHistorical
+        ? ((sourceReport?.errors.length ?? 0) > 0 ? 'failed' : 'succeeded')
+        : session.status;
+    const runId = sourceReport?.run.runId || reportEntry?.runId || session.runId;
+    const events = isHistorical ? (sourceReport?.events ?? []) : session.events;
+    const reportPath = sourceReport?.run.jsonReportPath || reportEntry?.jsonReportPath || session.reportPaths.jsonReportPath;
+    const summaryPath = sourceReport?.run.summaryPath || reportEntry?.summaryPath || session.reportPaths.summaryPath;
     const visibleEventLimit = Math.max(1, Math.min(eventLimit, Math.max(height - 15, 1)));
     const { offset, hasOverflow } = useScrollOffset({
-        itemCount: session.events.length,
+        itemCount: events.length,
         viewportSize: visibleEventLimit,
         enabled: isFocused
     });
-    const visibleEvents = session.events.slice(offset, offset + visibleEventLimit);
+    const visibleEvents = events.slice(offset, offset + visibleEventLimit);
 
     return (
         <Box
@@ -76,23 +100,23 @@ export function RunSummary({
             <Box flexDirection="column" minWidth={0}>
                 <Text color="greenBright" wrap="truncate">{t('runSummary.title')}</Text>
                 <Box marginTop={1} minWidth={0}>
-                    <StatusMessage variant={getStatusVariant(session.status)}>
-                        {session.status === 'running'
+                    <StatusMessage variant={getStatusVariant(summaryStatus)}>
+                        {summaryStatus === 'running'
                             ? t('runSummary.status.running')
-                            : session.status === 'succeeded'
+                            : summaryStatus === 'succeeded'
                                 ? t('runSummary.status.succeeded')
-                                : session.status === 'failed'
-                                    ? t('runSummary.status.failed', { error: session.lastError || t('common.value.unknown') })
+                                : summaryStatus === 'failed'
+                                    ? t('runSummary.status.failed', { error: isHistorical ? historicalError : (session.lastError || t('common.value.unknown')) })
                                     : t('runSummary.status.idle')}
                     </StatusMessage>
                 </Box>
-                {session.status === 'running' ? (
+                {summaryStatus === 'running' && !isHistorical ? (
                     <Box marginTop={1} minWidth={0}>
                         <Spinner label={session.currentStage ? t('runSummary.spinner.stage', { stage: session.currentStage }) : t('runSummary.spinner.starting')} />
                     </Box>
                 ) : null}
                 <Box marginTop={1} minWidth={0}>
-                    <Text wrap="wrap">{`${t('runSummary.runId')}: ${session.runId || t('common.placeholder.na')}`}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.runId')}: ${runId || t('common.placeholder.na')}`}</Text>
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
                     <StatPill
@@ -109,8 +133,8 @@ export function RunSummary({
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
                     <Text wrap="wrap">{`${t('runSummary.validation')}: ${validationStatus}`}</Text>
-                    <Text wrap="wrap">{`${t('runSummary.report')}: ${session.reportPaths.jsonReportPath || t('common.placeholder.na')}`}</Text>
-                    <Text wrap="wrap">{`${t('runSummary.summary')}: ${session.reportPaths.summaryPath || t('common.placeholder.na')}`}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.report')}: ${reportPath || t('common.placeholder.na')}`}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.summary')}: ${summaryPath || t('common.placeholder.na')}`}</Text>
                 </Box>
             </Box>
             <Box flexDirection="column" minWidth={0}>
@@ -119,14 +143,14 @@ export function RunSummary({
                     <Text dimColor wrap="truncate">
                         {t('runSummary.events.scroll', {
                             start: offset + 1,
-                            end: Math.min(offset + visibleEvents.length, session.events.length),
-                            total: session.events.length
+                            end: Math.min(offset + visibleEvents.length, events.length),
+                            total: events.length
                         })}
                     </Text>
                 ) : null}
                 {visibleEvents.map((event) => (
-                    <Text key={`${event.timestamp}-${event.type}`} dimColor wrap="wrap">
-                        {event.type}
+                    <Text key={`${event.timestamp}-${getEventKey(event)}`} dimColor wrap="wrap">
+                        {getEventLabel(event)}
                     </Text>
                 ))}
                 {visibleEvents.length === 0 ? <Text dimColor wrap="wrap">{t('runSummary.events.empty')}</Text> : null}

@@ -264,10 +264,12 @@ export function useServerManager(): {
     }
 
     function setResolvedEntrypointPath(value: string | null): void {
-        setState((previous) => ({
-            ...previous,
-            resolvedEntrypointPath: value
-        }));
+        setState((previous) => previous.resolvedEntrypointPath === value
+            ? previous
+            : {
+                ...previous,
+                resolvedEntrypointPath: value
+            });
     }
 
     return {

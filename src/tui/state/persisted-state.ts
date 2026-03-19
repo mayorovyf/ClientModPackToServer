@@ -20,7 +20,7 @@ export interface PersistedTuiState {
     serverForm: ServerFormState;
 }
 
-const VALID_SCREENS: ScreenId[] = ['build', 'server', 'results', 'settings'];
+const VALID_SCREENS: ScreenId[] = ['build', 'results', 'server', 'settings'];
 const VALID_UI_MODES: TuiMode[] = ['simple', 'expert'];
 const DEFAULT_TUI_SETTINGS_PATH = path.resolve(process.cwd(), 'data', 'tui-settings.json');
 
@@ -109,8 +109,12 @@ function normalizeActivePageByScreen(value: unknown): ActivePageByScreen {
         mutablePages.results = 'reports';
     }
 
+    if (candidate.results === 'review') {
+        mutablePages.results = 'overview';
+    }
+
     if (candidate.review === 'queue') {
-        mutablePages.results = 'review';
+        mutablePages.results = 'overview';
     }
 
     if (candidate.registry === 'overview') {

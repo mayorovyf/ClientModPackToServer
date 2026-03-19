@@ -10,7 +10,7 @@ export type TuiMode = 'simple' | 'expert';
 export type ScreenId = 'build' | 'server' | 'results' | 'settings';
 export type BuildPageId = 'inputs' | 'run' | 'presets';
 export type ServerPageId = 'setup' | 'install' | 'doctor' | 'launch' | 'logs';
-export type ResultsPageId = 'overview' | 'validation' | 'reports' | 'review';
+export type ResultsPageId = 'overview' | 'validation' | 'reports';
 export type SettingsPageId = 'general' | 'registry' | 'about';
 export type RunSessionStatus = 'idle' | 'running' | 'succeeded' | 'failed';
 export type FocusedColumn = 'sidebar' | 'content' | 'details';
@@ -93,15 +93,15 @@ export interface RunSessionState {
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
     { id: 'build', labelKey: 'nav.build.label', descriptionKey: 'nav.build.description' },
-    { id: 'server', labelKey: 'nav.server.label', descriptionKey: 'nav.server.description' },
     { id: 'results', labelKey: 'nav.results.label', descriptionKey: 'nav.results.description' },
+    { id: 'server', labelKey: 'nav.server.label', descriptionKey: 'nav.server.description' },
     { id: 'settings', labelKey: 'nav.settings.label', descriptionKey: 'nav.settings.description' }
 ];
 
 export const PAGE_ORDER_BY_SCREEN: { [K in ScreenId]: readonly SectionPageMap[K][] } = {
     build: ['inputs', 'run', 'presets'],
     server: ['setup', 'install', 'doctor', 'launch', 'logs'],
-    results: ['overview', 'validation', 'reports', 'review'],
+    results: ['reports', 'overview', 'validation'],
     settings: ['general', 'registry', 'about']
 };
 
@@ -109,7 +109,7 @@ export function createDefaultActivePageByScreen(): ActivePageByScreen {
     return {
         build: 'inputs',
         server: 'setup',
-        results: 'overview',
+        results: 'reports',
         settings: 'general'
     };
 }

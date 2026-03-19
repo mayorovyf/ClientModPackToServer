@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 
 import { useT } from '../i18n/use-t.js';
+import { normalizeHotkeyInput } from '../lib/normalize-hotkey-input.js';
 import type { RunPreset } from '../state/presets.js';
 
 function getVisibleWindow(total: number, selectedIndex: number, maxVisible: number): { start: number; end: number } {
@@ -86,6 +87,8 @@ export function PresetsScreen({
     }, [onSelectedPresetIdChange, presets, selectedIndex, selectedPresetId]);
 
     useInput((input, key) => {
+        const normalizedInput = normalizeHotkeyInput(input);
+
         if (!isFocused) {
             return;
         }
@@ -114,18 +117,18 @@ export function PresetsScreen({
             return;
         }
 
-        if (input.toLowerCase() === 'n') {
+        if (normalizedInput === 'n') {
             setCreatingPreset(true);
             setDraftName('');
             return;
         }
 
-        if (input.toLowerCase() === 'u' && presets[selectedIndex]) {
+        if (normalizedInput === 'u' && presets[selectedIndex]) {
             onUpdatePreset();
             return;
         }
 
-        if (input.toLowerCase() === 'd' && presets[selectedIndex]) {
+        if (normalizedInput === 'd' && presets[selectedIndex]) {
             onDeletePreset();
         }
     });

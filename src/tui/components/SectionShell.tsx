@@ -11,12 +11,16 @@ const SECTION_TAB_COLOR: Record<ScreenId, string> = {
     settings: 'gray'
 };
 
-interface TabSegment {
+const BORDER_HORIZONTAL = '\u2500';
+const BORDER_RIGHT_TEE = '\u2524';
+const BORDER_LEFT_TEE = '\u251C';
+
+interface BorderSegment {
     text: string;
-    active?: boolean;
+    color: string;
 }
 
-function fitTabLabels(labels: string[], maxChars: number): string[] {
+function fitBorderLabels(labels: string[], maxChars: number): string[] {
     if (labels.length === 0) {
         return [];
     }
@@ -53,49 +57,57 @@ function fitTabLabels(labels: string[], maxChars: number): string[] {
     return charArrays.map((chars, index) => chars.slice(0, lengths[index]).join(''));
 }
 
-function buildTabSegments(labels: string[], activeIndex: number, innerWidth: number): TabSegment[] {
+function buildBorderSegments(labels: string[], activeIndex: number, innerWidth: number, borderColor: string): BorderSegment[] {
     if (innerWidth <= 0) {
         return [];
     }
 
+    if (labels.length === 0) {
+        return [{
+            text: BORDER_HORIZONTAL.repeat(innerWidth),
+            color: borderColor
+        }];
+    }
+
+    const prefixWidth = Math.min(2, innerWidth);
     const delimiterWidth = labels.length * 2;
-    const minimumTailWidth = innerWidth > 2 + delimiterWidth ? 1 : 0;
-    const labelBudget = Math.max(labels.length, innerWidth - 2 - delimiterWidth - minimumTailWidth);
-    const fittedLabels = fitTabLabels(labels, labelBudget);
-    const segments: TabSegment[] = [{ text: '──' }];
+    const minimumTailWidth = innerWidth > prefixWidth + delimiterWidth ? 1 : 0;
+    const labelBudget = Math.max(labels.length, innerWidth - prefixWidth - delimiterWidth - minimumTailWidth);
+    const fittedLabels = fitBorderLabels(labels, labelBudget);
+    const segments: BorderSegment[] = [{
+        text: BORDER_HORIZONTAL.repeat(prefixWidth),
+        color: borderColor
+    }];
 
     for (const [index, label] of fittedLabels.entries()) {
-        segments.push({ text: '┤' });
-        segments.push({ text: label, active: index === activeIndex });
-        segments.push({ text: '├' });
+        segments.push({ text: BORDER_RIGHT_TEE, color: borderColor });
+        segments.push({
+            text: label,
+            color: index === activeIndex ? 'whiteBright' : borderColor
+        });
+        segments.push({ text: BORDER_LEFT_TEE, color: borderColor });
     }
 
     const usedWidth = segments.reduce((sum, segment) => sum + Array.from(segment.text).length, 0);
     const tailWidth = Math.max(0, innerWidth - usedWidth);
 
     if (tailWidth > 0) {
-        segments.push({ text: '─'.repeat(tailWidth) });
+        segments.push({
+            text: BORDER_HORIZONTAL.repeat(tailWidth),
+            color: borderColor
+        });
     }
 
     return segments;
 }
 
-function renderTabsOnBorder<S extends ScreenId>({
-    section,
-    activePageId,
-    isFocused,
-    width
-}: {
-    section: SectionDefinition<S>;
-    activePageId: SectionPageMap[S];
-    isFocused: boolean;
-    width: number;
-}): React.JSX.Element {
+function getBorderColor<S extends ScreenId>(section: SectionDefinition<S>, activePageId: SectionPageMap[S], isFocused: boolean): string {
     const activePage = section.pages.find((page) => page.id === activePageId) ?? section.pages[0];
-    const borderColor = isFocused ? 'green' : (activePage?.chromeColor ?? SECTION_TAB_COLOR[section.id] ?? 'cyan');
+    return isFocused ? 'green' : (activePage?.chromeColor ?? SECTION_TAB_COLOR[section.id] ?? 'cyan');
+}
+
+function renderBorderLine(segments: BorderSegment[], width: number): React.JSX.Element {
     const innerWidth = Math.max(1, width - 2);
-    const activeIndex = Math.max(0, section.pages.findIndex((page) => page.id === activePageId));
-    const segments = buildTabSegments(section.pages.map((page) => page.label), activeIndex, innerWidth);
 
     return (
         <Box flexDirection="row" width={width} minWidth={0}>
@@ -105,7 +117,7 @@ function renderTabsOnBorder<S extends ScreenId>({
                     {segments.map((segment, index) => (
                         <Text
                             key={`${index}-${segment.text}`}
-                            color={segment.active ? 'whiteBright' : borderColor}
+                            color={segment.color}
                         >
                             {segment.text}
                         </Text>
@@ -120,6 +132,7 @@ function renderTabsOnBorder<S extends ScreenId>({
 export function SectionShell<S extends ScreenId>({
     section,
     activePageId,
+    frameLabel = null,
     height,
     width,
     isFocused,
@@ -127,6 +140,7 @@ export function SectionShell<S extends ScreenId>({
 }: {
     section: SectionDefinition<S>;
     activePageId: SectionPageMap[S];
+    frameLabel?: string | null;
     height: number;
     width: number;
     isFocused: boolean;
@@ -134,6 +148,15 @@ export function SectionShell<S extends ScreenId>({
 }): React.JSX.Element {
     const showTabs = section.pages.length > 1;
     const contentHeight = Math.max(1, height);
+    const innerWidth = Math.max(1, width - 2);
+    const borderColor = getBorderColor(section, activePageId, isFocused);
+    const activeIndex = Math.max(0, section.pages.findIndex((page) => page.id === activePageId));
+    const topSegments = showTabs
+        ? buildBorderSegments(section.pages.map((page) => page.label), activeIndex, innerWidth, borderColor)
+        : [];
+    const bottomSegments = frameLabel
+        ? buildBorderSegments([frameLabel], 0, innerWidth, borderColor)
+        : [];
 
     return (
         <Box flexDirection="column" width={width} height={height} minWidth={0} position="relative">
@@ -142,7 +165,12 @@ export function SectionShell<S extends ScreenId>({
             </Box>
             {showTabs ? (
                 <Box position="absolute" width={width} height={1} minWidth={0}>
-                    {renderTabsOnBorder({ section, activePageId, isFocused, width })}
+                    {renderBorderLine(topSegments, width)}
+                </Box>
+            ) : null}
+            {frameLabel ? (
+                <Box position="absolute" width={width} height={1} minWidth={0} marginTop={Math.max(0, height - 1)}>
+                    {renderBorderLine(bottomSegments, width)}
                 </Box>
             ) : null}
         </Box>

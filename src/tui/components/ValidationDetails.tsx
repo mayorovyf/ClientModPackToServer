@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 
 import { useT } from '../i18n/use-t.js';
 import type { RunFormState, RunSessionState } from '../state/app-state.js';
+import type { RunReport } from '../../types/report.js';
 
 function DetailLine({
     label,
@@ -32,14 +33,20 @@ function DetailLine({
 export function ValidationDetails({
     form,
     session,
+    report = null,
     height
 }: {
     form: RunFormState;
     session: RunSessionState;
+    report?: RunReport | null;
     height: number;
 }): React.JSX.Element {
     const t = useT();
-    const validation = session.lastReport?.validation || null;
+    const sourceReport = report || session.lastReport;
+    const validation = sourceReport?.validation || null;
+    const validationMode = sourceReport?.run.validationMode || form.validationMode;
+    const validationEntrypointPath = sourceReport?.run.validationEntrypointPath || form.validationEntrypointPath;
+    const validationSaveArtifacts = sourceReport?.run.validationSaveArtifacts;
     const issuePreview = validation?.issues.slice(0, 4) || [];
     const suspectedPreview = validation?.suspectedFalseRemovals.slice(0, 3) || [];
     const statusColor = validation?.status === 'passed'
@@ -63,11 +70,11 @@ export function ValidationDetails({
             <Box flexDirection="column" minWidth={0}>
                 <Text color="greenBright" wrap="wrap">{t('details.validation.title')}</Text>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <DetailLine label={t('details.validation.mode')} value={form.validationMode} />
+                    <DetailLine label={t('details.validation.mode')} value={validationMode} />
                     <DetailLine label={t('details.validation.status')} value={validation?.status || 'not-run'} color={statusColor} />
-                    <DetailLine label={t('details.validation.entrypoint')} value={validation?.entrypoint?.path || form.validationEntrypointPath || t('common.placeholder.auto')} />
+                    <DetailLine label={t('details.validation.entrypoint')} value={validation?.entrypoint?.path || validationEntrypointPath || t('common.placeholder.auto')} />
                     <DetailLine label={t('details.validation.duration')} value={validation ? `${validation.durationMs} ms` : t('common.placeholder.na')} />
-                    <DetailLine label={t('details.validation.artifacts')} value={form.validationSaveArtifacts ? t('common.value.forcedOn') : t('common.value.defaultPolicy')} />
+                    <DetailLine label={t('details.validation.artifacts')} value={(validationSaveArtifacts ?? form.validationSaveArtifacts) ? t('common.value.forcedOn') : t('common.value.defaultPolicy')} />
                 </Box>
             </Box>
 

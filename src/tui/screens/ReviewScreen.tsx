@@ -4,6 +4,7 @@ import { Box, Text, useInput } from 'ink';
 import type { ManualReviewAction } from '../../review/manual-overrides.js';
 import { useLocale } from '../i18n/use-locale.js';
 import { useT } from '../i18n/use-t.js';
+import { normalizeHotkeyInput } from '../lib/normalize-hotkey-input.js';
 import { translateDecisionReason } from '../lib/translate-reason.js';
 import type { ReviewItem } from '../state/review-items.js';
 
@@ -103,6 +104,8 @@ export function ReviewScreen({
     }, [items, onSelectedItemChange, selectedIndex, selectedItemId]);
 
     useInput((input, key) => {
+        const normalizedInput = normalizeHotkeyInput(input);
+
         if (!isFocused || items.length === 0) {
             return;
         }
@@ -116,8 +119,6 @@ export function ReviewScreen({
             setSelectedIndex((current) => (current >= items.length - 1 ? 0 : current + 1));
             return;
         }
-
-        const normalizedInput = input.toLowerCase();
 
         if (normalizedInput === 'k') {
             onSaveOverride('keep');

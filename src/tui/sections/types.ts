@@ -3,6 +3,7 @@ import React from 'react';
 import type { MessageKey } from '../../i18n/catalog.js';
 import type { Locale, Translator } from '../../i18n/types.js';
 import type { ManualReviewAction } from '../../review/manual-overrides.js';
+import type { RunReport } from '../../types/report.js';
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
 import type {
     RunFormState,
@@ -15,7 +16,8 @@ import type {
 import type { ReportHistoryState } from '../state/report-history.js';
 import type { RunPreset } from '../state/presets.js';
 import type { ServerDoctorState } from '../state/server-doctor.js';
-import type { ReviewItem } from '../state/review-items.js';
+import type { ResultModItem, ResultModsSortMode } from '../state/results-mods.js';
+import type { DecisionReviewState, ReviewItem } from '../state/review-items.js';
 import type { RunFieldKey } from '../state/run-fields.js';
 import type { ServerFieldKey } from '../state/server-fields.js';
 import type { SettingsFieldKey } from '../state/settings-fields.js';
@@ -36,6 +38,7 @@ export interface SectionPageDefinition<S extends ScreenId = ScreenId> {
     id: SectionPageMap[S];
     label: string;
     chromeColor?: string;
+    frameLabel?: string | null;
     hasDetails?: boolean;
     renderContent: (props: SectionRenderProps) => React.JSX.Element;
     renderDetails?: (props: SectionRenderProps) => React.JSX.Element | null;
@@ -87,6 +90,21 @@ export interface SectionRegistryContext {
     selectedReportRunId: string;
     setSelectedReportRunId: (runId: string) => void;
     selectedReportEntry: ReportHistoryState['entries'][number] | null;
+    selectedReport: RunReport | null;
+    allResultModItems?: ResultModItem[];
+    resultModItems: ResultModItem[];
+    resultModDisputedCount?: number;
+    selectedResultMod: ResultModItem | null;
+    selectedResultModReviewState?: DecisionReviewState | null;
+    selectedResultModId: string;
+    setSelectedResultModId: (itemId: string) => void;
+    saveSelectedResultModOverride?: (action: ManualReviewAction) => void;
+    confirmSelectedResultModOverride?: () => void;
+    clearSelectedResultModOverride?: () => void;
+    resultModsDisputedOnly: boolean;
+    setResultModsDisputedOnly: (nextValue: boolean) => void;
+    resultModsSortMode: ResultModsSortMode;
+    setResultModsSortMode: (nextValue: ResultModsSortMode) => void;
     reportHistory: ReportHistoryState;
     reviewItems: ReviewItem[];
     selectedReviewItem: ReviewItem | null;

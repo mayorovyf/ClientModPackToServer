@@ -47,6 +47,17 @@ function getScreenSpecificHints(
                 t('sidebar.hint.server.useLatestBuild'),
                 t('sidebar.hint.server.applyValidation')
             ];
+        case 'results':
+            if (activePageId === 'overview') {
+                return [
+                    t('sidebar.hint.results.confirm'),
+                    t('sidebar.hint.results.filter'),
+                    t('sidebar.hint.results.sort'),
+                    t('sidebar.hint.results.review')
+                ];
+            }
+
+            return [];
         default:
             return [];
     }

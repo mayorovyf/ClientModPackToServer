@@ -1,8 +1,9 @@
 import { useInput } from 'ink';
+import { normalizeHotkeyInput } from '../lib/normalize-hotkey-input.js';
 
 import type { FocusedColumn, ScreenId, TuiMode } from '../state/app-state.js';
 
-const SCREEN_ORDER: ScreenId[] = ['build', 'server', 'results', 'settings'];
+const SCREEN_ORDER: ScreenId[] = ['build', 'results', 'server', 'settings'];
 const DEFAULT_COLUMN_ORDER: FocusedColumn[] = ['sidebar', 'content', 'details'];
 
 export function getAdjacentScreen(currentScreen: ScreenId, direction: 'prev' | 'next'): ScreenId {
@@ -99,6 +100,8 @@ export function useHotkeys({
     onExit: () => void;
 }): void {
     useInput((input, key) => {
+        const normalizedInput = normalizeHotkeyInput(input);
+
         if (key.ctrl && input === 'c') {
             onExit();
             return;
@@ -108,12 +111,12 @@ export function useHotkeys({
             return;
         }
 
-        if (input.toLowerCase() === 'm') {
+        if (normalizedInput === 'm') {
             setUiMode(uiMode === 'simple' ? 'expert' : 'simple');
             return;
         }
 
-        if (input.toLowerCase() === 'r' && !isRunning) {
+        if (normalizedInput === 'r' && !isRunning) {
             onRun();
             return;
         }
@@ -140,11 +143,11 @@ export function useHotkeys({
         if (
             focusedColumn === 'content'
             && activePageIds.length > 1
-            && (key.tab || input === ',' || input === '.')
+            && (key.tab || normalizedInput === ',' || normalizedInput === '.')
         ) {
             onActivePageChange(getAdjacentPage(
                 activePageId,
-                key.shift || input === ',' ? 'prev' : 'next',
+                key.shift || normalizedInput === ',' ? 'prev' : 'next',
                 activePageIds
             ));
             return;

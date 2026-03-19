@@ -1,19 +1,20 @@
 import React from 'react';
 
 import { ReportsDetails } from '../components/ReportsDetails.js';
-import { ReviewDetails } from '../components/ReviewDetails.js';
-import { RunSummary } from '../components/RunSummary.js';
+import { ResultModsDetails } from '../components/ResultModsDetails.js';
 import { ValidationDetails } from '../components/ValidationDetails.js';
 import { BuildValidationScreen } from '../screens/BuildValidationScreen.js';
+import { ResultModsScreen } from '../screens/ResultModsScreen.js';
 import { ReportsScreen } from '../screens/ReportsScreen.js';
-import { ReviewScreen } from '../screens/ReviewScreen.js';
 
 import type { MessageKey } from '../../i18n/catalog.js';
 import type { Translator } from '../../i18n/types.js';
 import type { ManualReviewAction } from '../../review/manual-overrides.js';
+import type { RunReport } from '../../types/report.js';
 import type { RunFormState, RunSessionState } from '../state/app-state.js';
 import type { ReportHistoryState } from '../state/report-history.js';
-import type { ReviewItem } from '../state/review-items.js';
+import type { ResultModItem, ResultModsSortMode } from '../state/results-mods.js';
+import type { DecisionReviewState } from '../state/review-items.js';
 import type { SectionDefinition, SectionNoticeState } from './types.js';
 
 export function createResultsSection({
@@ -24,13 +25,22 @@ export function createResultsSection({
     reportHistory,
     selectedReportRunId,
     selectedReportEntry,
+    selectedReport,
+    allResultModItems,
+    resultModItems,
+    resultModDisputedCount,
+    selectedResultMod,
+    selectedResultModReviewState,
+    selectedResultModId,
+    onSelectedResultModIdChange,
+    onSaveSelectedResultModOverride,
+    onConfirmSelectedResultModOverride,
+    onClearSelectedResultModOverride,
+    resultModsDisputedOnly,
+    onResultModsDisputedOnlyChange,
+    resultModsSortMode,
+    onResultModsSortModeChange,
     onSelectedReportRunIdChange,
-    reviewItems,
-    selectedReviewItem,
-    selectedReviewItemId,
-    onSelectedReviewItemIdChange,
-    onSaveReviewOverride,
-    onClearReviewOverride,
     reviewOverridesPath,
     reviewNotice
 }: {
@@ -41,84 +51,37 @@ export function createResultsSection({
     reportHistory: ReportHistoryState;
     selectedReportRunId: string;
     selectedReportEntry: ReportHistoryState['entries'][number] | null;
+    selectedReport: RunReport | null;
+    allResultModItems: ResultModItem[];
+    resultModItems: ResultModItem[];
+    resultModDisputedCount: number;
+    selectedResultMod: ResultModItem | null;
+    selectedResultModReviewState: DecisionReviewState | null;
+    selectedResultModId: string;
+    onSelectedResultModIdChange: (itemId: string) => void;
+    onSaveSelectedResultModOverride: (action: ManualReviewAction) => void;
+    onConfirmSelectedResultModOverride: () => void;
+    onClearSelectedResultModOverride: () => void;
+    resultModsDisputedOnly: boolean;
+    onResultModsDisputedOnlyChange: (nextValue: boolean) => void;
+    resultModsSortMode: ResultModsSortMode;
+    onResultModsSortModeChange: (nextValue: ResultModsSortMode) => void;
     onSelectedReportRunIdChange: (runId: string) => void;
-    reviewItems: ReviewItem[];
-    selectedReviewItem: ReviewItem | null;
-    selectedReviewItemId: string;
-    onSelectedReviewItemIdChange: (itemId: string) => void;
-    onSaveReviewOverride: (action: ManualReviewAction) => void;
-    onClearReviewOverride: () => void;
     reviewOverridesPath: string;
     reviewNotice: SectionNoticeState | null;
 }): SectionDefinition<'results'> {
+    const selectedRunLabel = selectedReport?.run.runId || selectedReportEntry?.runId || null;
+
     return {
         id: 'results',
         label: t('nav.results.label'),
-        defaultPage: 'overview',
+        defaultPage: 'reports',
         pages: [
-            {
-                id: 'overview',
-                label: t('page.results.overview'),
-                chromeColor: 'green',
-                hasDetails: true,
-                renderContent: ({ contentHeight, isContentFocused }) => (
-                    <RunSummary
-                        session={session}
-                        compact={compact}
-                        eventLimit={12}
-                        isFocused={isContentFocused}
-                        height={contentHeight}
-                    />
-                ),
-                renderDetails: ({ detailsHeight, isDetailsFocused }) => (
-                    <ReportsDetails
-                        entry={selectedReportEntry}
-                        reportRootDir={reportHistory.reportRootDir}
-                        loadError={reportHistory.error}
-                        isFocused={isDetailsFocused}
-                        height={detailsHeight}
-                    />
-                ),
-                getStatusMessage: () => selectedReportEntry
-                    ? t('section.results.overview.latest', { runId: selectedReportEntry.runId })
-                    : t('section.results.overview.empty')
-            },
-            {
-                id: 'validation',
-                label: t('page.results.validation'),
-                chromeColor: 'yellow',
-                hasDetails: true,
-                renderContent: ({ contentHeight, isContentFocused }) => (
-                    <BuildValidationScreen
-                        form={form}
-                        session={session}
-                        isFocused={isContentFocused}
-                        height={contentHeight}
-                    />
-                ),
-                renderDetails: ({ detailsHeight }) => (
-                    <ValidationDetails
-                        form={form}
-                        session={session}
-                        height={detailsHeight}
-                    />
-                ),
-                getStatusMessage: () => {
-                    const validationStatus = session.lastReport?.validation?.status || null;
-
-                    if (validationStatus) {
-                        return t('section.build.validation.latestStatus', { status: validationStatus });
-                    }
-
-                    return form.validationMode === 'off'
-                        ? t('section.build.validation.disabled')
-                        : t('section.build.validation.none');
-                }
-            },
             {
                 id: 'reports',
                 label: t('page.results.reports'),
                 chromeColor: 'magenta',
+                frameLabel: selectedRunLabel,
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ReportsScreen
@@ -146,34 +109,88 @@ export function createResultsSection({
                         : t('section.reports.status.empty'))
             },
             {
-                id: 'review',
-                label: t('page.results.review'),
-                chromeColor: 'red',
+                id: 'overview',
+                label: t('page.results.overview'),
+                chromeColor: 'green',
+                frameLabel: selectedRunLabel,
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
-                    <ReviewScreen
-                        items={reviewItems}
-                        selectedItemId={selectedReviewItemId}
-                        onSelectedItemChange={onSelectedReviewItemIdChange}
-                        onSaveOverride={onSaveReviewOverride}
-                        onClearOverride={onClearReviewOverride}
+                    <ResultModsScreen
+                        items={resultModItems}
+                        totalCount={allResultModItems.length}
+                        disputedCount={resultModDisputedCount}
+                        selectedItemId={selectedResultModId}
+                        onSelectedItemChange={onSelectedResultModIdChange}
+                        onSaveOverride={onSaveSelectedResultModOverride}
+                        onConfirmOverride={onConfirmSelectedResultModOverride}
+                        onClearOverride={onClearSelectedResultModOverride}
+                        disputedOnly={resultModsDisputedOnly}
+                        onDisputedOnlyChange={onResultModsDisputedOnlyChange}
+                        sortMode={resultModsSortMode}
+                        onSortModeChange={onResultModsSortModeChange}
                         isFocused={isContentFocused}
                         height={contentHeight}
                     />
                 ),
                 renderDetails: ({ detailsHeight, isDetailsFocused }) => (
-                    <ReviewDetails
-                        item={selectedReviewItem}
-                        overridesPath={reviewOverridesPath}
-                        notice={reviewNotice}
+                    <ResultModsDetails
+                        item={selectedResultMod}
+                        reviewState={selectedResultModReviewState}
+                        totalCount={resultModItems.length}
+                        disputedCount={resultModDisputedCount}
+                        disputedOnly={resultModsDisputedOnly}
+                        sortMode={resultModsSortMode}
+                        reviewOverridesPath={reviewOverridesPath}
+                        reviewNotice={reviewNotice}
                         isFocused={isDetailsFocused}
                         height={detailsHeight}
                     />
                 ),
-                getStatusMessage: () => reviewItems.length > 0
-                    ? t('section.review.status.shortcuts')
-                    : t('section.review.status.empty')
-            }
+                getStatusMessage: () => selectedReportEntry
+                    ? t('section.results.mods.selected', {
+                        runId: selectedReportEntry.runId,
+                        count: resultModItems.length,
+                        disputed: resultModDisputedCount,
+                        filter: resultModsDisputedOnly ? t('screen.mods.filter.disputed') : t('screen.mods.filter.all'),
+                        sort: t(`screen.mods.sort.${resultModsSortMode}` as MessageKey)
+                    })
+                    : t('section.results.mods.empty')
+            },
+            {
+                id: 'validation',
+                label: t('page.results.validation'),
+                chromeColor: 'yellow',
+                frameLabel: selectedRunLabel,
+                hasDetails: true,
+                renderContent: ({ contentHeight, isContentFocused }) => (
+                    <BuildValidationScreen
+                        form={form}
+                        session={session}
+                        report={selectedReport}
+                        isFocused={isContentFocused}
+                        height={contentHeight}
+                    />
+                ),
+                renderDetails: ({ detailsHeight }) => (
+                    <ValidationDetails
+                        form={form}
+                        session={session}
+                        report={selectedReport}
+                        height={detailsHeight}
+                    />
+                ),
+                getStatusMessage: () => {
+                    const validationStatus = selectedReport?.validation?.status || null;
+
+                    if (validationStatus) {
+                        return t('section.build.validation.latestStatus', { status: validationStatus });
+                    }
+
+                    return form.validationMode === 'off'
+                        ? t('section.build.validation.disabled')
+                        : t('section.build.validation.none');
+                }
+            },
         ]
     };
 }

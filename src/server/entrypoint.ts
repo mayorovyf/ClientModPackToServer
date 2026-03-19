@@ -3,37 +3,23 @@ import path from 'node:path';
 
 import type { ManagedServerEntrypoint, ManagedServerEntrypointKind } from './types.js';
 
-function walkFiles(rootDirectory: string): string[] {
-    if (!rootDirectory || !fs.existsSync(rootDirectory)) {
-        return [];
-    }
-
-    const queue: string[] = [rootDirectory];
-    const discovered: string[] = [];
-
-    while (queue.length > 0) {
-        const currentDirectory = queue.shift();
-
-        if (!currentDirectory) {
-            continue;
-        }
-
-        const entries = fs.readdirSync(currentDirectory, { withFileTypes: true });
-
-        for (const entry of entries) {
-            const fullPath = path.join(currentDirectory, entry.name);
-
-            if (entry.isDirectory()) {
-                queue.push(fullPath);
-                continue;
-            }
-
-            discovered.push(fullPath);
-        }
-    }
-
-    return discovered;
-}
+const MAX_AUTO_SCAN_DEPTH = 2;
+const IGNORED_AUTO_SCAN_DIRECTORIES = new Set([
+    'world',
+    'world_nether',
+    'world_the_end',
+    'logs',
+    'mods',
+    'config',
+    'defaultconfigs',
+    'kubejs',
+    'libraries',
+    'crash-reports',
+    'resourcepacks',
+    'datapacks',
+    'cache',
+    'backups'
+]);
 
 export function getManagedServerEntrypointKind(filePath: string): ManagedServerEntrypointKind | null {
     const extension = path.extname(filePath).toLowerCase();
@@ -90,6 +76,17 @@ function getCandidatePriority(filePath: string): number | null {
     return null;
 }
 
+function shouldScanDirectory(entryName: string): boolean {
+    return !IGNORED_AUTO_SCAN_DIRECTORIES.has(entryName.toLowerCase());
+}
+
+function compareCandidates(
+    left: { path: string; priority: number },
+    right: { path: string; priority: number }
+): number {
+    return left.priority - right.priority || left.path.localeCompare(right.path);
+}
+
 export function resolveManagedServerEntrypoint({
     serverDir,
     explicitEntrypointPath = null
@@ -118,16 +115,55 @@ export function resolveManagedServerEntrypoint({
         };
     }
 
-    const candidates = walkFiles(serverDir)
-        .map((filePath) => ({
-            path: filePath,
-            kind: getManagedServerEntrypointKind(filePath),
-            priority: getCandidatePriority(filePath)
-        }))
-        .filter((candidate) => candidate.kind && candidate.priority !== null)
-        .sort((left, right) => (left.priority as number) - (right.priority as number) || left.path.localeCompare(right.path));
+    if (!serverDir || !fs.existsSync(serverDir)) {
+        return null;
+    }
 
-    const bestCandidate = candidates[0];
+    const queue: Array<{ directory: string; depth: number }> = [{ directory: serverDir, depth: 0 }];
+    let bestCandidate: { path: string; kind: ManagedServerEntrypointKind; priority: number } | null = null;
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+
+        if (!current) {
+            continue;
+        }
+
+        const entries = fs.readdirSync(current.directory, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const fullPath = path.join(current.directory, entry.name);
+
+            if (entry.isDirectory()) {
+                if (current.depth < MAX_AUTO_SCAN_DEPTH && shouldScanDirectory(entry.name)) {
+                    queue.push({ directory: fullPath, depth: current.depth + 1 });
+                }
+
+                continue;
+            }
+
+            const kind = getManagedServerEntrypointKind(fullPath);
+            const priority = kind ? getCandidatePriority(fullPath) : null;
+
+            if (!kind || priority === null) {
+                continue;
+            }
+
+            const candidate = { path: fullPath, kind, priority };
+
+            if (!bestCandidate || compareCandidates(candidate, bestCandidate) < 0) {
+                bestCandidate = candidate;
+
+                if (priority === 10) {
+                    break;
+                }
+            }
+        }
+
+        if (bestCandidate?.priority === 10) {
+            break;
+        }
+    }
 
     if (!bestCandidate) {
         return null;
@@ -137,7 +173,7 @@ export function resolveManagedServerEntrypoint({
         path: bestCandidate.path,
         originalPath: bestCandidate.path,
         source: 'auto',
-        kind: bestCandidate.kind as ManagedServerEntrypointKind
+        kind: bestCandidate.kind
     };
 }
 

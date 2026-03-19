@@ -53,6 +53,7 @@ export function createServerSection({
     serverState,
     doctorState,
     latestBuildDir,
+    selectedRunLabel,
     selectedServerField,
     onChange,
     onUseLatestBuild,
@@ -69,6 +70,7 @@ export function createServerSection({
     serverState: ServerManagerState;
     doctorState: ServerDoctorState | null;
     latestBuildDir: string | null;
+    selectedRunLabel: string | null;
     selectedServerField: ServerFieldKey;
     onChange: (nextForm: ServerFormState) => void;
     onUseLatestBuild: () => void;
@@ -106,6 +108,7 @@ export function createServerSection({
                 id: 'setup',
                 label: t('page.server.setup'),
                 chromeColor: 'cyan',
+                frameLabel: selectedRunLabel,
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerScreen
@@ -138,6 +141,7 @@ export function createServerSection({
                 id: 'install',
                 label: t('page.server.install'),
                 chromeColor: 'cyan',
+                frameLabel: selectedRunLabel,
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerScreen
@@ -170,6 +174,7 @@ export function createServerSection({
                 id: 'doctor',
                 label: t('page.server.doctor'),
                 chromeColor: 'cyan',
+                frameLabel: selectedRunLabel,
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerDoctorScreen
@@ -209,6 +214,7 @@ export function createServerSection({
                 id: 'launch',
                 label: t('page.server.launch'),
                 chromeColor: 'cyan',
+                frameLabel: selectedRunLabel,
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerScreen
@@ -241,6 +247,7 @@ export function createServerSection({
                 id: 'logs',
                 label: t('page.server.logs'),
                 chromeColor: 'cyan',
+                frameLabel: selectedRunLabel,
                 hasDetails: false,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerLogsScreen
