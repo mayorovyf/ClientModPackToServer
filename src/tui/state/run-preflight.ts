@@ -7,6 +7,7 @@ import type { RunFormState } from './app-state.js';
 const require = createRequire(import.meta.url);
 const { normalizeRunIdPrefix } = require('../../config/runtime-config.js');
 const { resolveInstanceLayout } = require('../../io/instance-folder.js');
+const { cleanInputPath } = require('../../utils/path-utils.js');
 
 export type RunPreflightSeverity = 'ok' | 'warning' | 'error';
 export type RunPreflightCheckId =
@@ -63,8 +64,9 @@ function buildDirectoryCheck(
     configuredPath: string,
     fallbackPath: string
 ): RunPreflightCheck {
-    const resolvedPath = configuredPath.trim()
-        ? path.resolve(configuredPath.trim())
+    const normalizedConfiguredPath = cleanInputPath(configuredPath);
+    const resolvedPath = normalizedConfiguredPath
+        ? path.resolve(normalizedConfiguredPath)
         : path.resolve(fallbackPath);
     const parentDirectory = getExistingParentDirectory(resolvedPath);
 
@@ -92,13 +94,13 @@ function buildDirectoryCheck(
         id,
         severity: 'ok',
         title,
-        summary: configuredPath.trim() ? 'Custom directory is writable' : 'Default directory is available',
-        details: `Resolved path: ${resolvedPath}`
-    };
+            summary: normalizedConfiguredPath ? 'Custom directory is writable' : 'Default directory is available',
+            details: `Resolved path: ${resolvedPath}`
+        };
 }
 
 function buildInputPathCheck(form: RunFormState): RunPreflightCheck {
-    const inputPath = form.inputPath.trim();
+    const inputPath = cleanInputPath(form.inputPath);
 
     if (!inputPath) {
         return {
@@ -229,7 +231,7 @@ function buildValidationCheck(form: RunFormState): RunPreflightCheck {
         };
     }
 
-    const explicitEntrypointPath = form.validationEntrypointPath.trim();
+    const explicitEntrypointPath = cleanInputPath(form.validationEntrypointPath);
 
     if (!explicitEntrypointPath) {
         return {

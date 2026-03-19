@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
+import { createRequire } from 'node:module';
 import i18nTypesApi from '../../i18n/types.js';
 
 import type { Locale } from '../../i18n/types.js';
@@ -12,6 +13,8 @@ import { getSettingsFieldDefinitions } from '../state/settings-fields.js';
 import type { SettingsFieldKey } from '../state/settings-fields.js';
 
 const { SUPPORTED_LOCALES } = i18nTypesApi;
+const require = createRequire(import.meta.url);
+const { cleanInputPath } = require('../../utils/path-utils.js');
 
 type EditableSettingsField =
     | 'outputPath'
@@ -26,6 +29,22 @@ type EditableSettingsField =
     | 'registryOverridesPath'
     | 'enabledEngineNames'
     | 'disabledEngineNames';
+
+const PATH_SETTINGS_FIELDS = new Set<EditableSettingsField>([
+    'outputPath',
+    'reportDir',
+    'validationEntrypointPath',
+    'registryFilePath',
+    'registryOverridesPath'
+]);
+
+function normalizeSubmittedSettingsValue(field: EditableSettingsField, value: string): string {
+    if (PATH_SETTINGS_FIELDS.has(field)) {
+        return cleanInputPath(value);
+    }
+
+    return String(value || '').trim();
+}
 
 function formatSettingsListValue(value: string, maxLength = 24): string {
     if (value.length <= maxLength) {
@@ -269,9 +288,10 @@ export function SettingsScreen({
                             placeholder={t('screen.settings.editPlaceholder')}
                             onChange={setDraftValue}
                             onSubmit={(value) => {
+                                const normalizedValue = normalizeSubmittedSettingsValue(editingField, value);
                                 onChange({
                                     ...form,
-                                    [editingField]: value
+                                    [editingField]: normalizedValue
                                 });
                                 setEditingField(null);
                                 setDraftValue('');

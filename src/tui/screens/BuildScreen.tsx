@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
+import { createRequire } from 'node:module';
 
 import { useT } from '../i18n/use-t.js';
 import { cycleOption } from '../state/app-state.js';
@@ -14,6 +15,9 @@ import {
 } from '../state/run-fields.js';
 import type { RunFieldKey } from '../state/run-fields.js';
 
+const require = createRequire(import.meta.url);
+const { cleanInputPath } = require('../../utils/path-utils.js');
+
 type EditableTextField =
     | 'inputPath'
     | 'outputPath'
@@ -22,6 +26,21 @@ type EditableTextField =
     | 'runIdPrefix'
     | 'validationTimeoutMs'
     | 'validationEntrypointPath';
+
+const PATH_EDITABLE_FIELDS = new Set<EditableTextField>([
+    'inputPath',
+    'outputPath',
+    'reportDir',
+    'validationEntrypointPath'
+]);
+
+function normalizeSubmittedFieldValue(field: EditableTextField, value: string): string {
+    if (PATH_EDITABLE_FIELDS.has(field)) {
+        return cleanInputPath(value);
+    }
+
+    return String(value || '').trim();
+}
 
 function formatRunListValue(value: string, maxLength = 24): string {
     if (value.length <= maxLength) {
@@ -261,9 +280,10 @@ export function BuildScreen({
                             placeholder={t('screen.build.editPlaceholder')}
                             onChange={setDraftValue}
                             onSubmit={(value) => {
+                                const normalizedValue = normalizeSubmittedFieldValue(editingField, value);
                                 onChange({
                                     ...form,
-                                    [editingField]: value
+                                    [editingField]: normalizedValue
                                 });
                                 setEditingField(null);
                                 setDraftValue('');

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { Spinner, StatusMessage } from '@inkjs/ui';
+import { Spinner } from '@inkjs/ui';
 
 import { useT } from '../i18n/use-t.js';
 import type { RunSessionState } from '../state/app-state.js';
@@ -13,36 +13,65 @@ function getEventKey(event: RunReport['events'][number] | RunSessionState['event
 }
 
 function getEventLabel(event: RunReport['events'][number] | RunSessionState['events'][number]): string {
-    return 'type' in event ? event.type : event.kind;
+    if ('type' in event) {
+        const stage = typeof event.payload?.stage === 'string' ? event.payload.stage : null;
+
+        if (stage && (event.type === 'stage.started' || event.type === 'stage.completed')) {
+            return `${event.type}: ${stage}`;
+        }
+
+        return event.type;
+    }
+
+    return event.kind;
 }
 
-function getStatusVariant(status: RunSessionState['status']): 'info' | 'success' | 'error' | 'warning' {
+function getStatusColor(status: RunSessionState['status']): 'cyanBright' | 'greenBright' | 'redBright' | 'yellow' {
     switch (status) {
         case 'running':
-            return 'info';
+            return 'cyanBright';
         case 'succeeded':
-            return 'success';
+            return 'greenBright';
         case 'failed':
-            return 'error';
+            return 'redBright';
         default:
-            return 'warning';
+            return 'yellow';
     }
 }
 
-function StatPill({
-    label,
-    value,
-    backgroundColor
-}: {
-    label: string;
-    value: number;
-    backgroundColor: 'green' | 'red' | 'yellow';
-}): React.JSX.Element {
-    return (
-        <Text backgroundColor={backgroundColor} color="black" wrap="truncate">
-            {` ${label} ${value} `}
-        </Text>
-    );
+function getStatusText(
+    status: RunSessionState['status'],
+    t: ReturnType<typeof useT>,
+    errorText: string
+): string {
+    switch (status) {
+        case 'running':
+            return t('runSummary.status.running');
+        case 'succeeded':
+            return t('runSummary.status.succeeded');
+        case 'failed':
+            return t('runSummary.status.failed', { error: errorText });
+        default:
+            return t('runSummary.status.idle');
+    }
+}
+
+function formatTail(value: string | null, maxLength = 38): string {
+    const normalized = String(value || '').trim();
+
+    if (!normalized) {
+        return 'n/a';
+    }
+
+    if (normalized.length <= maxLength) {
+        return normalized;
+    }
+
+    if (normalized.includes('\\') || normalized.includes('/')) {
+        return `...${normalized.slice(-(maxLength - 3))}`;
+    }
+
+    return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
 export function RunSummary({
@@ -77,7 +106,10 @@ export function RunSummary({
     const events = isHistorical ? (sourceReport?.events ?? []) : session.events;
     const reportPath = sourceReport?.run.jsonReportPath || reportEntry?.jsonReportPath || session.reportPaths.jsonReportPath;
     const summaryPath = sourceReport?.run.summaryPath || reportEntry?.summaryPath || session.reportPaths.summaryPath;
-    const visibleEventLimit = Math.max(1, Math.min(eventLimit, Math.max(height - 15, 1)));
+    const contentHeight = Math.max(6, height - 4);
+    const summaryHeight = summaryStatus === 'running' && !isHistorical ? 8 : 7;
+    const eventsHeight = Math.max(3, contentHeight - summaryHeight);
+    const visibleEventLimit = Math.max(1, Math.min(eventLimit, Math.max(eventsHeight - 2, 1)));
     const { offset, hasOverflow } = useScrollOffset({
         itemCount: events.length,
         viewportSize: visibleEventLimit,
@@ -88,7 +120,6 @@ export function RunSummary({
     return (
         <Box
             flexDirection="column"
-            justifyContent="space-between"
             width="100%"
             height={height}
             borderStyle="round"
@@ -97,47 +128,25 @@ export function RunSummary({
             paddingY={1}
             minWidth={0}
         >
-            <Box flexDirection="column" minWidth={0}>
+            <Box flexDirection="column" height={summaryHeight} minWidth={0}>
                 <Text color="greenBright" wrap="truncate">{t('runSummary.title')}</Text>
-                <Box marginTop={1} minWidth={0}>
-                    <StatusMessage variant={getStatusVariant(summaryStatus)}>
-                        {summaryStatus === 'running'
-                            ? t('runSummary.status.running')
-                            : summaryStatus === 'succeeded'
-                                ? t('runSummary.status.succeeded')
-                                : summaryStatus === 'failed'
-                                    ? t('runSummary.status.failed', { error: isHistorical ? historicalError : (session.lastError || t('common.value.unknown')) })
-                                    : t('runSummary.status.idle')}
-                    </StatusMessage>
-                </Box>
+                <Text color={getStatusColor(summaryStatus)} wrap="truncate">
+                    {getStatusText(summaryStatus, t, isHistorical ? historicalError : (session.lastError || t('common.value.unknown')))}
+                </Text>
                 {summaryStatus === 'running' && !isHistorical ? (
-                    <Box marginTop={1} minWidth={0}>
+                    <Box minWidth={0}>
                         <Spinner label={session.currentStage ? t('runSummary.spinner.stage', { stage: session.currentStage }) : t('runSummary.spinner.starting')} />
                     </Box>
                 ) : null}
-                <Box marginTop={1} minWidth={0}>
-                    <Text wrap="wrap">{`${t('runSummary.runId')}: ${runId || t('common.placeholder.na')}`}</Text>
-                </Box>
-                <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <StatPill
-                        label={compact ? t('runSummary.stat.keep.short') : t('runSummary.stat.keep.full')}
-                        value={keptCount}
-                        backgroundColor="green"
-                    />
-                    <StatPill
-                        label={compact ? t('runSummary.stat.exclude.short') : t('runSummary.stat.exclude.full')}
-                        value={excludedCount}
-                        backgroundColor="red"
-                    />
-                    <StatPill label={t('runSummary.stat.review')} value={reviewCount} backgroundColor="yellow" />
-                </Box>
-                <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <Text wrap="wrap">{`${t('runSummary.validation')}: ${validationStatus}`}</Text>
-                    <Text wrap="wrap">{`${t('runSummary.report')}: ${reportPath || t('common.placeholder.na')}`}</Text>
-                    <Text wrap="wrap">{`${t('runSummary.summary')}: ${summaryPath || t('common.placeholder.na')}`}</Text>
-                </Box>
+                <Text wrap="truncate">{`${t('runSummary.runId')}: ${runId || t('common.placeholder.na')}`}</Text>
+                <Text wrap="truncate">
+                    {`${compact ? t('runSummary.stat.keep.short') : t('runSummary.stat.keep.full')} ${keptCount} | ${compact ? t('runSummary.stat.exclude.short') : t('runSummary.stat.exclude.full')} ${excludedCount} | ${t('runSummary.stat.review')} ${reviewCount}`}
+                </Text>
+                <Text wrap="truncate">{`${t('runSummary.validation')}: ${validationStatus}`}</Text>
+                <Text wrap="truncate">{`${t('runSummary.report')}: ${formatTail(reportPath, 34)}`}</Text>
+                <Text wrap="truncate">{`${t('runSummary.summary')}: ${formatTail(summaryPath, 34)}`}</Text>
             </Box>
-            <Box flexDirection="column" minWidth={0}>
+            <Box flexDirection="column" height={eventsHeight} minWidth={0}>
                 <Text color="cyan" wrap="wrap">{t('runSummary.events.title')}</Text>
                 {hasOverflow ? (
                     <Text dimColor wrap="truncate">
@@ -149,7 +158,7 @@ export function RunSummary({
                     </Text>
                 ) : null}
                 {visibleEvents.map((event) => (
-                    <Text key={`${event.timestamp}-${getEventKey(event)}`} dimColor wrap="wrap">
+                    <Text key={`${event.timestamp}-${getEventKey(event)}`} dimColor wrap="truncate">
                         {getEventLabel(event)}
                     </Text>
                 ))}

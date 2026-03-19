@@ -13,6 +13,7 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFilePath);
 const tsxCliPath = require.resolve('tsx/cli');
 const backendRunnerPath = path.resolve(currentDirectory, '..', '..', 'backend', 'headless-runner.ts');
+const { cleanInputPath } = require('../../utils/path-utils.js');
 
 export interface BackendRunResult {
     exitCode: number | null;
@@ -38,24 +39,29 @@ function parseMultiValueInput(value: string): string[] {
 }
 
 export function buildHeadlessRunnerArgs(form: RunFormState): string[] {
+    const normalizedInputPath = cleanInputPath(form.inputPath);
     const args = [
-        '--input', form.inputPath,
+        '--input', normalizedInputPath,
         '--profile', form.profile,
         '--deep-check', form.deepCheckMode,
         '--validation', form.validationMode,
         '--registry-mode', form.registryMode
     ];
 
-    if (form.outputPath.trim()) {
-        args.push('--output', form.outputPath.trim());
+    const normalizedOutputPath = cleanInputPath(form.outputPath);
+
+    if (normalizedOutputPath) {
+        args.push('--output', normalizedOutputPath);
     }
 
     if (form.serverDirName.trim()) {
         args.push('--server-dir-name', form.serverDirName.trim());
     }
 
-    if (form.reportDir.trim()) {
-        args.push('--report-dir', form.reportDir.trim());
+    const normalizedReportDir = cleanInputPath(form.reportDir);
+
+    if (normalizedReportDir) {
+        args.push('--report-dir', normalizedReportDir);
     }
 
     if (form.runIdPrefix.trim()) {
@@ -66,8 +72,10 @@ export function buildHeadlessRunnerArgs(form: RunFormState): string[] {
         args.push('--validation-timeout-ms', form.validationTimeoutMs.trim());
     }
 
-    if (form.validationEntrypointPath.trim()) {
-        args.push('--validation-entrypoint', form.validationEntrypointPath.trim());
+    const normalizedValidationEntrypointPath = cleanInputPath(form.validationEntrypointPath);
+
+    if (normalizedValidationEntrypointPath) {
+        args.push('--validation-entrypoint', normalizedValidationEntrypointPath);
     }
 
     if (form.validationSaveArtifacts) {
@@ -82,12 +90,16 @@ export function buildHeadlessRunnerArgs(form: RunFormState): string[] {
         args.push('--registry-bundle-url', form.registryBundleUrl.trim());
     }
 
-    if (form.registryFilePath.trim()) {
-        args.push('--registry-file', form.registryFilePath.trim());
+    const normalizedRegistryFilePath = cleanInputPath(form.registryFilePath);
+
+    if (normalizedRegistryFilePath) {
+        args.push('--registry-file', normalizedRegistryFilePath);
     }
 
-    if (form.registryOverridesPath.trim()) {
-        args.push('--registry-overrides', form.registryOverridesPath.trim());
+    const normalizedRegistryOverridesPath = cleanInputPath(form.registryOverridesPath);
+
+    if (normalizedRegistryOverridesPath) {
+        args.push('--registry-overrides', normalizedRegistryOverridesPath);
     }
 
     const enabledEngines = parseMultiValueInput(form.enabledEngineNames);
