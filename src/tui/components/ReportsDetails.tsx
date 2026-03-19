@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
+import { useT } from '../i18n/use-t.js';
 import type { ReportHistoryEntry } from '../state/report-history.js';
 
 function formatDateTime(value: string | null): string {
@@ -62,6 +63,8 @@ export function ReportsDetails({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
+
     return (
         <Box
             flexDirection="column"
@@ -76,30 +79,34 @@ export function ReportsDetails({
         >
             <Box flexDirection="column" minWidth={0}>
                 <Text color="greenBright" wrap="wrap">
-                    {entry ? entry.runId : 'История запусков'}
+                    {entry ? entry.runId : t('details.reports.title')}
                 </Text>
                 {entry?.serverDirName ? (
                     <Text dimColor wrap="wrap">{entry.serverDirName}</Text>
                 ) : null}
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <DetailLine label="Корень" value={reportRootDir} />
-                    {loadError ? <DetailLine label="Ошибка" value={loadError} valueColor="red" /> : null}
+                    <DetailLine label={t('details.reports.root')} value={reportRootDir} />
+                    {loadError ? <DetailLine label={t('details.reports.error')} value={loadError} valueColor="red" /> : null}
                     {!entry && !loadError ? (
-                        <DetailLine label="Статус" value="Запуски в этой папке пока не найдены" valueColor="yellow" />
+                        <DetailLine label={t('details.reports.status')} value={t('details.reports.emptyStatus')} valueColor="yellow" />
                     ) : null}
                     {entry ? (
                         <>
-                            <DetailLine label="Старт" value={formatDateTime(entry.startedAt)} />
-                            <DetailLine label="Финиш" value={formatDateTime(entry.completedAt)} />
-                            <DetailLine label="Инстанс" value={entry.instancePath || 'n/a'} />
-                            <DetailLine label="Сервер" value={entry.buildDir || 'n/a'} />
-                            <DetailLine label="Отчёты" value={entry.reportDir} />
-                            <DetailLine label="Режим" value={entry.mode || 'n/a'} />
-                            <DetailLine label="Dry-run" value={entry.dryRun ? 'on' : 'off'} valueColor={entry.dryRun ? 'yellow' : 'white'} />
-                            <DetailLine label="Профиль" value={entry.profile || 'n/a'} />
-                            <DetailLine label="Registry" value={entry.registryMode || 'n/a'} />
-                            <DetailLine label="Источник" value={entry.registrySource || 'n/a'} />
-                            <DetailLine label="Validation" value={entry.validationStatus || entry.validationMode || 'n/a'} />
+                            <DetailLine label={t('details.reports.started')} value={formatDateTime(entry.startedAt)} />
+                            <DetailLine label={t('details.reports.finished')} value={formatDateTime(entry.completedAt)} />
+                            <DetailLine label={t('details.reports.instance')} value={entry.instancePath || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.reports.server')} value={entry.buildDir || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.reports.reports')} value={entry.reportDir} />
+                            <DetailLine label={t('details.reports.mode')} value={entry.mode || t('common.placeholder.na')} />
+                            <DetailLine
+                                label={t('details.reports.dryRun')}
+                                value={entry.dryRun ? t('common.value.on') : t('common.value.off')}
+                                valueColor={entry.dryRun ? 'yellow' : 'white'}
+                            />
+                            <DetailLine label={t('details.reports.profile')} value={entry.profile || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.reports.registry')} value={entry.registryMode || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.reports.source')} value={entry.registrySource || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.reports.validation')} value={entry.validationStatus || entry.validationMode || t('common.placeholder.na')} />
                         </>
                     ) : null}
                 </Box>
@@ -107,20 +114,20 @@ export function ReportsDetails({
 
             {entry ? (
                 <Box flexDirection="column" minWidth={0}>
-                    <Text color="cyan" wrap="wrap">Сводка</Text>
-                    <DetailLine label="Всего jar" value={String(entry.totalJarFiles)} />
-                    <DetailLine label="KEPT" value={String(entry.kept)} valueColor="green" />
-                    <DetailLine label="EXCLUDED" value={String(entry.excluded)} valueColor="red" />
-                    <DetailLine label="REVIEW" value={String(entry.review)} valueColor="yellow" />
-                    <DetailLine label="Warnings" value={String(entry.warnings)} />
-                    <DetailLine label="Errors" value={String(entry.errors)} valueColor={entry.errors > 0 ? 'red' : 'white'} />
+                    <Text color="cyan" wrap="wrap">{t('details.reports.summary.title')}</Text>
+                    <DetailLine label={t('details.reports.summary.totalJar')} value={String(entry.totalJarFiles)} />
+                    <DetailLine label={t('details.reports.summary.kept')} value={String(entry.kept)} valueColor="green" />
+                    <DetailLine label={t('details.reports.summary.excluded')} value={String(entry.excluded)} valueColor="red" />
+                    <DetailLine label={t('details.reports.summary.review')} value={String(entry.review)} valueColor="yellow" />
+                    <DetailLine label={t('details.reports.summary.warnings')} value={String(entry.warnings)} />
+                    <DetailLine label={t('details.reports.summary.errors')} value={String(entry.errors)} valueColor={entry.errors > 0 ? 'red' : 'white'} />
                 </Box>
             ) : (
                 <Box flexDirection="column" minWidth={0}>
-                    <Text color="cyan" wrap="wrap">Файлы</Text>
-                    <DetailLine label="run.json" value="Метаданные конкретного запуска" />
-                    <DetailLine label="report.json" value="Полная сводка pipeline и статистика" />
-                    <DetailLine label="summary.md" value="Короткий человекочитаемый итог запуска" />
+                    <Text color="cyan" wrap="wrap">{t('details.reports.files.title')}</Text>
+                    <DetailLine label="run.json" value={t('details.reports.files.runJson')} />
+                    <DetailLine label="report.json" value={t('details.reports.files.reportJson')} />
+                    <DetailLine label="summary.md" value={t('details.reports.files.summaryMd')} />
                 </Box>
             )}
         </Box>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { StatusMessage } from '@inkjs/ui';
 
+import { useT } from '../i18n/use-t.js';
 import { useScrollOffset } from '../hooks/use-scroll-offset.js';
 import {
     collectServerDoctorFindings,
@@ -50,13 +51,19 @@ function ResultSummary({
     warningCount: number;
     infoCount: number;
 }): React.JSX.Element {
+    const t = useT();
+
     return (
         <Box flexDirection="column" minWidth={0}>
             <Text color={ok ? 'greenBright' : 'redBright'} wrap="truncate">
-                {`${label}: ${ok ? 'PASS' : 'BLOCKED'}`}
+                {`${label}: ${ok ? t('screen.serverDoctor.pass') : t('screen.serverDoctor.blocked')}`}
             </Text>
             <Text dimColor wrap="truncate">
-                {`errors ${errorCount} | warnings ${warningCount} | info ${infoCount}`}
+                {t('screen.serverDoctor.counts', {
+                    errors: errorCount,
+                    warnings: warningCount,
+                    infos: infoCount
+                })}
             </Text>
         </Box>
     );
@@ -71,6 +78,8 @@ export function ServerDoctorScreen({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
+
     if (!doctorState) {
         return (
             <Box
@@ -84,8 +93,8 @@ export function ServerDoctorScreen({
                 paddingY={1}
                 minWidth={0}
             >
-                <Text color="cyanBright" wrap="wrap">Server Doctor</Text>
-                <Text dimColor wrap="wrap">Open this page inside the Server section to run install and launch preflight checks.</Text>
+                <Text color="cyanBright" wrap="wrap">{t('screen.serverDoctor.title')}</Text>
+                <Text dimColor wrap="wrap">{t('screen.serverDoctor.empty')}</Text>
             </Box>
         );
     }
@@ -114,26 +123,26 @@ export function ServerDoctorScreen({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyanBright" wrap="wrap">Server Doctor</Text>
+                <Text color="cyanBright" wrap="wrap">{t('screen.serverDoctor.title')}</Text>
                 <Box marginTop={1} minWidth={0}>
                     <StatusMessage variant={getStatusVariant(doctorState)}>
                         {summary.ok
-                            ? 'Install and launch preflight both pass'
+                            ? t('section.server.doctor.ok')
                             : summary.errorCount > 0
-                                ? `Doctor found ${summary.errorCount} blocking issue(s)`
-                                : `Doctor passed with ${summary.warningCount} warning(s)`}
+                                ? t('section.server.doctor.blocking', { count: summary.errorCount })
+                                : t('section.server.doctor.warnings', { count: summary.warningCount })}
                     </StatusMessage>
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
                     <ResultSummary
-                        label="Install"
+                        label={t('screen.serverDoctor.install')}
                         ok={doctorState.install.ok}
                         errorCount={countPreflightFindings(doctorState.install, 'error')}
                         warningCount={countPreflightFindings(doctorState.install, 'warning')}
                         infoCount={countPreflightFindings(doctorState.install, 'info')}
                     />
                     <ResultSummary
-                        label="Launch"
+                        label={t('screen.serverDoctor.launch')}
                         ok={doctorState.launch.ok}
                         errorCount={countPreflightFindings(doctorState.launch, 'error')}
                         warningCount={countPreflightFindings(doctorState.launch, 'warning')}
@@ -141,17 +150,21 @@ export function ServerDoctorScreen({
                     />
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <Text wrap="truncate">{`Target: ${doctorState.launch.targetDir || doctorState.install.targetDir || '<missing>'}`}</Text>
-                    <Text wrap="truncate">{`Launcher: ${doctorState.launch.entrypoint?.path || '<not resolved>'}`}</Text>
-                    <Text wrap="truncate">{`Command: ${doctorState.launch.commandPreview || '<not available>'}`}</Text>
+                    <Text wrap="truncate">{`${t('screen.serverDoctor.target')}: ${doctorState.launch.targetDir || doctorState.install.targetDir || t('screen.serverDoctor.missingTarget')}`}</Text>
+                    <Text wrap="truncate">{`${t('screen.serverDoctor.launcher')}: ${doctorState.launch.entrypoint?.path || t('screen.serverDoctor.notResolved')}`}</Text>
+                    <Text wrap="truncate">{`${t('screen.serverDoctor.command')}: ${doctorState.launch.commandPreview || t('screen.serverDoctor.notAvailable')}`}</Text>
                 </Box>
             </Box>
 
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Findings</Text>
+                <Text color="cyan" wrap="wrap">{t('screen.serverDoctor.findings')}</Text>
                 {hasOverflow ? (
                     <Text dimColor wrap="truncate">
-                        {`j/k or ↑/↓ scroll findings | ${offset + 1}-${Math.min(offset + visibleFindings.length, findings.length)} of ${findings.length}`}
+                        {t('screen.serverDoctor.scroll', {
+                            start: offset + 1,
+                            end: Math.min(offset + visibleFindings.length, findings.length),
+                            total: findings.length
+                        })}
                     </Text>
                 ) : null}
                 {visibleFindings.length > 0 ? (
@@ -165,7 +178,7 @@ export function ServerDoctorScreen({
                         </Text>
                     ))
                 ) : (
-                    <Text dimColor wrap="wrap">No findings were produced yet.</Text>
+                    <Text dimColor wrap="wrap">{t('screen.serverDoctor.noFindings')}</Text>
                 )}
             </Box>
         </Box>

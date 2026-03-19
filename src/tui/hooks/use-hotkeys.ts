@@ -2,7 +2,7 @@ import { useInput } from 'ink';
 
 import type { FocusedColumn, ScreenId, TuiMode } from '../state/app-state.js';
 
-const SCREEN_ORDER: ScreenId[] = ['build', 'presets', 'server', 'registry', 'reports', 'review', 'settings', 'authors'];
+const SCREEN_ORDER: ScreenId[] = ['build', 'server', 'results', 'settings'];
 const DEFAULT_COLUMN_ORDER: FocusedColumn[] = ['sidebar', 'content', 'details'];
 
 export function getAdjacentScreen(currentScreen: ScreenId, direction: 'prev' | 'next'): ScreenId {

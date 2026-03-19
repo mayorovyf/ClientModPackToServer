@@ -1,12 +1,15 @@
 import React from 'react';
 
+import { PresetComparisonDetails } from '../components/PresetComparisonDetails.js';
 import { RunFieldDetails } from '../components/RunFieldDetails.js';
 import { RunSummary } from '../components/RunSummary.js';
-import { ValidationDetails } from '../components/ValidationDetails.js';
 import { BuildScreen } from '../screens/BuildScreen.js';
-import { BuildValidationScreen } from '../screens/BuildValidationScreen.js';
+import { PresetsScreen } from '../screens/PresetsScreen.js';
 
+import type { MessageKey } from '../../i18n/catalog.js';
+import type { Translator } from '../../i18n/types.js';
 import type { RunFormState, RunSessionState, TuiMode } from '../state/app-state.js';
+import type { RunPreset } from '../state/presets.js';
 import type { RunFieldKey } from '../state/run-fields.js';
 import type { SectionDefinition } from './types.js';
 
@@ -14,34 +17,53 @@ const BUILD_INPUT_FIELD_KEYS: RunFieldKey[] = ['inputPath', 'outputPath', 'serve
 const BUILD_RUN_FIELD_KEYS: RunFieldKey[] = ['dryRun', 'profile', 'deepCheckMode', 'validationMode', 'registryMode', 'run'];
 
 export function createBuildSection({
+    t,
     form,
     uiMode,
     session,
     selectedRunField,
+    presets,
+    selectedPreset,
+    selectedPresetId,
     compact,
     onChange,
     onRun,
     onInteractionChange,
-    onSelectedFieldChange
+    onSelectedFieldChange,
+    onSelectedPresetIdChange,
+    onApplyPreset,
+    onCreatePreset,
+    onUpdatePreset,
+    onDeletePreset
 }: {
+    t: Translator<MessageKey>;
     form: RunFormState;
     uiMode: TuiMode;
     session: RunSessionState;
     selectedRunField: RunFieldKey;
+    presets: RunPreset[];
+    selectedPreset: RunPreset | null;
+    selectedPresetId: string;
     compact: boolean;
     onChange: (nextForm: RunFormState) => void;
     onRun: () => void;
     onInteractionChange: (isLocked: boolean) => void;
     onSelectedFieldChange: (fieldKey: RunFieldKey) => void;
+    onSelectedPresetIdChange: (presetId: string) => void;
+    onApplyPreset: () => void;
+    onCreatePreset: (name: string) => void;
+    onUpdatePreset: () => void;
+    onDeletePreset: () => void;
 }): SectionDefinition<'build'> {
     return {
         id: 'build',
-        label: 'Р—Р°РїСѓСЃРє',
+        label: t('nav.build.label'),
         defaultPage: 'inputs',
         pages: [
             {
                 id: 'inputs',
-                label: 'Inputs',
+                label: t('page.build.inputs'),
+                chromeColor: 'yellow',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <BuildScreen
@@ -70,12 +92,13 @@ export function createBuildSection({
                     />
                 ),
                 getStatusMessage: () => form.inputPath.trim()
-                    ? 'Input and output paths are ready for the pipeline'
-                    : 'Set the instance path before starting the pipeline'
+                    ? t('section.build.inputs.ready')
+                    : t('section.build.inputs.missingInput')
             },
             {
                 id: 'run',
-                label: 'Run',
+                label: t('page.build.run'),
+                chromeColor: 'yellow',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <BuildScreen
@@ -103,41 +126,41 @@ export function createBuildSection({
                     />
                 ),
                 getStatusMessage: () => session.status === 'running'
-                    ? 'Pipeline is running'
+                    ? t('section.build.run.running')
                     : form.inputPath.trim()
-                        ? 'Ready to launch the pipeline with the current strategy'
-                        : 'Set the instance path before launching the pipeline'
+                        ? t('section.build.run.ready')
+                        : t('section.build.run.missingInput')
             },
             {
-                id: 'validation',
-                label: 'Validation',
+                id: 'presets',
+                label: t('page.build.presets'),
+                chromeColor: 'blue',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
-                    <BuildValidationScreen
-                        form={form}
-                        session={session}
+                    <PresetsScreen
+                        key="build-presets"
+                        presets={presets}
+                        selectedPresetId={selectedPresetId}
+                        onSelectedPresetIdChange={onSelectedPresetIdChange}
+                        onApplyPreset={onApplyPreset}
+                        onCreatePreset={onCreatePreset}
+                        onUpdatePreset={onUpdatePreset}
+                        onDeletePreset={onDeletePreset}
+                        onInteractionChange={onInteractionChange}
                         isFocused={isContentFocused}
                         height={contentHeight}
                     />
                 ),
                 renderDetails: ({ detailsHeight }) => (
-                    <ValidationDetails
-                        form={form}
-                        session={session}
+                    <PresetComparisonDetails
+                        preset={selectedPreset}
+                        currentForm={form}
                         height={detailsHeight}
                     />
                 ),
-                getStatusMessage: () => {
-                    const validationStatus = session.lastReport?.validation?.status || null;
-
-                    if (validationStatus) {
-                        return `Latest validation status: ${validationStatus}`;
-                    }
-
-                    return form.validationMode === 'off'
-                        ? 'Validation is disabled for new runs'
-                        : 'Validation settings are configured but no completed result is available yet';
-                }
+                getStatusMessage: () => presets.length > 0
+                    ? t('section.presets.list.ready')
+                    : t('section.presets.list.empty')
             }
         ]
     };

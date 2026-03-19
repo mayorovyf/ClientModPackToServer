@@ -1,20 +1,17 @@
 import { createRequire } from 'node:module';
 import type { BackendEvent } from '../../types/events.js';
 import type { RunReport } from '../../types/report.js';
+import type { MessageKey } from '../../i18n/catalog.js';
 
 const require = createRequire(import.meta.url);
 const { DEFAULT_REMOTE_REGISTRY_MANIFEST_URL } = require('../../registry/constants.js');
 
 export type TuiMode = 'simple' | 'expert';
-export type ScreenId = 'build' | 'presets' | 'server' | 'registry' | 'reports' | 'review' | 'settings' | 'authors';
-export type BuildPageId = 'inputs' | 'run' | 'validation';
-export type PresetsPageId = 'list' | 'details';
+export type ScreenId = 'build' | 'server' | 'results' | 'settings';
+export type BuildPageId = 'inputs' | 'run' | 'presets';
 export type ServerPageId = 'setup' | 'install' | 'doctor' | 'launch' | 'logs';
-export type RegistryPageId = 'overview';
-export type ReportsPageId = 'history';
-export type ReviewPageId = 'queue';
-export type SettingsPageId = 'general';
-export type AuthorsPageId = 'about';
+export type ResultsPageId = 'overview' | 'validation' | 'reports' | 'review';
+export type SettingsPageId = 'general' | 'registry' | 'about';
 export type RunSessionStatus = 'idle' | 'running' | 'succeeded' | 'failed';
 export type FocusedColumn = 'sidebar' | 'content' | 'details';
 export type RegistryMode = 'auto' | 'offline' | 'refresh' | 'pinned';
@@ -25,13 +22,9 @@ export type ServerCoreType = 'fabric' | 'forge' | 'neoforge';
 
 export interface SectionPageMap {
     build: BuildPageId;
-    presets: PresetsPageId;
     server: ServerPageId;
-    registry: RegistryPageId;
-    reports: ReportsPageId;
-    review: ReviewPageId;
+    results: ResultsPageId;
     settings: SettingsPageId;
-    authors: AuthorsPageId;
 }
 
 export type ActivePageByScreen = {
@@ -40,8 +33,8 @@ export type ActivePageByScreen = {
 
 export interface NavigationItem {
     id: ScreenId;
-    label: string;
-    description: string;
+    labelKey: MessageKey;
+    descriptionKey: MessageKey;
 }
 
 export interface RunFormState {
@@ -99,37 +92,25 @@ export interface RunSessionState {
 }
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
-    { id: 'build', label: 'Запуск', description: 'Запуск pipeline и основные параметры' },
-    { id: 'presets', label: 'Presets', description: 'Сохранённые наборы параметров запуска' },
-    { id: 'server', label: 'Server', description: 'Установка ядра и запуск собранного сервера' },
-    { id: 'registry', label: 'Registry', description: 'Источник данных, кэш и bundle' },
-    { id: 'reports', label: 'Отчёты', description: 'Артефакты последнего запуска' },
-    { id: 'review', label: 'Спорные', description: 'Моды со статусом review' },
-    { id: 'settings', label: 'Настройки', description: 'Режим интерфейса и справка' },
-    { id: 'authors', label: 'Авторы', description: 'Информация об авторах проекта' }
+    { id: 'build', labelKey: 'nav.build.label', descriptionKey: 'nav.build.description' },
+    { id: 'server', labelKey: 'nav.server.label', descriptionKey: 'nav.server.description' },
+    { id: 'results', labelKey: 'nav.results.label', descriptionKey: 'nav.results.description' },
+    { id: 'settings', labelKey: 'nav.settings.label', descriptionKey: 'nav.settings.description' }
 ];
 
 export const PAGE_ORDER_BY_SCREEN: { [K in ScreenId]: readonly SectionPageMap[K][] } = {
-    build: ['inputs', 'run', 'validation'],
-    presets: ['list', 'details'],
+    build: ['inputs', 'run', 'presets'],
     server: ['setup', 'install', 'doctor', 'launch', 'logs'],
-    registry: ['overview'],
-    reports: ['history'],
-    review: ['queue'],
-    settings: ['general'],
-    authors: ['about']
+    results: ['overview', 'validation', 'reports', 'review'],
+    settings: ['general', 'registry', 'about']
 };
 
 export function createDefaultActivePageByScreen(): ActivePageByScreen {
     return {
         build: 'inputs',
-        presets: 'list',
         server: 'setup',
-        registry: 'overview',
-        reports: 'history',
-        review: 'queue',
-        settings: 'general',
-        authors: 'about'
+        results: 'overview',
+        settings: 'general'
     };
 }
 

@@ -6,6 +6,8 @@ import { ServerDoctorScreen } from '../screens/ServerDoctorScreen.js';
 import { ServerScreen } from '../screens/ServerScreen.js';
 import { ServerLogsScreen } from '../screens/ServerLogsScreen.js';
 
+import type { MessageKey } from '../../i18n/catalog.js';
+import type { Translator } from '../../i18n/types.js';
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
 import type { ServerFormState } from '../state/app-state.js';
 import type { ServerDoctorState } from '../state/server-doctor.js';
@@ -46,6 +48,7 @@ const SERVER_LAUNCH_FIELD_KEYS: ServerFieldKey[] = [
 ];
 
 export function createServerSection({
+    t,
     form,
     serverState,
     doctorState,
@@ -61,6 +64,7 @@ export function createServerSection({
     onInteractionChange,
     onSelectedFieldChange
 }: {
+    t: Translator<MessageKey>;
     form: ServerFormState;
     serverState: ServerManagerState;
     doctorState: ServerDoctorState | null;
@@ -95,12 +99,13 @@ export function createServerSection({
 
     return {
         id: 'server',
-        label: 'Server',
+        label: t('nav.server.label'),
         defaultPage: 'setup',
         pages: [
             {
                 id: 'setup',
-                label: 'Setup',
+                label: t('page.server.setup'),
+                chromeColor: 'cyan',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerScreen
@@ -124,14 +129,15 @@ export function createServerSection({
                 ),
                 renderDetails: ({ detailsHeight }) => renderServerDetails({ detailsHeight, pageId: 'setup' }),
                 getStatusMessage: () => serverState.resolvedEntrypointPath
-                    ? 'Launcher detected; install a core or move to launch'
+                    ? t('section.server.setup.detected')
                     : latestBuildDir
-                        ? 'Use the latest build dir or choose a custom server directory'
-                        : 'Choose a target directory, core type and versions'
+                        ? t('section.server.setup.useLatestBuild')
+                        : t('section.server.setup.configure')
             },
             {
                 id: 'install',
-                label: 'Install Core',
+                label: t('page.server.install'),
+                chromeColor: 'cyan',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerScreen
@@ -155,14 +161,15 @@ export function createServerSection({
                 ),
                 renderDetails: ({ detailsHeight }) => renderServerDetails({ detailsHeight, pageId: 'install' }),
                 getStatusMessage: () => serverState.installStatus === 'installing'
-                    ? 'Installing the selected server core'
+                    ? t('section.server.install.running')
                     : serverState.lastInstall
-                        ? `Installed ${serverState.lastInstall.coreType} core`
-                        : 'Install the selected server core into the target directory'
+                        ? t('section.server.install.installed', { coreType: serverState.lastInstall.coreType })
+                        : t('section.server.install.ready')
             },
             {
                 id: 'doctor',
-                label: 'Doctor',
+                label: t('page.server.doctor'),
+                chromeColor: 'cyan',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerDoctorScreen
@@ -179,7 +186,7 @@ export function createServerSection({
                 ),
                 getStatusMessage: () => {
                     if (!doctorState) {
-                        return 'Open the doctor page to run install and launch preflight checks';
+                        return t('section.server.doctor.open');
                     }
 
                     const errorCount = doctorState.install.findings.filter((finding) => finding.level === 'error').length
@@ -188,19 +195,20 @@ export function createServerSection({
                         + doctorState.launch.findings.filter((finding) => finding.level === 'warning').length;
 
                     if (errorCount > 0) {
-                        return `Doctor found ${errorCount} blocking issue(s)`;
+                        return t('section.server.doctor.blocking', { count: errorCount });
                     }
 
                     if (warningCount > 0) {
-                        return `Doctor passed with ${warningCount} warning(s)`;
+                        return t('section.server.doctor.warnings', { count: warningCount });
                     }
 
-                    return 'Install and launch preflight both pass';
+                    return t('section.server.doctor.ok');
                 }
             },
             {
                 id: 'launch',
-                label: 'Launch',
+                label: t('page.server.launch'),
+                chromeColor: 'cyan',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerScreen
@@ -224,14 +232,15 @@ export function createServerSection({
                 ),
                 renderDetails: ({ detailsHeight }) => renderServerDetails({ detailsHeight, pageId: 'launch' }),
                 getStatusMessage: () => serverState.launchStatus === 'running'
-                    ? 'Server process is running'
+                    ? t('section.server.launch.running')
                     : serverState.resolvedEntrypointPath
-                        ? 'Launcher detected; you can start the server or bind it to validation'
-                        : 'Choose or install a launcher before starting the server'
+                        ? t('section.server.launch.detected')
+                        : t('section.server.launch.noLauncher')
             },
             {
                 id: 'logs',
-                label: 'Logs',
+                label: t('page.server.logs'),
+                chromeColor: 'cyan',
                 hasDetails: false,
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <ServerLogsScreen
@@ -241,10 +250,10 @@ export function createServerSection({
                     />
                 ),
                 getStatusMessage: () => serverState.launchStatus === 'failed'
-                    ? serverState.lastError || 'Server process failed'
+                    ? serverState.lastError || t('section.server.logs.failed')
                     : serverState.logs.length > 0
-                        ? 'Browse live server logs in the center column'
-                        : 'Logs will appear here after installation or launch'
+                        ? t('section.server.logs.browse')
+                        : t('section.server.logs.empty')
             }
         ]
     };

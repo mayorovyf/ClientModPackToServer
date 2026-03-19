@@ -1,11 +1,11 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-import { getServerFieldDetails } from '../state/server-fields.js';
-import type { ServerFieldKey } from '../state/server-fields.js';
-
+import { useT } from '../i18n/use-t.js';
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
 import type { ServerFormState } from '../state/app-state.js';
+import { getServerFieldDetails } from '../state/server-fields.js';
+import type { ServerFieldKey } from '../state/server-fields.js';
 
 function DetailLine({
     label,
@@ -43,35 +43,42 @@ function PageSummary({
     serverState: ServerManagerState;
     latestBuildDir: string | null;
 }): React.JSX.Element {
+    const t = useT();
+
     if (pageId === 'setup') {
         return (
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Setup Summary</Text>
-                <DetailLine label="Target" value={form.targetDir || '<empty>'} />
-                <DetailLine label="Last build" value={latestBuildDir || 'n/a'} />
-                <DetailLine label="Core" value={form.coreType} />
-                <DetailLine label="Minecraft" value={form.minecraftVersion || '<required>'} />
-                <DetailLine label="Loader" value={form.loaderVersion || '<auto>'} />
-                <DetailLine label="Java" value={form.javaPath || 'java from PATH'} />
-                <DetailLine label="Launcher" value={serverState.resolvedEntrypointPath || '<not detected>'} />
+                <Text color="cyan" wrap="wrap">{t('server.summary.setup.title')}</Text>
+                <DetailLine label={t('server.summary.setup.target')} value={form.targetDir || t('common.placeholder.empty')} />
+                <DetailLine label={t('server.summary.setup.lastBuild')} value={latestBuildDir || t('common.placeholder.na')} />
+                <DetailLine label={t('server.summary.setup.core')} value={form.coreType} />
+                <DetailLine label={t('server.summary.setup.minecraft')} value={form.minecraftVersion || t('common.placeholder.required')} />
+                <DetailLine label={t('server.summary.setup.loader')} value={form.loaderVersion || t('common.placeholder.auto')} />
+                <DetailLine label={t('server.summary.setup.java')} value={form.javaPath || t('common.placeholder.javaFromPath')} />
+                <DetailLine label={t('server.summary.setup.launcher')} value={serverState.resolvedEntrypointPath || t('common.placeholder.notDetected')} />
             </Box>
         );
     }
 
     if (pageId === 'install') {
         const notes = serverState.lastInstall?.notes.slice(-4) || [];
+
         return (
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Install Status</Text>
-                <DetailLine label="Status" value={serverState.installStatus} color={serverState.installStatus === 'failed' ? 'red' : serverState.installStatus === 'installed' ? 'green' : 'yellow'} />
-                <DetailLine label="Core" value={serverState.lastInstall?.coreType || form.coreType} />
-                <DetailLine label="Version" value={serverState.lastInstall?.minecraftVersion || form.minecraftVersion || '<required>'} />
-                <DetailLine label="Loader" value={serverState.lastInstall?.loaderVersion || form.loaderVersion || '<auto>'} />
-                <DetailLine label="Artifact" value={serverState.lastInstall?.downloadedArtifactPath || 'n/a'} />
-                <DetailLine label="Entrypoint" value={serverState.lastInstall?.entrypointPath || serverState.resolvedEntrypointPath || 'n/a'} />
+                <Text color="cyan" wrap="wrap">{t('server.summary.install.title')}</Text>
+                <DetailLine
+                    label={t('server.summary.install.status')}
+                    value={serverState.installStatus}
+                    color={serverState.installStatus === 'failed' ? 'red' : serverState.installStatus === 'installed' ? 'green' : 'yellow'}
+                />
+                <DetailLine label={t('server.summary.install.core')} value={serverState.lastInstall?.coreType || form.coreType} />
+                <DetailLine label={t('server.summary.install.version')} value={serverState.lastInstall?.minecraftVersion || form.minecraftVersion || t('common.placeholder.required')} />
+                <DetailLine label={t('server.summary.install.loader')} value={serverState.lastInstall?.loaderVersion || form.loaderVersion || t('common.placeholder.auto')} />
+                <DetailLine label={t('server.summary.install.artifact')} value={serverState.lastInstall?.downloadedArtifactPath || t('common.placeholder.na')} />
+                <DetailLine label={t('server.summary.install.entrypoint')} value={serverState.lastInstall?.entrypointPath || serverState.resolvedEntrypointPath || t('common.placeholder.na')} />
                 {notes.length > 0 ? (
                     <Box marginTop={1} flexDirection="column" minWidth={0}>
-                        <Text color="cyan" wrap="wrap">Recent notes</Text>
+                        <Text color="cyan" wrap="wrap">{t('server.summary.install.notes')}</Text>
                         {notes.map((note) => (
                             <Text key={note} dimColor wrap="wrap">{note}</Text>
                         ))}
@@ -82,22 +89,27 @@ function PageSummary({
     }
 
     const visibleLogs = serverState.logs.slice(-5);
+
     return (
         <Box flexDirection="column" minWidth={0}>
-            <Text color="cyan" wrap="wrap">Launch Status</Text>
-            <DetailLine label="Status" value={serverState.launchStatus} color={serverState.launchStatus === 'failed' ? 'red' : serverState.launchStatus === 'running' ? 'green' : 'yellow'} />
-            <DetailLine label="Launcher" value={serverState.resolvedEntrypointPath || form.explicitEntrypointPath || '<not detected>'} />
-            <DetailLine label="EULA" value={form.acceptEula ? 'accepted' : 'manual'} />
-            <DetailLine label="JVM args" value={form.jvmArgs || '<none>'} />
-            {serverState.lastError ? <DetailLine label="Error" value={serverState.lastError} color="red" /> : null}
+            <Text color="cyan" wrap="wrap">{t('server.summary.launch.title')}</Text>
+            <DetailLine
+                label={t('server.summary.launch.status')}
+                value={serverState.launchStatus}
+                color={serverState.launchStatus === 'failed' ? 'red' : serverState.launchStatus === 'running' ? 'green' : 'yellow'}
+            />
+            <DetailLine label={t('server.summary.launch.launcher')} value={serverState.resolvedEntrypointPath || form.explicitEntrypointPath || t('common.placeholder.notDetected')} />
+            <DetailLine label={t('server.summary.launch.eula')} value={form.acceptEula ? t('common.value.accepted') : t('common.value.manual')} />
+            <DetailLine label={t('server.summary.launch.jvmArgs')} value={form.jvmArgs || t('common.placeholder.none')} />
+            {serverState.lastError ? <DetailLine label={t('server.summary.launch.error')} value={serverState.lastError} color="red" /> : null}
             <Box marginTop={1} flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Recent logs</Text>
+                <Text color="cyan" wrap="wrap">{t('server.summary.launch.logs')}</Text>
                 {visibleLogs.length > 0 ? (
                     visibleLogs.map((line) => (
                         <Text key={line} dimColor wrap="truncate">{line}</Text>
                     ))
                 ) : (
-                    <Text dimColor wrap="wrap">No server logs yet.</Text>
+                    <Text dimColor wrap="wrap">{t('server.summary.launch.logs.empty')}</Text>
                 )}
             </Box>
         </Box>
@@ -119,7 +131,8 @@ export function ServerPageDetails({
     latestBuildDir: string | null;
     height: number;
 }): React.JSX.Element {
-    const details = getServerFieldDetails(fieldKey);
+    const t = useT();
+    const details = getServerFieldDetails(fieldKey, t);
 
     return (
         <Box

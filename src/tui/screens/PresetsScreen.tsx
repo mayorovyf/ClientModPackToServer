@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 
+import { useT } from '../i18n/use-t.js';
 import type { RunPreset } from '../state/presets.js';
 
 function getVisibleWindow(total: number, selectedIndex: number, maxVisible: number): { start: number; end: number } {
@@ -35,8 +36,8 @@ function formatTimestamp(value: string): string {
     return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function summarizePreset(preset: RunPreset): string {
-    return `${preset.form.profile} | ${preset.form.deepCheckMode} | ${preset.form.validationMode} | ${preset.form.dryRun ? 'dry-run' : 'build'}`;
+function summarizePreset(preset: RunPreset, t: ReturnType<typeof useT>): string {
+    return `${preset.form.profile} | ${preset.form.deepCheckMode} | ${preset.form.validationMode} | ${preset.form.dryRun ? t('screen.presets.summary.dryRun') : t('screen.presets.summary.build')}`;
 }
 
 export function PresetsScreen({
@@ -62,6 +63,7 @@ export function PresetsScreen({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const initialSelectedIndex = Math.max(presets.findIndex((preset) => preset.id === selectedPresetId), 0);
     const [selectedIndex, setSelectedIndex] = useState(initialSelectedIndex);
     const [creatingPreset, setCreatingPreset] = useState(false);
@@ -154,9 +156,13 @@ export function PresetsScreen({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="blueBright">Presets</Text>
-                <Text dimColor wrap="truncate">{presets.length > 0 ? `Сохранено: ${presets.length}` : 'Пресеты пока не созданы'}</Text>
-                <Text dimColor wrap="truncate">Enter применяет выбранный preset</Text>
+                <Text color="blueBright">{t('screen.presets.title')}</Text>
+                <Text dimColor wrap="truncate">
+                    {presets.length > 0
+                        ? t('screen.presets.savedCount', { count: presets.length })
+                        : t('screen.presets.empty')}
+                </Text>
+                <Text dimColor wrap="truncate">{t('screen.presets.applyHint')}</Text>
             </Box>
 
             <Box marginTop={1} flexDirection="column" height={listHeight} minWidth={0}>
@@ -186,24 +192,22 @@ export function PresetsScreen({
                                 </Box>
                             </Box>
                             <Box paddingLeft={2} minWidth={0}>
-                                <Text dimColor wrap="truncate">{summarizePreset(preset)}</Text>
+                                <Text dimColor wrap="truncate">{summarizePreset(preset, t)}</Text>
                             </Box>
                         </Box>
                     );
                 })}
                 {presets.length === 0 ? (
-                    <Text dimColor wrap="wrap">
-                        Нажмите `n`, чтобы сохранить текущую форму запуска как новый preset.
-                    </Text>
+                    <Text dimColor wrap="wrap">{t('screen.presets.emptyHint')}</Text>
                 ) : null}
             </Box>
 
             {creatingPreset ? (
                 <Box flexDirection="column" minWidth={0}>
-                    <Text wrap="truncate">Введите имя нового preset и нажмите Enter:</Text>
+                    <Text wrap="truncate">{t('screen.presets.createPrompt')}</Text>
                     <TextInput
                         defaultValue={draftName}
-                        placeholder="Например: safe-build"
+                        placeholder={t('screen.presets.createPlaceholder')}
                         onChange={setDraftName}
                         onSubmit={(value) => {
                             onCreatePreset(value);
@@ -211,11 +215,11 @@ export function PresetsScreen({
                             setDraftName('');
                         }}
                     />
-                    <Text dimColor wrap="truncate">Esc отменяет создание</Text>
+                    <Text dimColor wrap="truncate">{t('screen.presets.createCancel')}</Text>
                 </Box>
             ) : (
                 <Box flexDirection="column" minWidth={0}>
-                    <Text dimColor wrap="truncate">n новый preset | u обновить выбранный | d удалить</Text>
+                    <Text dimColor wrap="truncate">{t('screen.presets.shortcuts')}</Text>
                 </Box>
             )}
         </Box>

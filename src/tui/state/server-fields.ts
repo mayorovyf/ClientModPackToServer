@@ -1,6 +1,8 @@
-import type { ServerFormState } from './app-state.js';
+import type { MessageKey } from '../../i18n/catalog.js';
+import type { Translator } from '../../i18n/types.js';
 
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
+import type { ServerFormState } from './app-state.js';
 
 export type ServerFieldKey =
     | 'targetDir'
@@ -24,250 +26,224 @@ export interface ServerFieldDefinition {
     value: string;
     kind: 'text' | 'toggle' | 'enum' | 'action';
     description: string;
-}
-
-export interface ServerFieldOptionDescription {
-    label: string;
-    description: string;
+    activeOptionId?: string | null;
 }
 
 export interface ServerFieldDetails {
     title: string;
     overview: string;
-    options: ServerFieldOptionDescription[];
     note?: string;
 }
 
 export const SERVER_CORE_VALUES = ['fabric', 'forge', 'neoforge'] as const;
 
-const SERVER_FIELD_DETAILS: Record<ServerFieldKey, ServerFieldDetails> = {
+type T = Translator<MessageKey>;
+
+const SERVER_FIELD_DETAILS_KEYS: Record<
+    ServerFieldKey,
+    { titleKey: MessageKey; overviewKey: MessageKey; noteKey?: MessageKey }
+> = {
     targetDir: {
-        title: 'Target server dir',
-        overview: 'Каталог, в который ставится серверное ядро и откуда затем запускается сервер.',
-        options: [
-            { label: 'Пусто', description: 'Нужно указать папку сервера вручную или подтянуть последний build.' },
-            { label: 'Свой путь', description: 'Все installer и launcher-операции выполняются внутри указанной директории.' }
-        ],
-        note: 'Обычно сюда удобно подставлять путь последнего успешного build.'
+        titleKey: 'field.server.targetDir.title',
+        overviewKey: 'field.server.targetDir.overview',
+        noteKey: 'field.server.targetDir.note'
     },
     coreType: {
-        title: 'Core type',
-        overview: 'Выбор типа модового ядра, которое нужно установить в серверную папку.',
-        options: [
-            { label: 'fabric', description: 'Ставит Fabric server bootstrap через официальный Fabric meta API.' },
-            { label: 'forge', description: 'Скачивает Forge installer jar и выполняет server install через Java.' },
-            { label: 'neoforge', description: 'Скачивает NeoForge installer jar и выполняет server install через Java.' }
-        ]
+        titleKey: 'field.server.coreType.title',
+        overviewKey: 'field.server.coreType.overview'
     },
     minecraftVersion: {
-        title: 'Minecraft version',
-        overview: 'Версия Minecraft, под которую нужно подобрать и установить ядро.',
-        options: [
-            { label: 'Пусто', description: 'Установка ядра невозможна, пока версия Minecraft не указана.' },
-            { label: 'Своё значение', description: 'Используется для автоматического подбора версии loader или проверки совместимости.' }
-        ]
+        titleKey: 'field.server.minecraftVersion.title',
+        overviewKey: 'field.server.minecraftVersion.overview'
     },
     loaderVersion: {
-        title: 'Loader version',
-        overview: 'Явная версия loader/core. Для Fabric может оставаться пустой, тогда берётся актуальный стабильный loader.',
-        options: [
-            { label: 'Пусто', description: 'Fabric и Forge пытаются подобрать подходящую версию автоматически; NeoForge тоже пробует матчить по версии Minecraft.' },
-            { label: 'Своё значение', description: 'Используется указанная точная версия core/loader без автоподбора.' }
-        ]
+        titleKey: 'field.server.loaderVersion.title',
+        overviewKey: 'field.server.loaderVersion.overview'
     },
     javaPath: {
-        title: 'Java path',
-        overview: 'Путь до Java, которая будет использована для installer jars и запуска jar-launcher.',
-        options: [
-            { label: 'Пусто', description: 'Используется `java` из PATH.' },
-            { label: 'Свой путь', description: 'Позволяет запускать installer и сервер на конкретной Java.' }
-        ]
+        titleKey: 'field.server.javaPath.title',
+        overviewKey: 'field.server.javaPath.overview'
     },
     jvmArgs: {
-        title: 'JVM args',
-        overview: 'Дополнительные JVM-параметры для запуска jar-launcher сервера.',
-        options: [
-            { label: 'Пусто', description: 'Сервер запускается без дополнительных JVM-флагов.' },
-            { label: 'Свой набор', description: 'Например `-Xms2G -Xmx4G` для jar-entrypoint.' }
-        ],
-        note: 'Эти аргументы применяются только к jar-launchers, а не к .bat/.cmd/.ps1-скриптам.'
+        titleKey: 'field.server.jvmArgs.title',
+        overviewKey: 'field.server.jvmArgs.overview',
+        noteKey: 'field.server.jvmArgs.note'
     },
     explicitEntrypointPath: {
-        title: 'Explicit launcher',
-        overview: 'Явный путь до файла запуска сервера. Если оставить пустым, утилита попробует найти launcher автоматически.',
-        options: [
-            { label: 'Авто', description: 'Launcher ищется по типовым именам внутри target dir.' },
-            { label: 'Свой путь', description: 'Полезно, если ядро создаёт нестандартный launcher.' }
-        ]
+        titleKey: 'field.server.explicitEntrypointPath.title',
+        overviewKey: 'field.server.explicitEntrypointPath.overview'
     },
     acceptEula: {
-        title: 'Accept EULA',
-        overview: 'Если включено, утилита создаёт или обновляет `eula.txt` с `eula=true` перед install/launch.',
-        options: [
-            { label: 'off', description: 'EULA не меняется автоматически.' },
-            { label: 'on', description: 'Перед install и запуском выставляется `eula=true`.' }
-        ]
+        titleKey: 'field.server.acceptEula.title',
+        overviewKey: 'field.server.acceptEula.overview'
     },
     useLatestBuild: {
-        title: 'Use latest build dir',
-        overview: 'Подставляет путь последнего построенного server build в поле target dir.',
-        options: [
-            { label: 'available', description: 'Если есть последний build, target dir заполняется автоматически.' },
-            { label: 'missing', description: 'Если build ещё не запускался или был dry-run, действие ничего не делает.' }
-        ]
+        titleKey: 'field.server.useLatestBuild.title',
+        overviewKey: 'field.server.useLatestBuild.overview'
     },
     installCore: {
-        title: 'Install core',
-        overview: 'Запускает установку выбранного ядра в target dir.',
-        options: [
-            { label: 'ready', description: 'Устанавливает Fabric/Forge/NeoForge в указанную папку сервера.' },
-            { label: 'busy', description: 'Установка уже выполняется.' }
-        ]
+        titleKey: 'field.server.installCore.title',
+        overviewKey: 'field.server.installCore.overview'
     },
     applyEntrypointToValidation: {
-        title: 'Use launcher for validation',
-        overview: 'Копирует найденный server launcher в поле validation entrypoint текущей формы pipeline.',
-        options: [
-            { label: 'available', description: 'Найденный launcher можно сразу использовать в post-build validation.' },
-            { label: 'missing', description: 'Пока нет найденного launcher path, применять нечего.' }
-        ]
+        titleKey: 'field.server.applyEntrypointToValidation.title',
+        overviewKey: 'field.server.applyEntrypointToValidation.overview'
     },
     launchServer: {
-        title: 'Launch server',
-        overview: 'Запускает серверный процесс из target dir и показывает поток логов прямо в TUI.',
-        options: [
-            { label: 'ready', description: 'Сервер можно запустить.' },
-            { label: 'busy', description: 'Процесс сервера уже работает.' }
-        ]
+        titleKey: 'field.server.launchServer.title',
+        overviewKey: 'field.server.launchServer.overview'
     },
     stopServer: {
-        title: 'Stop server',
-        overview: 'Отправляет сигнал остановки запущенному серверному процессу.',
-        options: [
-            { label: 'ready', description: 'Процесс сервера будет остановлен.' },
-            { label: 'idle', description: 'Останавливать нечего, сервер сейчас не запущен.' }
-        ]
+        titleKey: 'field.server.stopServer.title',
+        overviewKey: 'field.server.stopServer.overview'
     },
     clearLogs: {
-        title: 'Clear logs',
-        overview: 'Очищает ленту серверных логов в TUI.',
-        options: [
-            { label: 'ready', description: 'Локальный буфер логов очищается.' }
-        ]
+        titleKey: 'field.server.clearLogs.title',
+        overviewKey: 'field.server.clearLogs.overview'
     }
 };
+
+function valueOrPlaceholder(value: string, fallback: string): string {
+    return value.trim() ? value : fallback;
+}
 
 export function getServerFieldDefinitions({
     form,
     serverState,
-    hasLatestBuild
+    hasLatestBuild,
+    t
 }: {
     form: ServerFormState;
     serverState: ServerManagerState;
     hasLatestBuild: boolean;
+    t: T;
 }): ServerFieldDefinition[] {
     return [
         {
             key: 'targetDir',
-            label: 'Target dir',
-            value: form.targetDir || '<not set>',
+            label: t('field.server.targetDir.label'),
+            value: valueOrPlaceholder(form.targetDir, t('common.placeholder.notSet')),
             kind: 'text',
-            description: 'Куда ставить и откуда запускать сервер'
+            description: t('field.server.targetDir.short')
         },
         {
             key: 'coreType',
-            label: 'Core type',
+            label: t('field.server.coreType.label'),
             value: form.coreType,
             kind: 'enum',
-            description: 'fabric / forge / neoforge'
+            description: t('field.server.coreType.short'),
+            activeOptionId: form.coreType
         },
         {
             key: 'minecraftVersion',
-            label: 'Minecraft',
-            value: form.minecraftVersion || '<required>',
+            label: t('field.server.minecraftVersion.label'),
+            value: valueOrPlaceholder(form.minecraftVersion, t('common.placeholder.required')),
             kind: 'text',
-            description: 'Версия Minecraft для ядра'
+            description: t('field.server.minecraftVersion.short')
         },
         {
             key: 'loaderVersion',
-            label: 'Loader version',
-            value: form.loaderVersion || '<auto>',
+            label: t('field.server.loaderVersion.label'),
+            value: valueOrPlaceholder(form.loaderVersion, t('common.placeholder.auto')),
             kind: 'text',
-            description: 'Явная версия loader/core'
+            description: t('field.server.loaderVersion.short')
         },
         {
             key: 'javaPath',
-            label: 'Java path',
-            value: form.javaPath || '<java from PATH>',
+            label: t('field.server.javaPath.label'),
+            value: valueOrPlaceholder(form.javaPath, t('common.placeholder.javaFromPath')),
             kind: 'text',
-            description: 'Java для install и jar-launch'
+            description: t('field.server.javaPath.short')
         },
         {
             key: 'jvmArgs',
-            label: 'JVM args',
-            value: form.jvmArgs || '<none>',
+            label: t('field.server.jvmArgs.label'),
+            value: valueOrPlaceholder(form.jvmArgs, t('common.placeholder.none')),
             kind: 'text',
-            description: 'Дополнительные JVM флаги'
+            description: t('field.server.jvmArgs.short')
         },
         {
             key: 'explicitEntrypointPath',
-            label: 'Launcher path',
-            value: form.explicitEntrypointPath || serverState.resolvedEntrypointPath || '<auto>',
+            label: t('field.server.explicitEntrypointPath.label'),
+            value: form.explicitEntrypointPath || serverState.resolvedEntrypointPath || t('common.placeholder.auto'),
             kind: 'text',
-            description: 'Явный launcher или auto-detect'
+            description: t('field.server.explicitEntrypointPath.short')
         },
         {
             key: 'acceptEula',
-            label: 'Accept EULA',
-            value: form.acceptEula ? 'on' : 'off',
+            label: t('field.server.acceptEula.label'),
+            value: t(form.acceptEula ? 'common.value.on' : 'common.value.off'),
             kind: 'toggle',
-            description: 'Автоматически писать eula=true'
+            description: t('field.server.acceptEula.short'),
+            activeOptionId: form.acceptEula ? 'on' : 'off'
         },
         {
             key: 'useLatestBuild',
-            label: 'Use latest build',
-            value: hasLatestBuild ? 'available' : 'missing',
+            label: t('field.server.useLatestBuild.label'),
+            value: t(hasLatestBuild ? 'common.value.available' : 'common.value.missing'),
             kind: 'action',
-            description: 'Подставить путь последнего build'
+            description: t('field.server.useLatestBuild.short'),
+            activeOptionId: hasLatestBuild ? 'available' : 'missing'
         },
         {
             key: 'installCore',
-            label: serverState.installStatus === 'installing' ? 'Installing core...' : 'Install core',
-            value: serverState.installStatus === 'installing' ? 'busy' : 'ready',
+            label: t(serverState.installStatus === 'installing'
+                ? 'field.server.installCore.label.busy'
+                : 'field.server.installCore.label.ready'),
+            value: t(serverState.installStatus === 'installing' ? 'common.value.busy' : 'common.value.ready'),
             kind: 'action',
-            description: 'Скачать и установить ядро'
+            description: t('field.server.installCore.short'),
+            activeOptionId: serverState.installStatus === 'installing' ? 'busy' : 'ready'
         },
         {
             key: 'applyEntrypointToValidation',
-            label: 'Use for validation',
-            value: serverState.resolvedEntrypointPath ? 'available' : 'missing',
+            label: t('field.server.applyEntrypointToValidation.label'),
+            value: t(serverState.resolvedEntrypointPath ? 'common.value.available' : 'common.value.missing'),
             kind: 'action',
-            description: 'Записать launcher в validation entrypoint'
+            description: t('field.server.applyEntrypointToValidation.short'),
+            activeOptionId: serverState.resolvedEntrypointPath ? 'available' : 'missing'
         },
         {
             key: 'launchServer',
-            label: serverState.launchStatus === 'running' ? 'Server is running' : 'Launch server',
-            value: serverState.launchStatus === 'running' ? 'busy' : 'ready',
+            label: t(serverState.launchStatus === 'running'
+                ? 'field.server.launchServer.label.busy'
+                : 'field.server.launchServer.label.ready'),
+            value: t(serverState.launchStatus === 'running' ? 'common.value.busy' : 'common.value.ready'),
             kind: 'action',
-            description: 'Запустить серверный процесс'
+            description: t('field.server.launchServer.short'),
+            activeOptionId: serverState.launchStatus === 'running' ? 'busy' : 'ready'
         },
         {
             key: 'stopServer',
-            label: 'Stop server',
-            value: serverState.launchStatus === 'running' || serverState.launchStatus === 'starting' ? 'ready' : 'idle',
+            label: t('field.server.stopServer.label'),
+            value: t(serverState.launchStatus === 'running' || serverState.launchStatus === 'starting'
+                ? 'common.value.ready'
+                : 'common.value.idle'),
             kind: 'action',
-            description: 'Остановить сервер'
+            description: t('field.server.stopServer.short'),
+            activeOptionId: serverState.launchStatus === 'running' || serverState.launchStatus === 'starting' ? 'ready' : 'idle'
         },
         {
             key: 'clearLogs',
-            label: 'Clear logs',
-            value: 'ready',
+            label: t('field.server.clearLogs.label'),
+            value: t('common.value.ready'),
             kind: 'action',
-            description: 'Очистить ленту логов'
+            description: t('field.server.clearLogs.short'),
+            activeOptionId: 'ready'
         }
     ];
 }
 
-export function getServerFieldDetails(fieldKey: ServerFieldKey): ServerFieldDetails {
-    return SERVER_FIELD_DETAILS[fieldKey];
+export function getServerFieldDetails(fieldKey: ServerFieldKey, t: T): ServerFieldDetails {
+    const meta = SERVER_FIELD_DETAILS_KEYS[fieldKey];
+    const details: ServerFieldDetails = {
+        title: t(meta.titleKey),
+        overview: t(meta.overviewKey)
+    };
+
+    if (meta.noteKey) {
+        details.note = t(meta.noteKey);
+    }
+
+    return details;
 }

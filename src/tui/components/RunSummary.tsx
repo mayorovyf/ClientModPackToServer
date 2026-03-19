@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Spinner, StatusMessage } from '@inkjs/ui';
 
+import { useT } from '../i18n/use-t.js';
 import type { RunSessionState } from '../state/app-state.js';
 import { useScrollOffset } from '../hooks/use-scroll-offset.js';
 
@@ -47,10 +48,11 @@ export function RunSummary({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const reviewCount = session.lastReport?.arbiter?.summary.finalDecisions.review ?? 0;
     const keptCount = session.lastReport?.stats.kept ?? 0;
     const excludedCount = session.lastReport?.stats.excluded ?? 0;
-    const validationStatus = session.lastReport?.validation?.status ?? 'n/a';
+    const validationStatus = session.lastReport?.validation?.status ?? t('common.placeholder.na');
     const visibleEventLimit = Math.max(1, Math.min(eventLimit, Math.max(height - 15, 1)));
     const { offset, hasOverflow } = useScrollOffset({
         itemCount: session.events.length,
@@ -72,42 +74,54 @@ export function RunSummary({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="greenBright" wrap="truncate">Последний запуск</Text>
+                <Text color="greenBright" wrap="truncate">{t('runSummary.title')}</Text>
                 <Box marginTop={1} minWidth={0}>
                     <StatusMessage variant={getStatusVariant(session.status)}>
                         {session.status === 'running'
-                            ? 'Pipeline выполняется'
+                            ? t('runSummary.status.running')
                             : session.status === 'succeeded'
-                                ? 'Последний запуск завершён успешно'
+                                ? t('runSummary.status.succeeded')
                                 : session.status === 'failed'
-                                    ? `Запуск завершился ошибкой: ${session.lastError || 'unknown'}`
-                                    : 'Запуск ещё не выполнялся'}
+                                    ? t('runSummary.status.failed', { error: session.lastError || t('common.value.unknown') })
+                                    : t('runSummary.status.idle')}
                     </StatusMessage>
                 </Box>
                 {session.status === 'running' ? (
                     <Box marginTop={1} minWidth={0}>
-                        <Spinner label={session.currentStage ? `Этап: ${session.currentStage}` : 'Запуск backend'} />
+                        <Spinner label={session.currentStage ? t('runSummary.spinner.stage', { stage: session.currentStage }) : t('runSummary.spinner.starting')} />
                     </Box>
                 ) : null}
                 <Box marginTop={1} minWidth={0}>
-                    <Text wrap="wrap">Run ID: {session.runId || 'n/a'}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.runId')}: ${session.runId || t('common.placeholder.na')}`}</Text>
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <StatPill label={compact ? 'KEEP' : 'KEPT'} value={keptCount} backgroundColor="green" />
-                    <StatPill label={compact ? 'EXCL' : 'EXCLUDED'} value={excludedCount} backgroundColor="red" />
-                    <StatPill label="REVIEW" value={reviewCount} backgroundColor="yellow" />
+                    <StatPill
+                        label={compact ? t('runSummary.stat.keep.short') : t('runSummary.stat.keep.full')}
+                        value={keptCount}
+                        backgroundColor="green"
+                    />
+                    <StatPill
+                        label={compact ? t('runSummary.stat.exclude.short') : t('runSummary.stat.exclude.full')}
+                        value={excludedCount}
+                        backgroundColor="red"
+                    />
+                    <StatPill label={t('runSummary.stat.review')} value={reviewCount} backgroundColor="yellow" />
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <Text wrap="wrap">Validation: {validationStatus}</Text>
-                    <Text wrap="wrap">Отчёт: {session.reportPaths.jsonReportPath || 'n/a'}</Text>
-                    <Text wrap="wrap">Summary: {session.reportPaths.summaryPath || 'n/a'}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.validation')}: ${validationStatus}`}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.report')}: ${session.reportPaths.jsonReportPath || t('common.placeholder.na')}`}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.summary')}: ${session.reportPaths.summaryPath || t('common.placeholder.na')}`}</Text>
                 </Box>
             </Box>
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Последние события</Text>
+                <Text color="cyan" wrap="wrap">{t('runSummary.events.title')}</Text>
                 {hasOverflow ? (
                     <Text dimColor wrap="truncate">
-                        {`↑/↓ события | ${offset + 1}-${Math.min(offset + visibleEvents.length, session.events.length)} из ${session.events.length}`}
+                        {t('runSummary.events.scroll', {
+                            start: offset + 1,
+                            end: Math.min(offset + visibleEvents.length, session.events.length),
+                            total: session.events.length
+                        })}
                     </Text>
                 ) : null}
                 {visibleEvents.map((event) => (
@@ -115,7 +129,7 @@ export function RunSummary({
                         {event.type}
                     </Text>
                 ))}
-                {visibleEvents.length === 0 ? <Text dimColor wrap="wrap">События ещё не поступали</Text> : null}
+                {visibleEvents.length === 0 ? <Text dimColor wrap="wrap">{t('runSummary.events.empty')}</Text> : null}
             </Box>
         </Box>
     );

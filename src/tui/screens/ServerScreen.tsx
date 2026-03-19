@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 
-import { cycleOption } from '../state/app-state.js';
-import { getServerFieldDefinitions, SERVER_CORE_VALUES } from '../state/server-fields.js';
-import type { ServerFieldDefinition, ServerFieldKey } from '../state/server-fields.js';
-
-import type { ServerFormState } from '../state/app-state.js';
+import { useT } from '../i18n/use-t.js';
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
+import { cycleOption } from '../state/app-state.js';
+import type { ServerFormState } from '../state/app-state.js';
+import { getServerFieldDefinitions, SERVER_CORE_VALUES } from '../state/server-fields.js';
+import type { ServerFieldKey } from '../state/server-fields.js';
 
 type EditableServerField =
     | 'targetDir'
@@ -79,13 +79,15 @@ export function ServerScreen({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [editingField, setEditingField] = useState<EditableServerField | null>(null);
     const [draftValue, setDraftValue] = useState('');
     const fields = getServerFieldDefinitions({
         form,
         serverState,
-        hasLatestBuild: Boolean(latestBuildDir)
+        hasLatestBuild: Boolean(latestBuildDir),
+        t
     }).filter((field) => !fieldKeys || fieldKeys.includes(field.key));
     const selectedField = fields[selectedIndex] || fields[0];
 
@@ -200,9 +202,13 @@ export function ServerScreen({
             paddingY={1}
             minWidth={0}
         >
-            <Text color="cyanBright">Server</Text>
+            <Text color="cyanBright">{t('screen.server.title')}</Text>
             <Text dimColor wrap="truncate">
-                {`Поля ${windowRange.start + 1}-${windowRange.end} из ${fields.length}`}
+                {t('screen.server.range', {
+                    start: windowRange.start + 1,
+                    end: windowRange.end,
+                    total: fields.length
+                })}
             </Text>
 
             <Box marginTop={1} flexDirection="column" height={listHeight} minWidth={0}>
@@ -242,10 +248,10 @@ export function ServerScreen({
 
             {editingField ? (
                 <Box flexDirection="column" minWidth={0}>
-                    <Text wrap="truncate">Введите новое значение и нажмите Enter:</Text>
+                    <Text wrap="truncate">{t('screen.server.editPrompt')}</Text>
                     <TextInput
                         defaultValue={draftValue}
-                        placeholder="Введите значение..."
+                        placeholder={t('screen.server.editPlaceholder')}
                         onChange={setDraftValue}
                         onSubmit={(value) => {
                             onChange({
@@ -256,11 +262,11 @@ export function ServerScreen({
                             setDraftValue('');
                         }}
                     />
-                    <Text dimColor wrap="truncate">Esc отменяет редактирование</Text>
+                    <Text dimColor wrap="truncate">{t('screen.server.editCancel')}</Text>
                 </Box>
             ) : (
                 <Box flexDirection="column" minWidth={0}>
-                    <Text dimColor wrap="truncate">Enter редактирует поле или выполняет действие</Text>
+                    <Text dimColor wrap="truncate">{t('screen.server.idleHint')}</Text>
                 </Box>
             )}
         </Box>

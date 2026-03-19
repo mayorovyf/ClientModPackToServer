@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { StatusMessage } from '@inkjs/ui';
 
+import { useT } from '../i18n/use-t.js';
 import { useScrollOffset } from '../hooks/use-scroll-offset.js';
 
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
@@ -29,6 +30,7 @@ export function ServerLogsScreen({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const headerLines = 7;
     const visibleLogCount = Math.max(1, height - headerLines);
     const { offset, hasOverflow } = useScrollOffset({
@@ -51,22 +53,26 @@ export function ServerLogsScreen({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyanBright">Server Logs</Text>
+                <Text color="cyanBright">{t('screen.serverLogs.title')}</Text>
                 <Box marginTop={1} minWidth={0}>
                     <StatusMessage variant={getStatusVariant(serverState.launchStatus)}>
                         {serverState.launchStatus === 'running'
-                            ? 'Server process is running'
+                            ? t('screen.serverLogs.running')
                             : serverState.launchStatus === 'starting'
-                                ? 'Server process is starting'
+                                ? t('screen.serverLogs.starting')
                                 : serverState.launchStatus === 'failed'
-                                    ? `Server process failed: ${serverState.lastError || 'unknown error'}`
-                                    : 'Server process is not running'}
+                                    ? t('screen.serverLogs.failed', { error: serverState.lastError || t('common.value.unknown') })
+                                    : t('screen.serverLogs.idle')}
                     </StatusMessage>
                 </Box>
-                <Text wrap="wrap">{`Launcher: ${serverState.resolvedEntrypointPath || 'n/a'}`}</Text>
+                <Text wrap="wrap">{`${t('server.summary.launch.launcher')}: ${serverState.resolvedEntrypointPath || t('common.placeholder.na')}`}</Text>
                 {hasOverflow ? (
                     <Text dimColor wrap="truncate">
-                        {`↑/↓ scroll logs | ${offset + 1}-${Math.min(offset + visibleLogs.length, serverState.logs.length)} of ${serverState.logs.length}`}
+                        {t('screen.serverLogs.scroll', {
+                            start: offset + 1,
+                            end: Math.min(offset + visibleLogs.length, serverState.logs.length),
+                            total: serverState.logs.length
+                        })}
                     </Text>
                 ) : null}
             </Box>
@@ -79,9 +85,7 @@ export function ServerLogsScreen({
                         </Text>
                     ))
                 ) : (
-                    <Text dimColor wrap="wrap">
-                        Server and installer logs will appear here. Use the Launch page for start/stop actions.
-                    </Text>
+                    <Text dimColor wrap="wrap">{t('screen.serverLogs.empty')}</Text>
                 )}
             </Box>
         </Box>

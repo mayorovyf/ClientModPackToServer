@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
+import { useT } from '../i18n/use-t.js';
 import {
     collectServerDoctorFindings,
     countPreflightFindings,
@@ -34,7 +35,7 @@ function DetailLine({
     );
 }
 
-function buildRecommendedActions(doctor: ServerDoctorState): string[] {
+function buildRecommendedActions(doctor: ServerDoctorState, t: ReturnType<typeof useT>): string[] {
     const findings = collectServerDoctorFindings(doctor);
     const actions: string[] = [];
 
@@ -46,23 +47,23 @@ function buildRecommendedActions(doctor: ServerDoctorState): string[] {
 
     addAction(
         findings.some((finding) => finding.code === 'target-dir-required'),
-        'Set Target dir before install or launch.'
+        t('details.serverDoctor.action.targetDir')
     );
     addAction(
         findings.some((finding) => finding.code === 'minecraft-version-required'),
-        'Specify Minecraft version before installing the selected core.'
+        t('details.serverDoctor.action.minecraftVersion')
     );
     addAction(
         findings.some((finding) => finding.code === 'launcher-missing'),
-        'Install a core first or point Explicit launcher to an existing server start file.'
+        t('details.serverDoctor.action.launcher')
     );
     addAction(
         findings.some((finding) => finding.code === 'java-unavailable'),
-        'Fix Java path or ensure java is available in PATH for installer and jar launchers.'
+        t('details.serverDoctor.action.java')
     );
     addAction(
         findings.some((finding) => finding.code === 'eula-pending'),
-        'Enable Accept EULA or write eula=true manually before the first launch.'
+        t('details.serverDoctor.action.eula')
     );
 
     return actions.slice(0, 4);
@@ -79,6 +80,8 @@ export function ServerDoctorDetails({
     doctorState: ServerDoctorState | null;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
+
     if (!doctorState) {
         return (
             <Box
@@ -92,8 +95,8 @@ export function ServerDoctorDetails({
                 paddingY={1}
                 minWidth={0}
             >
-                <Text color="cyan" wrap="wrap">Doctor Summary</Text>
-                <Text dimColor wrap="wrap">Open Server / Doctor to inspect install and launch readiness.</Text>
+                <Text color="cyan" wrap="wrap">{t('details.serverDoctor.title')}</Text>
+                <Text dimColor wrap="wrap">{t('details.serverDoctor.empty')}</Text>
             </Box>
         );
     }
@@ -101,7 +104,7 @@ export function ServerDoctorDetails({
     const summary = summarizeServerDoctorState(doctorState);
     const topError = pickTopFinding(doctorState, 'error');
     const topWarning = pickTopFinding(doctorState, 'warning');
-    const actions = buildRecommendedActions(doctorState);
+    const actions = buildRecommendedActions(doctorState, t);
 
     return (
         <Box
@@ -116,52 +119,55 @@ export function ServerDoctorDetails({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Doctor Summary</Text>
+                <Text color="cyan" wrap="wrap">{t('details.serverDoctor.title')}</Text>
                 <DetailLine
-                    label="Overall"
-                    value={summary.ok ? 'READY' : summary.errorCount > 0 ? 'BLOCKED' : 'WARNINGS'}
+                    label={t('details.serverDoctor.overall')}
+                    value={summary.ok ? t('details.serverDoctor.state.ready') : summary.errorCount > 0 ? t('details.serverDoctor.state.blocked') : t('details.serverDoctor.state.warnings')}
                     color={summary.ok ? 'green' : summary.errorCount > 0 ? 'red' : 'yellow'}
                 />
                 <DetailLine
-                    label="Install"
-                    value={doctorState.install.ok ? 'pass' : 'blocked'}
+                    label={t('screen.serverDoctor.install')}
+                    value={doctorState.install.ok ? t('details.serverDoctor.state.pass') : t('details.serverDoctor.state.blockedLower')}
                     color={doctorState.install.ok ? 'green' : 'red'}
                 />
                 <DetailLine
-                    label="Launch"
-                    value={doctorState.launch.ok ? 'pass' : 'blocked'}
+                    label={t('screen.serverDoctor.launch')}
+                    value={doctorState.launch.ok ? t('details.serverDoctor.state.pass') : t('details.serverDoctor.state.blockedLower')}
                     color={doctorState.launch.ok ? 'green' : 'red'}
                 />
-                <DetailLine label="Errors" value={String(summary.errorCount)} color={summary.errorCount > 0 ? 'red' : 'green'} />
-                <DetailLine label="Warnings" value={String(summary.warningCount)} color={summary.warningCount > 0 ? 'yellow' : 'green'} />
-                <DetailLine label="Infos" value={String(summary.infoCount)} color="cyan" />
-                <DetailLine label="Launcher" value={doctorState.launch.entrypoint?.kind || 'n/a'} />
-                <DetailLine label="Command" value={doctorState.launch.commandPreview || 'n/a'} />
+                <DetailLine label={t('details.serverDoctor.errors')} value={String(summary.errorCount)} color={summary.errorCount > 0 ? 'red' : 'green'} />
+                <DetailLine label={t('details.serverDoctor.warnings')} value={String(summary.warningCount)} color={summary.warningCount > 0 ? 'yellow' : 'green'} />
+                <DetailLine label={t('details.serverDoctor.infos')} value={String(summary.infoCount)} color="cyan" />
+                <DetailLine label={t('details.serverDoctor.launcher')} value={doctorState.launch.entrypoint?.kind || t('common.placeholder.na')} />
+                <DetailLine label={t('details.serverDoctor.command')} value={doctorState.launch.commandPreview || t('common.placeholder.na')} />
                 {topError ? (
                     <Box marginTop={1} flexDirection="column" minWidth={0}>
-                        <Text color="red" wrap="wrap">Top blocker</Text>
+                        <Text color="red" wrap="wrap">{t('details.serverDoctor.topBlocker')}</Text>
                         <Text wrap="wrap">{`${topError.code}: ${topError.message}`}</Text>
                     </Box>
                 ) : topWarning ? (
                     <Box marginTop={1} flexDirection="column" minWidth={0}>
-                        <Text color="yellow" wrap="wrap">Top warning</Text>
+                        <Text color="yellow" wrap="wrap">{t('details.serverDoctor.topWarning')}</Text>
                         <Text wrap="wrap">{`${topWarning.code}: ${topWarning.message}`}</Text>
                     </Box>
                 ) : null}
             </Box>
 
             <Box flexDirection="column" minWidth={0}>
-                <Text color="greenBright" wrap="wrap">Recommended next steps</Text>
+                <Text color="greenBright" wrap="wrap">{t('details.serverDoctor.nextSteps')}</Text>
                 {actions.length > 0 ? (
                     actions.map((action) => (
                         <Text key={action} wrap="wrap">{`- ${action}`}</Text>
                     ))
                 ) : (
-                    <Text wrap="wrap">No blocking action is required. Server setup looks ready.</Text>
+                    <Text wrap="wrap">{t('details.serverDoctor.ready')}</Text>
                 )}
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
                     <Text dimColor wrap="truncate">
-                        {`Install info: ${countPreflightFindings(doctorState.install, 'info')} | Launch info: ${countPreflightFindings(doctorState.launch, 'info')}`}
+                        {t('details.serverDoctor.infoLine', {
+                            install: countPreflightFindings(doctorState.install, 'info'),
+                            launch: countPreflightFindings(doctorState.launch, 'info')
+                        })}
                     </Text>
                 </Box>
             </Box>

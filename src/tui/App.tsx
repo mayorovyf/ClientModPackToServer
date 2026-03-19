@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useApp } from 'ink';
 
+import i18nApi from '../i18n/create-translator.js';
 import entrypointApi from '../server/entrypoint.js';
 import manualReviewOverridesApi from '../review/manual-overrides.js';
 import type { ManualReviewAction } from '../review/manual-overrides.js';
@@ -12,6 +13,8 @@ import { useBackendRun } from './hooks/use-backend-run.js';
 import { getColumnOrder, useHotkeys } from './hooks/use-hotkeys.js';
 import { useServerManager } from './hooks/use-server-manager.js';
 import { useTerminalLayout } from './hooks/use-terminal-layout.js';
+import { I18nContext } from './i18n/I18nContext.js';
+import { LocaleContext } from './i18n/LocaleContext.js';
 import { createSectionRegistry } from './sections/registry.js';
 import { NAVIGATION_ITEMS } from './state/app-state.js';
 import { AUTHOR_PROFILES } from './state/authors.js';
@@ -21,6 +24,7 @@ import { loadReportHistory, resolveReportRootDir } from './state/report-history.
 import { buildReviewItems } from './state/review-items.js';
 import { buildServerDoctorState } from './state/server-doctor.js';
 
+import type { Locale } from '../i18n/types.js';
 import type { ActivePageByScreen, FocusedColumn, RunFormState, ScreenId, ServerFormState, TuiMode } from './state/app-state.js';
 import type { ReportHistoryState } from './state/report-history.js';
 import type { RunPreset } from './state/presets.js';
@@ -36,6 +40,7 @@ const {
     setManualReviewOverride
 } = manualReviewOverridesApi;
 const { resolveManagedServerEntrypoint } = entrypointApi;
+const { createTranslator } = i18nApi;
 
 interface NoticeState {
     level: 'success' | 'error';
@@ -52,6 +57,7 @@ export function App(): React.JSX.Element {
     const [persistedState] = useState(loadPersistedTuiState);
     const [activeScreen, setActiveScreen] = useState<ScreenId>(persistedState.activeScreen);
     const [activePageByScreen, setActivePageByScreen] = useState<ActivePageByScreen>(persistedState.activePageByScreen);
+    const [locale, setLocale] = useState<Locale>(persistedState.locale);
     const [uiMode, setUiMode] = useState<TuiMode>(persistedState.uiMode);
     const [form, setForm] = useState<RunFormState>(persistedState.form);
     const [serverForm, setServerForm] = useState<ServerFormState>(persistedState.serverForm);
@@ -62,7 +68,7 @@ export function App(): React.JSX.Element {
     const [selectedAuthorId, setSelectedAuthorId] = useState<string>(AUTHOR_PROFILES[0]?.id ?? '');
     const [selectedReportRunId, setSelectedReportRunId] = useState('');
     const [selectedReviewItemId, setSelectedReviewItemId] = useState('');
-    const [selectedSettingsField, setSelectedSettingsField] = useState<SettingsFieldKey>('uiMode');
+    const [selectedSettingsField, setSelectedSettingsField] = useState<SettingsFieldKey>('locale');
     const [selectedPresetId, setSelectedPresetId] = useState('');
     const [showHints, setShowHints] = useState(persistedState.showHints);
     const [reviewOverridesRevision, setReviewOverridesRevision] = useState(0);
@@ -72,6 +78,7 @@ export function App(): React.JSX.Element {
     const [persistenceError, setPersistenceError] = useState<string | null>(null);
     const { session, startRun, cancelRun } = useBackendRun();
     const serverManager = useServerManager();
+    const t = useMemo(() => createTranslator(locale), [locale]);
 
     const reportRootDir = useMemo(
         () => resolveReportRootDir(form.reportDir, session.reportPaths.reportDir),
@@ -127,9 +134,12 @@ export function App(): React.JSX.Element {
         serverManager.state.resolvedEntrypointPath
     ]);
     const sectionContext: SectionRegistryContext = {
+        t,
+        locale,
         form,
         setForm,
         uiMode,
+        setLocale,
         setUiMode,
         showHints,
         setShowHints,
@@ -188,7 +198,10 @@ export function App(): React.JSX.Element {
     const activePageId = activePageByScreen[activeScreen];
     const activePage = activeSection.pages.find((page) => page.id === activePageId) ?? activeSection.pages[0]!;
     const activePageIds = activeSection.pages.map((page) => page.id);
-    const activeScreenLabel = activeSection?.label || NAVIGATION_ITEMS.find((item) => item.id === activeScreen)?.label || activeScreen;
+    const activeScreenLabel = activeSection?.label || (() => {
+        const navigationItem = NAVIGATION_ITEMS.find((item) => item.id === activeScreen);
+        return navigationItem ? t(navigationItem.labelKey) : activeScreen;
+    })();
     const activePageLabel = activePage?.label || String(activePageId || '');
     const showDetails = Boolean(activePage?.hasDetails && activePage.renderDetails);
 
@@ -217,6 +230,7 @@ export function App(): React.JSX.Element {
                 version: 2,
                 activeScreen,
                 activePageByScreen,
+                locale,
                 uiMode,
                 showHints,
                 form,
@@ -226,7 +240,7 @@ export function App(): React.JSX.Element {
         } catch (error) {
             setPersistenceError(error instanceof Error ? error.message : String(error));
         }
-    }, [activePageByScreen, activeScreen, form, serverForm, showHints, uiMode]);
+    }, [activePageByScreen, activeScreen, form, locale, serverForm, showHints, uiMode]);
 
     useEffect(() => {
         if (!selectedReportRunId && reportHistory.entries[0]?.runId) {
@@ -290,7 +304,7 @@ export function App(): React.JSX.Element {
         if (!form.inputPath.trim()) {
             setAppNotice({
                 level: 'error',
-                message: 'Input instance path is required before running the pipeline'
+                message: t('app.notice.inputRequired')
             });
             return;
         }
@@ -325,7 +339,7 @@ export function App(): React.JSX.Element {
         setFocusedColumn('content');
         setAppNotice({
             level: 'success',
-            message: `Preset applied: ${selectedPreset.name}`
+            message: t('app.notice.presetApplied', { name: selectedPreset.name })
         });
     }
 
@@ -339,7 +353,7 @@ export function App(): React.JSX.Element {
             refreshPresets(preset.id);
             setAppNotice({
                 level: 'success',
-                message: `Preset saved: ${preset.name}`
+                message: t('app.notice.presetSaved', { name: preset.name })
             });
         } catch (error) {
             setAppNotice({
@@ -364,7 +378,7 @@ export function App(): React.JSX.Element {
             refreshPresets(preset.id);
             setAppNotice({
                 level: 'success',
-                message: `Preset updated: ${preset.name}`
+                message: t('app.notice.presetUpdated', { name: preset.name })
             });
         } catch (error) {
             setAppNotice({
@@ -384,7 +398,7 @@ export function App(): React.JSX.Element {
         if (!deleted) {
             setAppNotice({
                 level: 'error',
-                message: `Preset was not found: ${selectedPreset.name}`
+                message: t('app.notice.presetMissing', { name: selectedPreset.name })
             });
             return;
         }
@@ -392,7 +406,7 @@ export function App(): React.JSX.Element {
         refreshPresets();
         setAppNotice({
             level: 'success',
-            message: `Preset deleted: ${selectedPreset.name}`
+            message: t('app.notice.presetDeleted', { name: selectedPreset.name })
         });
     }
 
@@ -448,7 +462,7 @@ export function App(): React.JSX.Element {
         if (!latestBuildDir) {
             setAppNotice({
                 level: 'error',
-                message: 'No built server directory is available yet'
+                message: t('app.notice.noBuildDir')
             });
             return;
         }
@@ -459,7 +473,7 @@ export function App(): React.JSX.Element {
         }));
         setAppNotice({
             level: 'success',
-            message: `Target server dir set to latest build: ${latestBuildDir}`
+            message: t('app.notice.serverTargetUpdated', { path: latestBuildDir })
         });
     }
 
@@ -469,7 +483,7 @@ export function App(): React.JSX.Element {
         if (!entrypointPath) {
             setAppNotice({
                 level: 'error',
-                message: 'No resolved server launcher is available yet'
+                message: t('app.notice.noResolvedLauncher')
             });
             return;
         }
@@ -480,7 +494,7 @@ export function App(): React.JSX.Element {
         }));
         setAppNotice({
             level: 'success',
-            message: 'Validation entrypoint updated from the managed server launcher'
+            message: t('app.notice.validationEntrypointUpdated')
         });
     }
 
@@ -513,10 +527,10 @@ export function App(): React.JSX.Element {
     const fallbackStatusMessage = serverManager.state.lastError
         || session.lastError
         || (session.status === 'running'
-            ? 'Pipeline is running'
+            ? t('app.status.pipelineRunning')
             : form.inputPath.trim()
-                ? 'Ready to run'
-                : 'Set the instance path before starting the pipeline');
+                ? t('app.status.readyToRun')
+                : t('app.status.setInputPath'));
     const statusMessage = appNotice?.message
         || reviewNotice?.message
         || persistenceError
@@ -527,11 +541,11 @@ export function App(): React.JSX.Element {
         const warnings: string[] = [];
 
         if (!layout.widthSupported) {
-            warnings.push(`Increase terminal width to at least ${layout.minimumThreeColumnWidth} characters.`);
+            warnings.push(t('app.layout.increaseWidth', { width: layout.minimumThreeColumnWidth }));
         }
 
         if (!layout.heightSupported) {
-            warnings.push(`Increase terminal height to at least ${layout.minimumRootHeight} rows.`);
+            warnings.push(t('app.layout.increaseHeight', { height: layout.minimumRootHeight }));
         }
 
         return (
@@ -552,11 +566,11 @@ export function App(): React.JSX.Element {
                     paddingX={1}
                     minWidth={0}
                 >
-                    <Text color="yellowBright" wrap="wrap">Terminal window is too small</Text>
+                    <Text color="yellowBright" wrap="wrap">{t('app.layout.tooSmall')}</Text>
                     {warnings.map((warning) => (
                         <Text key={warning} wrap="wrap">{warning}</Text>
                     ))}
-                    <Text dimColor wrap="wrap">{`Current size: ${layout.columns} x ${layout.rows}`}</Text>
+                    <Text dimColor wrap="wrap">{t('app.layout.currentSize', { width: layout.columns, height: layout.rows })}</Text>
                 </Box>
             </Box>
         );
@@ -565,11 +579,17 @@ export function App(): React.JSX.Element {
     const sidebarHeight = layout.sidebarInline ? layout.mainAreaHeight : layout.sidebarHeight;
     const screenHeight = layout.sidebarInline ? layout.mainAreaHeight : layout.screenAreaHeight;
     const detailsHeight = layout.detailsInline ? layout.mainAreaHeight : layout.detailsHeight;
+    const screenWidth = layout.sidebarInline
+        ? (showDetails && layout.detailsInline
+            ? layout.columns - layout.sidebarWidth - layout.detailsWidth - layout.gap * 2
+            : layout.columns - layout.sidebarWidth - layout.gap)
+        : layout.columns;
     const content = (
         <SectionShell
             section={activeSection}
             activePageId={activePage.id}
             height={screenHeight}
+            width={screenWidth}
             isFocused={focusedColumn === 'content'}
             content={(contentHeight) => activePage.renderContent({
                 contentHeight,
@@ -590,41 +610,46 @@ export function App(): React.JSX.Element {
         : undefined;
 
     return (
-        <Layout
-            layout={layout}
-            sidebar={
-                <Sidebar
-                    items={NAVIGATION_ITEMS}
-                    activeScreen={activeScreen}
-                    activePageLabel={activePageLabel}
-                    hasMultiplePages={activeSection.pages.length > 1}
-                    isFocused={focusedColumn === 'sidebar'}
-                    uiMode={uiMode}
-                    runStatus={session.status}
-                    showHints={showHints}
-                    compact={layout.compact}
-                    height={sidebarHeight}
-                    {...(layout.sidebarInline ? { width: layout.sidebarWidth } : {})}
+        <LocaleContext.Provider value={locale}>
+            <I18nContext.Provider value={t}>
+                <Layout
+                    layout={layout}
+                    sidebar={
+                        <Sidebar
+                            items={NAVIGATION_ITEMS}
+                            activeScreen={activeScreen}
+                            activePageId={String(activePage.id)}
+                            activePageLabel={activePageLabel}
+                            hasMultiplePages={activeSection.pages.length > 1}
+                            isFocused={focusedColumn === 'sidebar'}
+                            uiMode={uiMode}
+                            runStatus={session.status}
+                            showHints={showHints}
+                            compact={layout.compact}
+                            height={sidebarHeight}
+                            {...(layout.sidebarInline ? { width: layout.sidebarWidth } : {})}
+                        />
+                    }
+                    content={
+                        <Box flexDirection="column" width="100%" height={screenHeight} flexGrow={1} minWidth={0}>
+                            {content}
+                        </Box>
+                    }
+                    showDetails={showDetails}
+                    details={details}
+                    statusBar={
+                        <StatusBar
+                            activeScreenLabel={activeScreenLabel}
+                            activePageLabel={activePageLabel}
+                            focusedColumn={focusedColumn}
+                            uiMode={uiMode}
+                            runStatus={session.status}
+                            currentStage={session.currentStage}
+                            statusMessage={statusMessage}
+                        />
+                    }
                 />
-            }
-            content={
-                <Box flexDirection="column" width="100%" height={screenHeight} flexGrow={1} minWidth={0}>
-                    {content}
-                </Box>
-            }
-            showDetails={showDetails}
-            details={details}
-            statusBar={
-                <StatusBar
-                    activeScreenLabel={activeScreenLabel}
-                    activePageLabel={activePageLabel}
-                    focusedColumn={focusedColumn}
-                    uiMode={uiMode}
-                    runStatus={session.status}
-                    currentStage={session.currentStage}
-                    statusMessage={statusMessage}
-                />
-            }
-        />
+            </I18nContext.Provider>
+        </LocaleContext.Provider>
     );
 }

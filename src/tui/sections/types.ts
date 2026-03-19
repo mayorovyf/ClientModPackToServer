@@ -1,5 +1,7 @@
 import React from 'react';
 
+import type { MessageKey } from '../../i18n/catalog.js';
+import type { Locale, Translator } from '../../i18n/types.js';
 import type { ManualReviewAction } from '../../review/manual-overrides.js';
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
 import type {
@@ -33,6 +35,7 @@ export interface SectionNoticeState {
 export interface SectionPageDefinition<S extends ScreenId = ScreenId> {
     id: SectionPageMap[S];
     label: string;
+    chromeColor?: string;
     hasDetails?: boolean;
     renderContent: (props: SectionRenderProps) => React.JSX.Element;
     renderDetails?: (props: SectionRenderProps) => React.JSX.Element | null;
@@ -47,9 +50,12 @@ export interface SectionDefinition<S extends ScreenId = ScreenId> {
 }
 
 export interface SectionRegistryContext {
+    t: Translator<MessageKey>;
+    locale: Locale;
     form: RunFormState;
     setForm: (nextForm: RunFormState) => void;
     uiMode: TuiMode;
+    setLocale: (nextLocale: Locale) => void;
     setUiMode: (nextMode: TuiMode) => void;
     showHints: boolean;
     setShowHints: (nextValue: boolean) => void;

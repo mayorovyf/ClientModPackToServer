@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
+import { useT } from '../i18n/use-t.js';
 import type { RunFormState, RunSessionState } from '../state/app-state.js';
 
 function DetailLine({
@@ -37,6 +38,7 @@ export function ValidationDetails({
     session: RunSessionState;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const validation = session.lastReport?.validation || null;
     const issuePreview = validation?.issues.slice(0, 4) || [];
     const suspectedPreview = validation?.suspectedFalseRemovals.slice(0, 3) || [];
@@ -59,18 +61,18 @@ export function ValidationDetails({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="greenBright" wrap="wrap">Validation Details</Text>
+                <Text color="greenBright" wrap="wrap">{t('details.validation.title')}</Text>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <DetailLine label="Mode" value={form.validationMode} />
-                    <DetailLine label="Status" value={validation?.status || 'not-run'} color={statusColor} />
-                    <DetailLine label="Entrypoint" value={validation?.entrypoint?.path || form.validationEntrypointPath || '<auto>'} />
-                    <DetailLine label="Duration" value={validation ? `${validation.durationMs} ms` : 'n/a'} />
-                    <DetailLine label="Artifacts" value={form.validationSaveArtifacts ? 'forced on' : 'default policy'} />
+                    <DetailLine label={t('details.validation.mode')} value={form.validationMode} />
+                    <DetailLine label={t('details.validation.status')} value={validation?.status || 'not-run'} color={statusColor} />
+                    <DetailLine label={t('details.validation.entrypoint')} value={validation?.entrypoint?.path || form.validationEntrypointPath || t('common.placeholder.auto')} />
+                    <DetailLine label={t('details.validation.duration')} value={validation ? `${validation.durationMs} ms` : t('common.placeholder.na')} />
+                    <DetailLine label={t('details.validation.artifacts')} value={form.validationSaveArtifacts ? t('common.value.forcedOn') : t('common.value.defaultPolicy')} />
                 </Box>
             </Box>
 
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Issues</Text>
+                <Text color="cyan" wrap="wrap">{t('details.validation.issues')}</Text>
                 {issuePreview.length > 0 ? (
                     issuePreview.map((issue, index) => (
                         <Box key={`${issue.kind}-${index}`} flexDirection="column" minWidth={0}>
@@ -79,10 +81,10 @@ export function ValidationDetails({
                         </Box>
                     ))
                 ) : (
-                    <Text dimColor wrap="wrap">No parsed validation issues are available yet.</Text>
+                    <Text dimColor wrap="wrap">{t('details.validation.issues.empty')}</Text>
                 )}
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <Text color="cyan" wrap="wrap">Suspected false removals</Text>
+                    <Text color="cyan" wrap="wrap">{t('details.validation.suspected')}</Text>
                     {suspectedPreview.length > 0 ? (
                         suspectedPreview.map((item, index) => (
                             <Text key={`${item.fileName}-${index}`} dimColor wrap="wrap">
@@ -90,7 +92,7 @@ export function ValidationDetails({
                             </Text>
                         ))
                     ) : (
-                        <Text dimColor wrap="wrap">No suspected false removals were linked.</Text>
+                        <Text dimColor wrap="wrap">{t('details.validation.suspected.empty')}</Text>
                     )}
                 </Box>
             </Box>

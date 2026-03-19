@@ -1,40 +1,51 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
+import { useT } from '../i18n/use-t.js';
+
 import type { NavigationItem, RunSessionStatus, ScreenId, TuiMode } from '../state/app-state.js';
 
 function StatusPill({ status }: { status: RunSessionStatus }): React.JSX.Element {
+    const t = useT();
+
     switch (status) {
         case 'running':
-            return <Text backgroundColor="yellow" color="black"> BUSY </Text>;
+            return <Text backgroundColor="yellow" color="black"> {t('status.pill.running')} </Text>;
         case 'failed':
-            return <Text backgroundColor="red" color="black"> FAILED </Text>;
+            return <Text backgroundColor="red" color="black"> {t('status.pill.failed')} </Text>;
         case 'succeeded':
-            return <Text backgroundColor="green" color="black"> DONE </Text>;
+            return <Text backgroundColor="green" color="black"> {t('status.pill.succeeded')} </Text>;
         case 'idle':
         default:
-            return <Text backgroundColor="green" color="black"> READY </Text>;
+            return <Text backgroundColor="green" color="black"> {t('status.pill.idle')} </Text>;
     }
 }
 
-function getScreenSpecificHints(activeScreen: ScreenId, compact: boolean): string[] {
+function getScreenSpecificHints(
+    activeScreen: ScreenId,
+    activePageId: string,
+    compact: boolean,
+    t: ReturnType<typeof useT>
+): string[] {
     switch (activeScreen) {
         case 'build':
+            if (activePageId === 'presets') {
+                return [
+                    t('sidebar.hint.presets.apply'),
+                    t('sidebar.hint.presets.save'),
+                    t('sidebar.hint.presets.update'),
+                    t('sidebar.hint.presets.delete')
+                ];
+            }
+
             return compact
-                ? ['Enter edits or toggles the selected run field']
-                : ['Enter edits a field or toggles the selected run option'];
-        case 'presets':
-            return [
-                'Enter applies preset',
-                'n saves current form',
-                'u updates selected preset',
-                'd deletes selected preset'
-            ];
+                ? [t('sidebar.hint.build.compact')]
+                : [t('sidebar.hint.build.full')];
         case 'server':
             return [
-                'Enter edits a field or runs a server action',
-                'Use latest build to bind the newest build dir',
-                'Use for validation copies launcher into pipeline validation'
+                t('sidebar.hint.server.enter'),
+                t('sidebar.hint.server.useLatestBuild'),
+                t('sidebar.hint.server.applyValidation')
             ];
         default:
             return [];
@@ -44,6 +55,7 @@ function getScreenSpecificHints(activeScreen: ScreenId, compact: boolean): strin
 export function Sidebar({
     items,
     activeScreen,
+    activePageId,
     activePageLabel,
     hasMultiplePages,
     isFocused,
@@ -56,6 +68,7 @@ export function Sidebar({
 }: {
     items: NavigationItem[];
     activeScreen: ScreenId;
+    activePageId: string;
     activePageLabel: string;
     hasMultiplePages: boolean;
     isFocused: boolean;
@@ -66,7 +79,8 @@ export function Sidebar({
     width?: number;
     height: number;
 }): React.JSX.Element {
-    const screenSpecificHints = showHints ? getScreenSpecificHints(activeScreen, compact) : [];
+    const t = useT();
+    const screenSpecificHints = showHints ? getScreenSpecificHints(activeScreen, activePageId, compact, t) : [];
 
     return (
         <Box
@@ -82,8 +96,8 @@ export function Sidebar({
         >
             <Box flexDirection="column" minWidth={0}>
                 <Text color="cyanBright" wrap="truncate">{compact ? 'CMPTS' : 'ClientModPackToServer'}</Text>
-                <Text dimColor wrap="truncate">{uiMode === 'simple' ? 'Simple mode' : 'Expert mode'}</Text>
-                <Text dimColor wrap="truncate">{`Page: ${activePageLabel}`}</Text>
+                <Text dimColor wrap="truncate">{uiMode === 'simple' ? t('sidebar.mode.simple') : t('sidebar.mode.expert')}</Text>
+                <Text dimColor wrap="truncate">{t('sidebar.page', { page: activePageLabel })}</Text>
                 <Box marginTop={1}>
                     <StatusPill status={runStatus} />
                 </Box>
@@ -102,7 +116,7 @@ export function Sidebar({
                                     </Box>
                                     <Box flexGrow={1} minWidth={0}>
                                         <Text color={isActive ? 'greenBright' : 'white'} wrap="truncate">
-                                            {`${index + 1}. ${item.label}`}
+                                            {`${index + 1}. ${t(item.labelKey)}`}
                                         </Text>
                                     </Box>
                                 </Box>
@@ -116,16 +130,16 @@ export function Sidebar({
                 {showHints ? (
                     <>
                         {screenSpecificHints.map((hint) => (
-                            <Text key={hint} dimColor wrap="wrap">{hint}</Text>
+                            <Text key={hint} dimColor wrap="truncate">{hint}</Text>
                         ))}
-                        {hasMultiplePages ? <Text dimColor wrap="truncate">Tab/Shift+Tab switches pages</Text> : null}
+                        {hasMultiplePages ? <Text dimColor wrap="truncate">{t('sidebar.hint.pages')}</Text> : null}
                         {screenSpecificHints.length > 0 ? <Text dimColor wrap="truncate"> </Text> : null}
-                        <Text dimColor wrap="truncate">Left/Right switches columns</Text>
-                        <Text dimColor wrap="truncate">Up/Down moves inside active column</Text>
-                        <Text dimColor wrap="truncate">1-8 opens screens</Text>
-                        <Text dimColor wrap="truncate">m toggles UI mode</Text>
-                        <Text dimColor wrap="truncate">r runs pipeline</Text>
-                        <Text dimColor wrap="truncate">Ctrl+C exits</Text>
+                        <Text dimColor wrap="truncate">{t('sidebar.hint.columns')}</Text>
+                        <Text dimColor wrap="truncate">{t('sidebar.hint.move')}</Text>
+                        <Text dimColor wrap="truncate">{t('sidebar.hint.sections')}</Text>
+                        <Text dimColor wrap="truncate">{t('sidebar.hint.toggleMode')}</Text>
+                        <Text dimColor wrap="truncate">{t('sidebar.hint.run')}</Text>
+                        <Text dimColor wrap="truncate">{t('sidebar.hint.exit')}</Text>
                     </>
                 ) : null}
             </Box>

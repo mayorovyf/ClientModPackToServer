@@ -1,21 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import i18nTypesApi from '../../i18n/types.js';
 
 import { createDefaultActivePageByScreen, createDefaultRunFormState, createDefaultServerFormState, PAGE_ORDER_BY_SCREEN } from './app-state.js';
 
+import type { Locale } from '../../i18n/types.js';
 import type { ActivePageByScreen, RunFormState, ScreenId, ServerFormState, TuiMode } from './app-state.js';
+
+const { DEFAULT_LOCALE, normalizeLocale } = i18nTypesApi;
 
 export interface PersistedTuiState {
     version: 2;
     activeScreen: ScreenId;
     activePageByScreen: ActivePageByScreen;
+    locale: Locale;
     uiMode: TuiMode;
     showHints: boolean;
     form: RunFormState;
     serverForm: ServerFormState;
 }
 
-const VALID_SCREENS: ScreenId[] = ['build', 'presets', 'server', 'registry', 'reports', 'review', 'settings', 'authors'];
+const VALID_SCREENS: ScreenId[] = ['build', 'server', 'results', 'settings'];
 const VALID_UI_MODES: TuiMode[] = ['simple', 'expert'];
 const DEFAULT_TUI_SETTINGS_PATH = path.resolve(process.cwd(), 'data', 'tui-settings.json');
 
@@ -24,6 +29,7 @@ function createDefaultPersistedTuiState(): PersistedTuiState {
         version: 2,
         activeScreen: 'build',
         activePageByScreen: createDefaultActivePageByScreen(),
+        locale: DEFAULT_LOCALE,
         uiMode: 'simple',
         showHints: true,
         form: createDefaultRunFormState(),
@@ -31,8 +37,28 @@ function createDefaultPersistedTuiState(): PersistedTuiState {
     };
 }
 
-function normalizeScreenId(value: unknown): ScreenId {
-    return VALID_SCREENS.includes(value as ScreenId) ? (value as ScreenId) : 'build';
+function normalizeScreenId(value: unknown, pages: Partial<Record<string, string>> = {}): ScreenId {
+    if (value === 'build' && pages.build === 'validation') {
+        return 'results';
+    }
+
+    switch (value) {
+        case 'build':
+        case 'server':
+        case 'results':
+        case 'settings':
+            return value;
+        case 'presets':
+            return 'build';
+        case 'reports':
+        case 'review':
+            return 'results';
+        case 'registry':
+        case 'authors':
+            return 'settings';
+        default:
+            return 'build';
+    }
 }
 
 function normalizeTuiMode(value: unknown): TuiMode {
@@ -58,7 +84,7 @@ function normalizeBoolean(value: unknown, fallback = false): boolean {
 
 function normalizeActivePageByScreen(value: unknown): ActivePageByScreen {
     const defaults = createDefaultActivePageByScreen();
-    const candidate = value && typeof value === 'object' ? (value as Partial<Record<ScreenId, string>>) : {};
+    const candidate = value && typeof value === 'object' ? (value as Partial<Record<string, string>>) : {};
     const pages = { ...defaults } as ActivePageByScreen;
     const mutablePages = pages as Record<ScreenId, string>;
 
@@ -69,6 +95,30 @@ function normalizeActivePageByScreen(value: unknown): ActivePageByScreen {
         mutablePages[screenId] = allowedPages.includes(String(nextPage))
             ? String(nextPage)
             : String(defaults[screenId]);
+    }
+
+    if (candidate.build === 'validation') {
+        mutablePages.results = 'validation';
+    }
+
+    if (candidate.presets === 'list' || candidate.presets === 'details') {
+        mutablePages.build = 'presets';
+    }
+
+    if (candidate.reports === 'history') {
+        mutablePages.results = 'reports';
+    }
+
+    if (candidate.review === 'queue') {
+        mutablePages.results = 'review';
+    }
+
+    if (candidate.registry === 'overview') {
+        mutablePages.settings = 'registry';
+    }
+
+    if (candidate.authors === 'about') {
+        mutablePages.settings = 'about';
     }
 
     return pages;
@@ -137,12 +187,16 @@ export function loadPersistedTuiState(): PersistedTuiState {
             return defaults;
         }
 
-        const parsed = JSON.parse(fs.readFileSync(DEFAULT_TUI_SETTINGS_PATH, 'utf8')) as Partial<PersistedTuiState>;
+        const parsed = JSON.parse(fs.readFileSync(DEFAULT_TUI_SETTINGS_PATH, 'utf8')) as Partial<PersistedTuiState> & {
+            activePageByScreen?: Partial<Record<string, string>>;
+        };
+        const normalizedPages = normalizeActivePageByScreen(parsed.activePageByScreen);
 
         return {
             version: 2,
-            activeScreen: normalizeScreenId(parsed.activeScreen),
-            activePageByScreen: normalizeActivePageByScreen(parsed.activePageByScreen),
+            activeScreen: normalizeScreenId(parsed.activeScreen, parsed.activePageByScreen),
+            activePageByScreen: normalizedPages,
+            locale: normalizeLocale(parsed.locale, defaults.locale),
             uiMode: normalizeTuiMode(parsed.uiMode),
             showHints: normalizeBoolean(parsed.showHints, defaults.showHints),
             form: normalizeRunFormState(parsed.form),
@@ -156,8 +210,9 @@ export function loadPersistedTuiState(): PersistedTuiState {
 export function savePersistedTuiState(state: PersistedTuiState): void {
     const normalizedState: PersistedTuiState = {
         version: 2,
-        activeScreen: normalizeScreenId(state.activeScreen),
+        activeScreen: normalizeScreenId(state.activeScreen, state.activePageByScreen as unknown as Partial<Record<string, string>>),
         activePageByScreen: normalizeActivePageByScreen(state.activePageByScreen),
+        locale: normalizeLocale(state.locale, DEFAULT_LOCALE),
         uiMode: normalizeTuiMode(state.uiMode),
         showHints: normalizeBoolean(state.showHints, true),
         form: normalizeRunFormState(state.form),
