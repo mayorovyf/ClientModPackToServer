@@ -1,3 +1,6 @@
+import type { MessageKey } from '../../i18n/catalog.js';
+import type { Translator } from '../../i18n/types.js';
+
 import type { RunFormState, TuiMode } from './app-state.js';
 
 export type RunFieldKey =
@@ -5,10 +8,14 @@ export type RunFieldKey =
     | 'outputPath'
     | 'serverDirName'
     | 'reportDir'
+    | 'runIdPrefix'
     | 'dryRun'
     | 'profile'
     | 'deepCheckMode'
     | 'validationMode'
+    | 'validationTimeoutMs'
+    | 'validationEntrypointPath'
+    | 'validationSaveArtifacts'
     | 'registryMode'
     | 'run';
 
@@ -18,9 +25,11 @@ export interface RunFieldDefinition {
     value: string;
     kind: 'text' | 'toggle' | 'enum' | 'action';
     description: string;
+    activeOptionId?: string | null;
 }
 
 export interface RunFieldOptionDescription {
+    id: string;
     label: string;
     description: string;
 }
@@ -37,212 +46,208 @@ export const DEEP_CHECK_VALUES = ['auto', 'off', 'force'] as const;
 export const VALIDATION_VALUES = ['off', 'auto', 'require', 'force'] as const;
 export const REGISTRY_VALUES = ['auto', 'offline', 'refresh', 'pinned'] as const;
 
-const RUN_FIELD_DETAILS: Record<RunFieldKey, RunFieldDetails> = {
+type T = Translator<MessageKey>;
+
+interface RunFieldDetailsMeta {
+    titleKey: MessageKey;
+    overviewKey: MessageKey;
+    options: Array<{
+        id: string;
+        label: string;
+        labelIsKey?: boolean;
+        descriptionKey: MessageKey;
+    }>;
+    noteKey?: MessageKey;
+}
+
+const RUN_FIELD_DETAILS_META: Record<RunFieldKey, RunFieldDetailsMeta> = {
     inputPath: {
-        title: 'Папка инстанса',
-        overview: 'Корневая папка клиентского инстанса, внутри которой лежат `mods/`, `config/` и остальные файлы. Без неё запуск из TUI не начнётся.',
+        titleKey: 'field.run.inputPath.title',
+        overviewKey: 'field.run.inputPath.overview',
         options: [
-            {
-                label: 'Пусто',
-                description: 'Кнопка запуска и горячая клавиша `r` ничего не делают, пока путь не заполнен.'
-            },
-            {
-                label: 'Путь указан',
-                description: 'Backend получает `--input <path>`, находит внутри инстанса папку `mods` и собирает серверную версию всего содержимого.'
-            }
+            { id: 'empty', label: 'common.option.empty', labelIsKey: true, descriptionKey: 'field.run.inputPath.option.empty' },
+            { id: 'pathSet', label: 'common.option.pathSet', labelIsKey: true, descriptionKey: 'field.run.inputPath.option.pathSet' }
         ],
-        note: 'Указывай корень инстанса, а не отдельную папку `mods`.'
+        noteKey: 'field.run.inputPath.note'
     },
     outputPath: {
-        title: 'Папка build',
-        overview: 'Корневая директория, внутри которой создаётся итоговая серверная папка.',
+        titleKey: 'field.run.outputPath.title',
+        overviewKey: 'field.run.outputPath.overview',
         options: [
-            {
-                label: 'Пусто',
-                description: 'Используется стандартный каталог `build/` в корне проекта.'
-            },
-            {
-                label: 'Свой путь',
-                description: 'Итоговая серверная папка будет создана внутри указанной директории.'
-            }
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.run.outputPath.option.default' },
+            { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.run.outputPath.option.customPath' }
         ]
     },
     serverDirName: {
-        title: 'Папка сервера',
-        overview: 'Имя итоговой серверной папки внутри build root. Внутри неё будут `mods`, `config` и остальные файлы инстанса.',
+        titleKey: 'field.run.serverDirName.title',
+        overviewKey: 'field.run.serverDirName.overview',
         options: [
-            {
-                label: 'Авто',
-                description: 'Имя будет сгенерировано автоматически по названию инстанса.'
-            },
-            {
-                label: 'Свое имя',
-                description: 'Серверная сборка будет записана в папку с указанным именем.'
-            }
+            { id: 'auto', label: 'common.option.auto', labelIsKey: true, descriptionKey: 'field.run.serverDirName.option.auto' },
+            { id: 'customName', label: 'common.option.customName', labelIsKey: true, descriptionKey: 'field.run.serverDirName.option.customName' }
         ],
-        note: 'Это именно имя каталога, а не полный путь.'
+        noteKey: 'field.run.serverDirName.note'
     },
     reportDir: {
-        title: 'Папка reports',
-        overview: 'Корневая директория для артефактов запуска: `report.json`, `summary.md` и `events.log`.',
+        titleKey: 'field.run.reportDir.title',
+        overviewKey: 'field.run.reportDir.overview',
         options: [
-            {
-                label: 'Пусто',
-                description: 'Используется стандартный каталог `reports/` в корне проекта.'
-            },
-            {
-                label: 'Свой путь',
-                description: 'Все отчёты текущего запуска сохраняются в указанную директорию.'
-            }
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.run.reportDir.option.default' },
+            { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.run.reportDir.option.customPath' }
+        ]
+    },
+    runIdPrefix: {
+        titleKey: 'field.run.runIdPrefix.title',
+        overviewKey: 'field.run.runIdPrefix.overview',
+        options: [
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.run.runIdPrefix.option.default' },
+            { id: 'customValue', label: 'common.option.customValue', labelIsKey: true, descriptionKey: 'field.run.runIdPrefix.option.customValue' }
         ]
     },
     dryRun: {
-        title: 'Dry-run',
-        overview: 'Переключает запуск без копирования модов и без создания итоговой серверной папки.',
+        titleKey: 'field.run.dryRun.title',
+        overviewKey: 'field.run.dryRun.overview',
         options: [
-            {
-                label: 'off',
-                description: 'Обычный запуск: kept-моды и остальные файлы инстанса копируются в серверную папку.'
-            },
-            {
-                label: 'on',
-                description: 'Только анализ и отчёты: решения считаются, но итоговая серверная папка не создаётся.'
-            }
+            { id: 'off', label: 'common.value.off', labelIsKey: true, descriptionKey: 'field.run.dryRun.option.off' },
+            { id: 'on', label: 'common.value.on', labelIsKey: true, descriptionKey: 'field.run.dryRun.option.on' }
         ]
     },
     profile: {
-        title: 'Arbiter profile',
-        overview: 'Определяет, насколько консервативно финальный арбитр обращается со спорными модами.',
+        titleKey: 'field.run.profile.title',
+        overviewKey: 'field.run.profile.overview',
         options: [
-            {
-                label: 'safe',
-                description: 'Максимально осторожный режим: чаще оставляет спорные кейсы на review.'
-            },
-            {
-                label: 'balanced',
-                description: 'Рабочий режим по умолчанию: умеренно балансирует keep/remove.'
-            },
-            {
-                label: 'aggressive',
-                description: 'Более жёсткий режим: охотнее исключает спорные клиентские моды.'
-            }
+            { id: 'safe', label: 'safe', descriptionKey: 'field.run.profile.option.safe' },
+            { id: 'balanced', label: 'balanced', descriptionKey: 'field.run.profile.option.balanced' },
+            { id: 'aggressive', label: 'aggressive', descriptionKey: 'field.run.profile.option.aggressive' }
         ]
     },
     deepCheckMode: {
-        title: 'Deep-check',
-        overview: 'Управляет углублённой проверкой спорных модов по содержимому архива и внутренним сигнатурам.',
+        titleKey: 'field.run.deepCheckMode.title',
+        overviewKey: 'field.run.deepCheckMode.overview',
         options: [
-            {
-                label: 'auto',
-                description: 'Deep-check запускается только для кейсов, которые действительно требуют эскалации.'
-            },
-            {
-                label: 'off',
-                description: 'Углублённая проверка выключена; решение остаётся на предыдущих сигналах.'
-            },
-            {
-                label: 'force',
-                description: 'Пытается принудительно прогонять deep-check там, где он поддерживается.'
-            }
+            { id: 'auto', label: 'auto', descriptionKey: 'field.run.deepCheckMode.option.auto' },
+            { id: 'off', label: 'off', descriptionKey: 'field.run.deepCheckMode.option.off' },
+            { id: 'force', label: 'force', descriptionKey: 'field.run.deepCheckMode.option.force' }
         ]
     },
     validationMode: {
-        title: 'Validation',
-        overview: 'Определяет поведение post-build smoke-test после того, как серверная папка уже собрана.',
+        titleKey: 'field.run.validationMode.title',
+        overviewKey: 'field.run.validationMode.overview',
         options: [
-            {
-                label: 'off',
-                description: 'Smoke-test полностью пропускается.'
-            },
-            {
-                label: 'auto',
-                description: 'Проверка запускается только когда есть server build и найден server entrypoint.'
-            },
-            {
-                label: 'require',
-                description: 'Smoke-test обязателен: его нельзя тихо пропустить, иначе stage помечается ошибкой.'
-            },
-            {
-                label: 'force',
-                description: 'Жёсткий режим обязательной проверки с ожиданием успешного прохождения smoke-test.'
-            }
+            { id: 'off', label: 'off', descriptionKey: 'field.run.validationMode.option.off' },
+            { id: 'auto', label: 'auto', descriptionKey: 'field.run.validationMode.option.auto' },
+            { id: 'require', label: 'require', descriptionKey: 'field.run.validationMode.option.require' },
+            { id: 'force', label: 'force', descriptionKey: 'field.run.validationMode.option.force' }
+        ]
+    },
+    validationTimeoutMs: {
+        titleKey: 'field.run.validationTimeoutMs.title',
+        overviewKey: 'field.run.validationTimeoutMs.overview',
+        options: [
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.run.validationTimeoutMs.option.default' },
+            { id: 'customValue', label: 'common.option.customValue', labelIsKey: true, descriptionKey: 'field.run.validationTimeoutMs.option.customValue' }
+        ]
+    },
+    validationEntrypointPath: {
+        titleKey: 'field.run.validationEntrypointPath.title',
+        overviewKey: 'field.run.validationEntrypointPath.overview',
+        options: [
+            { id: 'auto', label: 'common.option.auto', labelIsKey: true, descriptionKey: 'field.run.validationEntrypointPath.option.auto' },
+            { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.run.validationEntrypointPath.option.customPath' }
+        ]
+    },
+    validationSaveArtifacts: {
+        titleKey: 'field.run.validationSaveArtifacts.title',
+        overviewKey: 'field.run.validationSaveArtifacts.overview',
+        options: [
+            { id: 'off', label: 'common.value.off', labelIsKey: true, descriptionKey: 'field.run.validationSaveArtifacts.option.off' },
+            { id: 'on', label: 'common.value.on', labelIsKey: true, descriptionKey: 'field.run.validationSaveArtifacts.option.on' }
         ]
     },
     registryMode: {
-        title: 'Registry mode',
-        overview: 'Определяет, откуда брать effective registry: из встроенного файла, кэша или удалённого источника.',
+        titleKey: 'field.run.registryMode.title',
+        overviewKey: 'field.run.registryMode.overview',
         options: [
-            {
-                label: 'auto',
-                description: 'Пробует обновить remote registry, а при проблемах откатывается к кэшу или embedded fallback.'
-            },
-            {
-                label: 'offline',
-                description: 'Работает только с локальными данными: кэш и встроенный fallback без сети.'
-            },
-            {
-                label: 'refresh',
-                description: 'Требует обновление из remote manifest/bundle и не рассчитан на полностью офлайн-запуск.'
-            },
-            {
-                label: 'pinned',
-                description: 'Фиксируется на локальном embedded registry без автоматического refresh.'
-            }
+            { id: 'auto', label: 'auto', descriptionKey: 'field.run.registryMode.option.auto' },
+            { id: 'offline', label: 'offline', descriptionKey: 'field.run.registryMode.option.offline' },
+            { id: 'refresh', label: 'refresh', descriptionKey: 'field.run.registryMode.option.refresh' },
+            { id: 'pinned', label: 'pinned', descriptionKey: 'field.run.registryMode.option.pinned' }
         ]
     },
     run: {
-        title: 'Запуск pipeline',
-        overview: 'Запускает headless backend runner с текущими параметрами формы и начинает новый run.',
+        titleKey: 'field.run.run.title',
+        overviewKey: 'field.run.run.overview',
         options: [
-            {
-                label: 'ready',
-                description: 'Запуск доступен, если заполнена папка инстанса и backend сейчас не работает.'
-            },
-            {
-                label: 'busy',
-                description: 'Backend уже выполняется; повторный старт блокируется до завершения или отмены.'
-            }
+            { id: 'ready', label: 'common.option.ready', labelIsKey: true, descriptionKey: 'field.run.run.option.ready' },
+            { id: 'busy', label: 'common.option.busy', labelIsKey: true, descriptionKey: 'field.run.run.option.busy' }
         ],
-        note: 'Горячая клавиша `r` делает то же самое, что и Enter на этом пункте.'
+        noteKey: 'field.run.run.note'
     }
 };
 
-export function getRunFieldDefinitions(form: RunFormState, uiMode: TuiMode, isRunning: boolean): RunFieldDefinition[] {
+function getPlaceholder(t: T, key: MessageKey): string {
+    return t(key);
+}
+
+function getRunFieldValueLabel(value: string, t: T): string {
+    return value === 'on' || value === 'off' || value === 'ready' || value === 'busy'
+        ? t(`common.value.${value}` as MessageKey)
+        : value;
+}
+
+export function getRunFieldDefinitions(
+    form: RunFormState,
+    uiMode: TuiMode,
+    isRunning: boolean,
+    t: T
+): RunFieldDefinition[] {
     const fields: RunFieldDefinition[] = [
         {
             key: 'inputPath',
-            label: 'Папка инстанса',
-            value: form.inputPath || '<не указана>',
+            label: t('field.run.inputPath.label'),
+            value: form.inputPath || getPlaceholder(t, 'common.placeholder.notSet'),
             kind: 'text',
-            description: 'Корень инстанса с mods, config и прочим'
+            description: t('field.run.inputPath.short'),
+            activeOptionId: form.inputPath.trim() ? 'pathSet' : 'empty'
         },
         {
             key: 'outputPath',
-            label: 'Папка build',
-            value: form.outputPath || '<по умолчанию>',
+            label: t('field.run.outputPath.label'),
+            value: form.outputPath || getPlaceholder(t, 'common.placeholder.default'),
             kind: 'text',
-            description: 'Куда создать серверную папку'
+            description: t('field.run.outputPath.short'),
+            activeOptionId: form.outputPath.trim() ? 'customPath' : 'default'
         },
         {
             key: 'serverDirName',
-            label: 'Папка сервера',
-            value: form.serverDirName || '<авто>',
+            label: t('field.run.serverDirName.label'),
+            value: form.serverDirName || getPlaceholder(t, 'common.placeholder.auto'),
             kind: 'text',
-            description: 'Имя итоговой серверной папки'
+            description: t('field.run.serverDirName.short'),
+            activeOptionId: form.serverDirName.trim() ? 'customName' : 'auto'
         },
         {
             key: 'reportDir',
-            label: 'Папка reports',
-            value: form.reportDir || '<по умолчанию>',
+            label: t('field.run.reportDir.label'),
+            value: form.reportDir || getPlaceholder(t, 'common.placeholder.default'),
             kind: 'text',
-            description: 'Куда писать отчёты run'
+            description: t('field.run.reportDir.short'),
+            activeOptionId: form.reportDir.trim() ? 'customPath' : 'default'
+        },
+        {
+            key: 'runIdPrefix',
+            label: t('field.run.runIdPrefix.label'),
+            value: form.runIdPrefix || getPlaceholder(t, 'common.placeholder.default'),
+            kind: 'text',
+            description: t('field.run.runIdPrefix.short'),
+            activeOptionId: form.runIdPrefix.trim() ? 'customValue' : 'default'
         },
         {
             key: 'dryRun',
-            label: 'Dry-run',
-            value: form.dryRun ? 'on' : 'off',
+            label: t('field.run.dryRun.label'),
+            value: getRunFieldValueLabel(form.dryRun ? 'on' : 'off', t),
             kind: 'toggle',
-            description: 'Только анализ без создания серверной папки'
+            description: t('field.run.dryRun.short'),
+            activeOptionId: form.dryRun ? 'on' : 'off'
         }
     ];
 
@@ -250,46 +255,93 @@ export function getRunFieldDefinitions(form: RunFormState, uiMode: TuiMode, isRu
         fields.push(
             {
                 key: 'profile',
-                label: 'Arbiter profile',
+                label: t('field.run.profile.label'),
                 value: form.profile,
                 kind: 'enum',
-                description: 'safe / balanced / aggressive'
+                description: t('field.run.profile.short'),
+                activeOptionId: form.profile
             },
             {
                 key: 'deepCheckMode',
-                label: 'Deep-check',
+                label: t('field.run.deepCheckMode.label'),
                 value: form.deepCheckMode,
                 kind: 'enum',
-                description: 'auto / off / force'
+                description: t('field.run.deepCheckMode.short'),
+                activeOptionId: form.deepCheckMode
             },
             {
                 key: 'validationMode',
-                label: 'Validation',
+                label: t('field.run.validationMode.label'),
                 value: form.validationMode,
                 kind: 'enum',
-                description: 'off / auto / require / force'
+                description: t('field.run.validationMode.short'),
+                activeOptionId: form.validationMode
+            },
+            {
+                key: 'validationTimeoutMs',
+                label: t('field.run.validationTimeoutMs.label'),
+                value: form.validationTimeoutMs || getPlaceholder(t, 'common.placeholder.default'),
+                kind: 'text',
+                description: t('field.run.validationTimeoutMs.short'),
+                activeOptionId: form.validationTimeoutMs.trim() ? 'customValue' : 'default'
+            },
+            {
+                key: 'validationEntrypointPath',
+                label: t('field.run.validationEntrypointPath.label'),
+                value: form.validationEntrypointPath || getPlaceholder(t, 'common.placeholder.auto'),
+                kind: 'text',
+                description: t('field.run.validationEntrypointPath.short'),
+                activeOptionId: form.validationEntrypointPath.trim() ? 'customPath' : 'auto'
+            },
+            {
+                key: 'validationSaveArtifacts',
+                label: t('field.run.validationSaveArtifacts.label'),
+                value: getRunFieldValueLabel(form.validationSaveArtifacts ? 'on' : 'off', t),
+                kind: 'toggle',
+                description: t('field.run.validationSaveArtifacts.short'),
+                activeOptionId: form.validationSaveArtifacts ? 'on' : 'off'
             },
             {
                 key: 'registryMode',
-                label: 'Registry mode',
+                label: t('field.run.registryMode.label'),
                 value: form.registryMode,
                 kind: 'enum',
-                description: 'auto / offline / refresh / pinned'
+                description: t('field.run.registryMode.short'),
+                activeOptionId: form.registryMode
             }
         );
     }
 
+    const runState = isRunning ? 'busy' : 'ready';
+
     fields.push({
         key: 'run',
-        label: isRunning ? 'Pipeline выполняется' : 'Запустить pipeline',
-        value: isRunning ? 'busy' : 'ready',
+        label: t(isRunning ? 'field.run.run.label.busy' : 'field.run.run.label.ready'),
+        value: getRunFieldValueLabel(runState, t),
         kind: 'action',
-        description: 'Enter запускает headless backend runner'
+        description: t('field.run.run.short'),
+        activeOptionId: runState
     });
 
     return fields;
 }
 
-export function getRunFieldDetails(fieldKey: RunFieldKey): RunFieldDetails {
-    return RUN_FIELD_DETAILS[fieldKey];
+export function getRunFieldDetails(fieldKey: RunFieldKey, t: T): RunFieldDetails {
+    const meta = RUN_FIELD_DETAILS_META[fieldKey];
+
+    const details: RunFieldDetails = {
+        title: t(meta.titleKey),
+        overview: t(meta.overviewKey),
+        options: meta.options.map((option) => ({
+            id: option.id,
+            label: option.labelIsKey ? t(option.label as MessageKey) : option.label,
+            description: t(option.descriptionKey)
+        }))
+    };
+
+    if (meta.noteKey) {
+        details.note = t(meta.noteKey);
+    }
+
+    return details;
 }

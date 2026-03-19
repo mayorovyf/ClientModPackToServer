@@ -1,6 +1,7 @@
-﻿import type { ManualReviewAction } from '../../review/manual-overrides.js';
+import type { Locale } from '../../i18n/types.js';
+import type { ManualReviewAction } from '../../review/manual-overrides.js';
 
-const EXACT_REASON_TRANSLATIONS: Record<string, string> = {
+const EXACT_REASON_TRANSLATIONS_RU: Record<string, string> = {
     'Saved from TUI review menu': 'Сохранено через меню спорных модов.',
     'Deep-check did not produce enough decisive evidence': 'Deep-check не нашёл достаточно убедительных доказательств.',
     'Deep-check found both keep and remove evidence': 'Deep-check нашёл признаки и для keep, и для remove.',
@@ -28,74 +29,78 @@ const EXACT_REASON_TRANSLATIONS: Record<string, string> = {
     'Local registry does not contain matching rules': 'В локальном registry нет подходящих правил.'
 };
 
-function translateManualReviewAction(action: ManualReviewAction): string {
-    return action === 'exclude' ? 'исключить' : 'оставить';
-}
-
-function translateManualReviewNote(note: string): string {
+function translateManualReviewNote(note: string, locale: Locale): string {
     const normalizedNote = String(note || '').trim();
 
     if (!normalizedNote) {
-        return 'без пояснения';
+        return locale === 'ru' ? 'без пояснения' : 'no explanation';
     }
 
-    if (normalizedNote in EXACT_REASON_TRANSLATIONS) {
-        return EXACT_REASON_TRANSLATIONS[normalizedNote] || normalizedNote;
+    if (locale === 'ru' && normalizedNote in EXACT_REASON_TRANSLATIONS_RU) {
+        return EXACT_REASON_TRANSLATIONS_RU[normalizedNote] || normalizedNote;
     }
 
-    if (normalizedNote === 'keep') {
-        return 'оставить';
-    }
-
-    if (normalizedNote === 'exclude') {
-        return 'исключить';
+    if (normalizedNote === 'keep' || normalizedNote === 'exclude') {
+        return translateManualOverrideSummary(normalizedNote, locale);
     }
 
     return normalizedNote;
 }
 
-export function translateDecisionReason(reason: string | null | undefined): string {
+export function translateDecisionReason(reason: string | null | undefined, locale: Locale = 'ru'): string {
     const normalizedReason = String(reason || '').trim();
 
     if (!normalizedReason) {
-        return 'Без пояснения.';
+        return locale === 'ru' ? 'Без пояснения.' : 'No explanation.';
     }
 
-    if (normalizedReason in EXACT_REASON_TRANSLATIONS) {
-        return EXACT_REASON_TRANSLATIONS[normalizedReason] || normalizedReason;
+    if (locale === 'ru' && normalizedReason in EXACT_REASON_TRANSLATIONS_RU) {
+        return EXACT_REASON_TRANSLATIONS_RU[normalizedReason] || normalizedReason;
     }
 
     if (normalizedReason.startsWith('Manual review override: ')) {
-        return `Ручное решение: ${translateManualReviewNote(normalizedReason.slice('Manual review override: '.length))}`;
+        const note = translateManualReviewNote(normalizedReason.slice('Manual review override: '.length), locale);
+        return locale === 'ru' ? `Ручное решение: ${note}` : `Manual review: ${note}`;
     }
 
     if (normalizedReason.startsWith('Manual review override (') && normalizedReason.endsWith(')')) {
         const action = normalizedReason.slice('Manual review override ('.length, -1);
-        return `Ручное решение: ${translateManualReviewNote(action)}.`;
+        const note = translateManualReviewNote(action, locale);
+        return locale === 'ru' ? `Ручное решение: ${note}.` : `Manual review: ${note}.`;
     }
 
     if (normalizedReason.startsWith('Profile ') && normalizedReason.endsWith(' escalated a risky remove decision into review')) {
         const profile = normalizedReason.slice('Profile '.length, normalizedReason.indexOf(' escalated a risky remove decision into review'));
-        return `Профиль ${profile} перевёл рискованное remove-решение в review.`;
+        return locale === 'ru'
+            ? `Профиль ${profile} перевёл рискованное remove-решение в review.`
+            : `Profile ${profile} escalated a risky remove decision into review.`;
     }
 
     if (normalizedReason.startsWith('Legacy filename matcher matched "') && normalizedReason.endsWith('"')) {
         const matchedRule = normalizedReason.slice('Legacy filename matcher matched "'.length, -1);
-        return `Старый filename matcher сработал по шаблону "${matchedRule}".`;
+        return locale === 'ru'
+            ? `Старый filename matcher сработал по шаблону "${matchedRule}".`
+            : `Legacy filename matcher matched "${matchedRule}".`;
     }
 
     if (normalizedReason.startsWith('Engine ') && normalizedReason.endsWith(' failed')) {
         const engineName = normalizedReason.slice('Engine '.length, -' failed'.length);
-        return `Движок ${engineName} завершился с ошибкой.`;
+        return locale === 'ru'
+            ? `Движок ${engineName} завершился с ошибкой.`
+            : `Engine ${engineName} failed.`;
     }
 
     return normalizedReason;
 }
 
-export function translateManualOverrideSummary(action: ManualReviewAction | null): string {
+export function translateManualOverrideSummary(action: ManualReviewAction | null, locale: Locale = 'ru'): string {
     if (!action) {
-        return 'нет';
+        return locale === 'ru' ? 'нет' : 'none';
     }
 
-    return translateManualReviewAction(action);
+    if (locale === 'ru') {
+        return action === 'exclude' ? 'исключить' : 'оставить';
+    }
+
+    return action;
 }

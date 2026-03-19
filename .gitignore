@@ -35,6 +35,7 @@ pnpm-debug.log*
 Thumbs.db
 .DS_Store
 
+
 # Локальные и приватные переопределения данных
 /data/*.local.*
 /data/local-overrides.json

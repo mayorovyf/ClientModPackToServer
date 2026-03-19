@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
+import i18nTypesApi from '../../i18n/types.js';
 
+import type { Locale } from '../../i18n/types.js';
+import { useT } from '../i18n/use-t.js';
 import { cycleOption } from '../state/app-state.js';
 import type { RunFormState, TuiMode } from '../state/app-state.js';
 import { DEEP_CHECK_VALUES, PROFILE_VALUES, REGISTRY_VALUES, VALIDATION_VALUES } from '../state/run-fields.js';
 import { getSettingsFieldDefinitions } from '../state/settings-fields.js';
 import type { SettingsFieldKey } from '../state/settings-fields.js';
+
+const { SUPPORTED_LOCALES } = i18nTypesApi;
 
 type EditableSettingsField =
     | 'outputPath'
@@ -53,9 +58,11 @@ function getVisibleFieldWindow(total: number, selectedIndex: number, maxVisible:
 
 export function SettingsScreen({
     form,
+    locale,
     uiMode,
     showHints,
     onChange,
+    onLocaleChange,
     onUiModeChange,
     onShowHintsChange,
     onInteractionChange,
@@ -64,9 +71,11 @@ export function SettingsScreen({
     height
 }: {
     form: RunFormState;
+    locale: Locale;
     uiMode: TuiMode;
     showHints: boolean;
     onChange: (nextForm: RunFormState) => void;
+    onLocaleChange: (nextLocale: Locale) => void;
     onUiModeChange: (nextMode: TuiMode) => void;
     onShowHintsChange: (nextValue: boolean) => void;
     onInteractionChange: (isLocked: boolean) => void;
@@ -74,10 +83,11 @@ export function SettingsScreen({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [editingField, setEditingField] = useState<EditableSettingsField | null>(null);
     const [draftValue, setDraftValue] = useState('');
-    const fields = getSettingsFieldDefinitions({ form, uiMode, showHints });
+    const fields = getSettingsFieldDefinitions({ form, locale, uiMode, showHints, t });
     const selectedField = fields[selectedIndex] || fields[0];
 
     useEffect(() => {
@@ -123,6 +133,9 @@ export function SettingsScreen({
         }
 
         switch (selectedField.key) {
+            case 'locale':
+                onLocaleChange(cycleOption(locale, SUPPORTED_LOCALES));
+                return;
             case 'uiMode':
                 onUiModeChange(uiMode === 'simple' ? 'expert' : 'simple');
                 return;
@@ -203,9 +216,13 @@ export function SettingsScreen({
             paddingY={1}
             minWidth={0}
         >
-            <Text color="whiteBright">Настройки</Text>
+            <Text color="whiteBright">{t('screen.settings.title')}</Text>
             <Text dimColor wrap="truncate">
-                {`Пункты ${windowRange.start + 1}-${windowRange.end} из ${fields.length}`}
+                {t('screen.settings.range', {
+                    start: windowRange.start + 1,
+                    end: windowRange.end,
+                    total: fields.length
+                })}
             </Text>
 
             <Box marginTop={1} flexDirection="column" height={listHeight} minWidth={0}>
@@ -236,9 +253,7 @@ export function SettingsScreen({
                                 </Box>
                             </Box>
                             <Box paddingLeft={2} minWidth={0}>
-                                <Text dimColor wrap="truncate">
-                                    {field.description}
-                                </Text>
+                                <Text dimColor wrap="truncate">{field.description}</Text>
                             </Box>
                         </Box>
                     );
@@ -248,10 +263,10 @@ export function SettingsScreen({
             {editingField ? (
                 <Box flexDirection="column" minWidth={0}>
                     <Box marginTop={1} flexDirection="column" minWidth={0}>
-                        <Text wrap="truncate">Введите новое значение и нажмите Enter:</Text>
+                        <Text wrap="truncate">{t('screen.settings.editPrompt')}</Text>
                         <TextInput
                             defaultValue={draftValue}
-                            placeholder="Введите значение..."
+                            placeholder={t('screen.settings.editPlaceholder')}
                             onChange={setDraftValue}
                             onSubmit={(value) => {
                                 onChange({
@@ -262,7 +277,7 @@ export function SettingsScreen({
                                 setDraftValue('');
                             }}
                         />
-                        <Text dimColor wrap="truncate">Esc отменяет редактирование</Text>
+                        <Text dimColor wrap="truncate">{t('screen.settings.editCancel')}</Text>
                     </Box>
                 </Box>
             ) : null}

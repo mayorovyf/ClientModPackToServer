@@ -156,12 +156,20 @@ function createConflictPayload(signalState: ReturnType<typeof extractSignalState
     };
 }
 
+function hasStrongKeepConsensus(signalState: ReturnType<typeof extractSignalState>): boolean {
+    const metadataKeep = signalState.strongKeepSignals.find((result) => result.engine === 'metadata-engine');
+    const registryKeep = signalState.strongKeepSignals.find((result) => result.engine === 'registry-engine');
+
+    return Boolean(metadataKeep && registryKeep);
+}
+
 function arbitrateDecision(input: ArbiterInput): ArbiterResult {
     const profile = input.profile || ARBITER_PROFILES.balanced;
     const signalState = extractSignalState(input);
     const dependencyState = extractDependencyState(input);
     const hasStrongConflict = signalState.strongKeepSignals.length > 0 && signalState.strongRemoveSignals.length > 0;
     const hasActionableSignals = signalState.keepSignals.length > 0 || signalState.removeSignals.length > 0;
+    const strongKeepConsensus = hasStrongKeepConsensus(signalState);
 
     if (dependencyState.preservedByDependency) {
         return createArbiterResult({
@@ -206,6 +214,18 @@ function arbitrateDecision(input: ArbiterInput): ArbiterResult {
                 ...createWinningEvidence(signalState.bestKeep),
                 ...createWinningEvidence(signalState.bestRemove)
             ]
+        });
+    }
+
+    if (strongKeepConsensus && signalState.bestKeep) {
+        return createArbiterResult({
+            finalDecision: ARBITER_DECISIONS.keep,
+            finalConfidence: signalState.bestKeep.confidence,
+            reason: 'Metadata and registry strongly agree that this mod should be kept',
+            reasons: signalState.strongKeepSignals.map((result) => result.reason),
+            decisionOrigin: 'engine-consensus',
+            recommendedBuildAction: ARBITER_BUILD_ACTIONS.keep,
+            winningEvidence: signalState.strongKeepSignals.flatMap((result) => createWinningEvidence(result))
         });
     }
 

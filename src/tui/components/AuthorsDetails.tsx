@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
+import { useT } from '../i18n/use-t.js';
 import { getAuthorProfile } from '../state/authors.js';
 
 function normalizeWrappedText(value: string): string {
@@ -18,6 +19,7 @@ export function AuthorsDetails({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const author = getAuthorProfile(selectedAuthorId);
     const description = normalizeWrappedText(author.description);
     const contactLines = String(author.contact || '')
@@ -46,7 +48,7 @@ export function AuthorsDetails({
             </Box>
 
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Контакты</Text>
+                <Text color="cyan" wrap="wrap">{t('details.authors.contacts')}</Text>
                 {contactLines.map((line) => (
                     <Text key={line} wrap="wrap">{line}</Text>
                 ))}

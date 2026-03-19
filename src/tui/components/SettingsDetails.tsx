@@ -1,63 +1,31 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
+import type { Locale } from '../../i18n/types.js';
+import { useT } from '../i18n/use-t.js';
 import type { RunFormState, TuiMode } from '../state/app-state.js';
 import { getSettingsFieldDefinitions, getSettingsFieldDetails } from '../state/settings-fields.js';
 import type { SettingsFieldKey } from '../state/settings-fields.js';
 
-function getActiveOptionLabel(fieldKey: SettingsFieldKey, fieldValue: string | undefined): string | null {
-    switch (fieldKey) {
-        case 'uiMode':
-        case 'profile':
-        case 'deepCheckMode':
-        case 'validationMode':
-        case 'registryMode':
-            return fieldValue || null;
-        case 'showHints':
-        case 'validationSaveArtifacts':
-            return fieldValue === 'on' ? 'on' : 'off';
-        case 'outputPath':
-        case 'reportDir':
-            return fieldValue === '<по умолчанию>' ? 'По умолчанию' : 'Свой путь';
-        case 'serverDirName':
-            return fieldValue === '<авто>' ? 'Авто' : 'Свое имя';
-        case 'validationEntrypointPath':
-            return fieldValue === '<авто>' ? 'Авто' : 'Свой путь';
-        case 'runIdPrefix':
-            return fieldValue === '<по умолчанию>' ? 'По умолчанию' : 'Свой префикс';
-        case 'validationTimeoutMs':
-            return fieldValue === '<по умолчанию>' ? 'По умолчанию' : 'Свое значение';
-        case 'registryManifestUrl':
-        case 'registryBundleUrl':
-            return fieldValue === '<не задано>' ? 'Не задано' : 'Указано';
-        case 'registryFilePath':
-        case 'registryOverridesPath':
-            return fieldValue === '<по умолчанию>' ? 'Не задано' : 'Указано';
-        case 'enabledEngineNames':
-            return fieldValue === '<по умолчанию>' ? 'По умолчанию' : 'Свой список';
-        case 'disabledEngineNames':
-            return fieldValue === '<пусто>' ? 'Пусто' : 'Свой список';
-        default:
-            return null;
-    }
-}
-
 export function SettingsDetails({
     fieldKey,
     form,
+    locale,
     uiMode,
     showHints,
     height
 }: {
     fieldKey: SettingsFieldKey;
     form: RunFormState;
+    locale: Locale;
     uiMode: TuiMode;
     showHints: boolean;
     height: number;
 }): React.JSX.Element {
-    const field = getSettingsFieldDefinitions({ form, uiMode, showHints }).find((item) => item.key === fieldKey) || null;
-    const details = getSettingsFieldDetails(fieldKey);
-    const activeOptionLabel = getActiveOptionLabel(fieldKey, field?.value);
+    const t = useT();
+    const field = getSettingsFieldDefinitions({ form, locale, uiMode, showHints, t }).find((item) => item.key === fieldKey) || null;
+    const details = getSettingsFieldDetails(fieldKey, t);
+    const activeOptionId = field?.activeOptionId ?? null;
 
     return (
         <Box
@@ -79,12 +47,12 @@ export function SettingsDetails({
             </Box>
 
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Варианты</Text>
+                <Text color="cyan" wrap="wrap">{t('details.options')}</Text>
                 {details.options.map((option) => {
-                    const isActiveOption = activeOptionLabel === option.label;
+                    const isActiveOption = activeOptionId === option.id;
 
                     return (
-                        <Box key={option.label} flexDirection="column" minWidth={0}>
+                        <Box key={option.id} flexDirection="column" minWidth={0}>
                             <Text color={isActiveOption ? 'greenBright' : 'whiteBright'} wrap="wrap">
                                 {option.label}
                             </Text>

@@ -30,15 +30,24 @@ function scoreRuleMatch(rule: RegistryRule, descriptor: ModDescriptor, descripto
         score += 50;
     }
 
-    const fileStem = path.basename(descriptor.fileName, '.jar').toLowerCase();
+    const lowerFileName = path.basename(descriptor.fileName).toLowerCase();
+    const fileStem = path.basename(lowerFileName, '.jar');
 
     for (const fileNameRule of rule.fileNames) {
-        if (fileStem === fileNameRule) {
+        const normalizedRule = String(fileNameRule || '').trim().toLowerCase();
+
+        if (!normalizedRule) {
+            continue;
+        }
+
+        const ruleStem = path.basename(normalizedRule, '.jar');
+
+        if (lowerFileName === normalizedRule || fileStem === normalizedRule || fileStem === ruleStem) {
             score += 25;
             continue;
         }
 
-        if (isClientMod(descriptor.fileName, [fileNameRule])) {
+        if (isClientMod(descriptor.fileName, [normalizedRule, ruleStem])) {
             score += 10;
         }
     }

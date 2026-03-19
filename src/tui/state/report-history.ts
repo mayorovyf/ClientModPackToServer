@@ -54,6 +54,14 @@ function readJsonFile<T>(filePath: string): T | null {
     }
 }
 
+export function loadReportForHistoryEntry(entry: ReportHistoryEntry | null): RunReport | null {
+    if (!entry?.jsonReportPath) {
+        return null;
+    }
+
+    return readJsonFile<RunReport>(entry.jsonReportPath);
+}
+
 function parseTimestampMs(value: unknown): number {
     if (typeof value !== 'string' || !value.trim()) {
         return 0;

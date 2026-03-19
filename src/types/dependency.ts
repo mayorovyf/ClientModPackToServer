@@ -10,7 +10,7 @@ export type DependencyFindingKind =
     | 'graph-error';
 
 export type DependencyFindingSeverity = 'info' | 'warn' | 'error';
-export type DependencyResolution = 'missing' | 'unique' | 'ambiguous' | 'self';
+export type DependencyResolution = 'missing' | 'platform' | 'unique' | 'ambiguous' | 'self';
 export type DependencyValidationMode = 'conservative' | 'report-only' | 'strict';
 export type EffectiveBuildDecision = 'keep' | 'exclude' | 'unknown';
 

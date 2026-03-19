@@ -8,6 +8,7 @@ const { RunConfigurationError } = require('../core/errors');
 const { DEEP_CHECK_MODES, normalizeDeepCheckMode } = require('../deep-check/constants');
 const { DEFAULT_VALIDATION_TIMEOUT_MS, normalizeValidationMode } = require('../validation/constants');
 const {
+    DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
     DEFAULT_LOCAL_OVERRIDES_FILE_NAME,
     DEFAULT_LOCAL_REGISTRY_DIR_NAME,
     DEFAULT_LOCAL_REGISTRY_FILE_NAME,
@@ -96,7 +97,7 @@ const DEFAULT_CONFIG: Readonly<DefaultConfigShape> = Object.freeze({
     validationTimeoutMs: DEFAULT_VALIDATION_TIMEOUT_MS,
     serverDirName: null,
     registryMode: REGISTRY_RUNTIME_MODES.auto,
-    registryManifestUrl: process.env.CLIENT_TO_SERVER_REGISTRY_MANIFEST_URL || null,
+    registryManifestUrl: process.env.CLIENT_TO_SERVER_REGISTRY_MANIFEST_URL || DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
     registryBundleUrl: process.env.CLIENT_TO_SERVER_REGISTRY_BUNDLE_URL || null,
     registryFetchTimeoutMs: DEFAULT_REGISTRY_FETCH_TIMEOUT_MS
 });

@@ -230,9 +230,17 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('                [--profile <safe|balanced|aggressive>] [--deep-check <auto|off|force>]');
     logger.raw('                [--validation <off|auto|require|force>] [--validation-timeout-ms <ms>] [--validation-entrypoint <path>]');
     logger.raw('                [--validation-save-artifacts]');
+    logger.raw('  node index.js preset list');
+    logger.raw('  node index.js preset save <name> [run-options]');
+    logger.raw('  node index.js preset show <name-or-id>');
+    logger.raw('  node index.js preset delete <name-or-id>');
+    logger.raw('  node index.js preset run <name-or-id> [run-options]');
+    logger.raw('  node index.js server doctor --target-dir <dir> [--launcher <path>] [--java <path>] [--jvm-args "<args>"] [--accept-eula]');
+    logger.raw('  node index.js server install --target-dir <dir> --core <fabric|forge|neoforge> --minecraft <version> [--loader <version>] [--java <path>] [--accept-eula]');
+    logger.raw('  node index.js server start --target-dir <dir> [--launcher <path>] [--java <path>] [--jvm-args "<args>"] [--accept-eula]');
     logger.raw('');
     logger.raw('Options:');
-    logger.raw('  --input            Path to the instance directory that contains mods/');
+    logger.raw('  --input            Path to the instance dir, mods/ dir, or Prism root with minecraft/.minecraft');
     logger.raw('  --output           Root directory where server build folders are created');
     logger.raw('  --server-dir-name  Name of the final server build directory');
     logger.raw('  --report-dir       Root directory for run reports');
@@ -252,6 +260,14 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('  --validation-timeout-ms Timeout in milliseconds for smoke-test');
     logger.raw('  --validation-entrypoint Explicit path to server launcher for smoke-test');
     logger.raw('  --validation-save-artifacts Save validation stdout/stderr artifacts into report dir');
+    logger.raw('  --target-dir       Managed server target directory for server commands');
+    logger.raw('  --core             Managed server core type: fabric, forge, or neoforge');
+    logger.raw('  --minecraft        Minecraft version for server core installation');
+    logger.raw('  --loader           Explicit loader/core version for managed server install');
+    logger.raw('  --java             Explicit Java executable for install/start commands');
+    logger.raw('  --launcher         Explicit server launcher path for managed server start/doctor');
+    logger.raw('  --jvm-args         JVM arguments used for jar-based managed server launch');
+    logger.raw('  --accept-eula      Write eula=true before managed server install/start');
     logger.raw('  --help             Show this help');
 }
 

@@ -1,7 +1,10 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 
 import type { ManualReviewAction } from '../../review/manual-overrides.js';
+import { useLocale } from '../i18n/use-locale.js';
+import { useT } from '../i18n/use-t.js';
+import { normalizeHotkeyInput } from '../lib/normalize-hotkey-input.js';
 import { translateDecisionReason } from '../lib/translate-reason.js';
 import type { ReviewItem } from '../state/review-items.js';
 
@@ -22,17 +25,17 @@ function getVisibleWindow(total: number, selectedIndex: number, maxVisible: numb
     return { start, end };
 }
 
-function getStateLabel(item: ReviewItem): string {
+function getStateLabel(item: ReviewItem, t: ReturnType<typeof useT>): string {
     switch (item.state) {
         case 'keep':
-            return 'KEEP';
+            return t('screen.review.state.keep');
         case 'exclude':
-            return 'EXCLUDE';
+            return t('screen.review.state.exclude');
         case 'history':
-            return 'HISTORY';
+            return t('screen.review.state.history');
         case 'review':
         default:
-            return 'REVIEW';
+            return t('screen.review.state.review');
     }
 }
 
@@ -50,20 +53,20 @@ function getStateColor(item: ReviewItem): 'greenBright' | 'redBright' | 'yellow'
     }
 }
 
-function createReviewSubtitle(item: ReviewItem): string {
+function createReviewSubtitle(item: ReviewItem, t: ReturnType<typeof useT>, locale: ReturnType<typeof useLocale>): string {
     if (item.currentOverrideAction === 'keep') {
-        return 'Сохранено вручную: оставить';
+        return t('screen.review.subtitle.manualKeep');
     }
 
     if (item.currentOverrideAction === 'exclude') {
-        return 'Сохранено вручную: исключить';
+        return t('screen.review.subtitle.manualExclude');
     }
 
     if (item.state === 'history') {
-        return 'В последнем отчёте было ручное решение';
+        return t('screen.review.subtitle.history');
     }
 
-    return translateDecisionReason(item.decision.reason || 'Требуется ручная проверка');
+    return translateDecisionReason(item.decision.reason || t('screen.review.subtitle.requiresReview'), locale);
 }
 
 export function ReviewScreen({
@@ -83,6 +86,8 @@ export function ReviewScreen({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
+    const locale = useLocale();
     const initialSelectedIndex = Math.max(items.findIndex((item) => item.id === selectedItemId), 0);
     const [selectedIndex, setSelectedIndex] = useState(initialSelectedIndex);
 
@@ -99,6 +104,8 @@ export function ReviewScreen({
     }, [items, onSelectedItemChange, selectedIndex, selectedItemId]);
 
     useInput((input, key) => {
+        const normalizedInput = normalizeHotkeyInput(input);
+
         if (!isFocused || items.length === 0) {
             return;
         }
@@ -112,8 +119,6 @@ export function ReviewScreen({
             setSelectedIndex((current) => (current >= items.length - 1 ? 0 : current + 1));
             return;
         }
-
-        const normalizedInput = input.toLowerCase();
 
         if (normalizedInput === 'k') {
             onSaveOverride('keep');
@@ -157,21 +162,29 @@ export function ReviewScreen({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="redBright">Спорные</Text>
+                <Text color="redBright">{t('screen.review.title')}</Text>
                 {items.length > 0 ? (
                     <>
-                        <Text dimColor wrap="truncate">{`Моды ${windowRange.start + 1}-${windowRange.end} из ${items.length}`}</Text>
-                        <Text dimColor wrap="truncate">{`Нужно решить: ${reviewCount} | Сохранено: ${savedCount}`}</Text>
+                        <Text dimColor wrap="truncate">
+                            {t('screen.review.range', {
+                                start: windowRange.start + 1,
+                                end: windowRange.end,
+                                total: items.length
+                            })}
+                        </Text>
+                        <Text dimColor wrap="truncate">
+                            {t('screen.review.counts', { reviewCount, savedCount })}
+                        </Text>
                     </>
                 ) : (
-                    <Text dimColor wrap="truncate">Нет спорных модов в последнем отчёте</Text>
+                    <Text dimColor wrap="truncate">{t('screen.review.empty')}</Text>
                 )}
             </Box>
 
             <Box marginTop={1} flexDirection="column" height={listHeight} minWidth={0}>
                 {items.length === 0 ? (
                     <Text dimColor wrap="wrap">
-                        После запуска здесь появится список модов со статусом review и модов, для которых уже сохранено ручное решение.
+                        {t('screen.review.emptyBody')}
                     </Text>
                 ) : null}
                 {visibleItems.map((item, index) => {
@@ -195,12 +208,12 @@ export function ReviewScreen({
                                 </Box>
                                 <Box marginLeft={1} flexShrink={0} minWidth={0}>
                                     <Text color={getStateColor(item)} wrap="truncate">
-                                        {getStateLabel(item)}
+                                        {getStateLabel(item, t)}
                                     </Text>
                                 </Box>
                             </Box>
                             <Box paddingLeft={2} minWidth={0}>
-                                <Text dimColor wrap="truncate">{createReviewSubtitle(item)}</Text>
+                                <Text dimColor wrap="truncate">{createReviewSubtitle(item, t, locale)}</Text>
                             </Box>
                         </Box>
                     );

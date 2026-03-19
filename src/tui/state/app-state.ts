@@ -1,19 +1,40 @@
+import { createRequire } from 'node:module';
 import type { BackendEvent } from '../../types/events.js';
 import type { RunReport } from '../../types/report.js';
+import type { MessageKey } from '../../i18n/catalog.js';
+
+const require = createRequire(import.meta.url);
+const { DEFAULT_REMOTE_REGISTRY_MANIFEST_URL } = require('../../registry/constants.js');
 
 export type TuiMode = 'simple' | 'expert';
-export type ScreenId = 'build' | 'registry' | 'reports' | 'review' | 'settings' | 'authors';
+export type ScreenId = 'build' | 'server' | 'results' | 'settings';
+export type BuildPageId = 'paths' | 'strategy' | 'check' | 'launch' | 'presets';
+export type ServerPageId = 'setup' | 'install' | 'doctor' | 'launch' | 'logs';
+export type ResultsPageId = 'overview' | 'problems' | 'compare' | 'reports';
+export type SettingsPageId = 'general' | 'registry' | 'about';
 export type RunSessionStatus = 'idle' | 'running' | 'succeeded' | 'failed';
 export type FocusedColumn = 'sidebar' | 'content' | 'details';
 export type RegistryMode = 'auto' | 'offline' | 'refresh' | 'pinned';
 export type ProfileMode = 'safe' | 'balanced' | 'aggressive';
 export type DeepCheckMode = 'auto' | 'off' | 'force';
 export type ValidationMode = 'off' | 'auto' | 'require' | 'force';
+export type ServerCoreType = 'fabric' | 'forge' | 'neoforge';
+
+export interface SectionPageMap {
+    build: BuildPageId;
+    server: ServerPageId;
+    results: ResultsPageId;
+    settings: SettingsPageId;
+}
+
+export type ActivePageByScreen = {
+    [K in ScreenId]: SectionPageMap[K];
+};
 
 export interface NavigationItem {
     id: ScreenId;
-    label: string;
-    description: string;
+    labelKey: MessageKey;
+    descriptionKey: MessageKey;
 }
 
 export interface RunFormState {
@@ -38,6 +59,17 @@ export interface RunFormState {
     disabledEngineNames: string;
 }
 
+export interface ServerFormState {
+    targetDir: string;
+    coreType: ServerCoreType;
+    minecraftVersion: string;
+    loaderVersion: string;
+    javaPath: string;
+    jvmArgs: string;
+    explicitEntrypointPath: string;
+    acceptEula: boolean;
+}
+
 export interface ReportPathsState {
     reportDir: string | null;
     jsonReportPath: string | null;
@@ -60,13 +92,27 @@ export interface RunSessionState {
 }
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
-    { id: 'build', label: 'Запуск', description: 'Запуск pipeline и основные параметры' },
-    { id: 'registry', label: 'Registry', description: 'Источник данных, кэш и bundle' },
-    { id: 'reports', label: 'Отчёты', description: 'Артефакты последнего запуска' },
-    { id: 'review', label: 'Спорные', description: 'Моды со статусом review' },
-    { id: 'settings', label: 'Настройки', description: 'Режим интерфейса и справка' },
-    { id: 'authors', label: 'Авторы', description: 'Информация об авторах проекта' }
+    { id: 'build', labelKey: 'nav.build.label', descriptionKey: 'nav.build.description' },
+    { id: 'results', labelKey: 'nav.results.label', descriptionKey: 'nav.results.description' },
+    { id: 'server', labelKey: 'nav.server.label', descriptionKey: 'nav.server.description' },
+    { id: 'settings', labelKey: 'nav.settings.label', descriptionKey: 'nav.settings.description' }
 ];
+
+export const PAGE_ORDER_BY_SCREEN: { [K in ScreenId]: readonly SectionPageMap[K][] } = {
+    build: ['paths', 'strategy', 'check', 'launch', 'presets'],
+    server: ['setup', 'install', 'doctor', 'launch', 'logs'],
+    results: ['reports', 'overview', 'problems', 'compare'],
+    settings: ['general', 'registry', 'about']
+};
+
+export function createDefaultActivePageByScreen(): ActivePageByScreen {
+    return {
+        build: 'paths',
+        server: 'setup',
+        results: 'reports',
+        settings: 'general'
+    };
+}
 
 export function createDefaultRunFormState(): RunFormState {
     return {
@@ -83,12 +129,25 @@ export function createDefaultRunFormState(): RunFormState {
         validationEntrypointPath: '',
         validationSaveArtifacts: false,
         registryMode: 'auto',
-        registryManifestUrl: '',
+        registryManifestUrl: DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
         registryBundleUrl: '',
         registryFilePath: '',
         registryOverridesPath: '',
         enabledEngineNames: '',
         disabledEngineNames: ''
+    };
+}
+
+export function createDefaultServerFormState(): ServerFormState {
+    return {
+        targetDir: '',
+        coreType: 'fabric',
+        minecraftVersion: '',
+        loaderVersion: '',
+        javaPath: '',
+        jvmArgs: '',
+        explicitEntrypointPath: '',
+        acceptEula: false
     };
 }
 

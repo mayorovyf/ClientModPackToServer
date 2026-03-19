@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 
+import { useT } from '../i18n/use-t.js';
 import { cycleOption } from '../state/app-state.js';
 import type { RunFormState, RunSessionState, TuiMode } from '../state/app-state.js';
 import {
@@ -11,9 +12,16 @@ import {
     REGISTRY_VALUES,
     VALIDATION_VALUES
 } from '../state/run-fields.js';
-import type { RunFieldDefinition, RunFieldKey } from '../state/run-fields.js';
+import type { RunFieldKey } from '../state/run-fields.js';
 
-type EditableTextField = 'inputPath' | 'outputPath' | 'serverDirName' | 'reportDir';
+type EditableTextField =
+    | 'inputPath'
+    | 'outputPath'
+    | 'serverDirName'
+    | 'reportDir'
+    | 'runIdPrefix'
+    | 'validationTimeoutMs'
+    | 'validationEntrypointPath';
 
 function formatRunListValue(value: string, maxLength = 24): string {
     if (value.length <= maxLength) {
@@ -48,6 +56,7 @@ export function BuildScreen({
     form,
     uiMode,
     session,
+    fieldKeys,
     onChange,
     onRun,
     onInteractionChange,
@@ -59,6 +68,7 @@ export function BuildScreen({
     form: RunFormState;
     uiMode: TuiMode;
     session: RunSessionState;
+    fieldKeys?: RunFieldKey[];
     onChange: (nextForm: RunFormState) => void;
     onRun: () => void;
     onInteractionChange: (isLocked: boolean) => void;
@@ -67,10 +77,12 @@ export function BuildScreen({
     compact: boolean;
     height: number;
 }): React.JSX.Element {
+    const t = useT();
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [editingField, setEditingField] = useState<EditableTextField | null>(null);
     const [draftValue, setDraftValue] = useState('');
-    const fields = getRunFieldDefinitions(form, uiMode, session.status === 'running');
+    const fields = getRunFieldDefinitions(form, uiMode, session.status === 'running', t)
+        .filter((field) => !fieldKeys || fieldKeys.includes(field.key));
     const selectedField = fields[selectedIndex] || fields[0];
 
     useEffect(() => {
@@ -120,6 +132,9 @@ export function BuildScreen({
             case 'outputPath':
             case 'serverDirName':
             case 'reportDir':
+            case 'runIdPrefix':
+            case 'validationTimeoutMs':
+            case 'validationEntrypointPath':
                 setEditingField(selectedField.key);
                 setDraftValue(form[selectedField.key]);
                 return;
@@ -145,6 +160,12 @@ export function BuildScreen({
                 onChange({
                     ...form,
                     validationMode: cycleOption(form.validationMode, VALIDATION_VALUES)
+                });
+                return;
+            case 'validationSaveArtifacts':
+                onChange({
+                    ...form,
+                    validationSaveArtifacts: !form.validationSaveArtifacts
                 });
                 return;
             case 'registryMode':
@@ -187,9 +208,13 @@ export function BuildScreen({
             paddingY={1}
             minWidth={0}
         >
-            <Text color="yellowBright">Запуск</Text>
+            <Text color="yellowBright">{t('screen.build.title')}</Text>
             <Text dimColor wrap="truncate">
-                {`Поля ${windowRange.start + 1}-${windowRange.end} из ${fields.length}`}
+                {t('screen.build.range', {
+                    start: windowRange.start + 1,
+                    end: windowRange.end,
+                    total: fields.length
+                })}
             </Text>
 
             <Box marginTop={1} flexDirection="column" height={listHeight} minWidth={0}>
@@ -230,10 +255,10 @@ export function BuildScreen({
             {editingField ? (
                 <Box flexDirection="column" minWidth={0}>
                     <Box marginTop={1} flexDirection="column" minWidth={0}>
-                        <Text wrap="truncate">Введите новое значение и нажмите Enter:</Text>
+                        <Text wrap="truncate">{t('screen.build.editPrompt')}</Text>
                         <TextInput
                             defaultValue={draftValue}
-                            placeholder="Введите значение..."
+                            placeholder={t('screen.build.editPlaceholder')}
                             onChange={setDraftValue}
                             onSubmit={(value) => {
                                 onChange({
@@ -244,7 +269,7 @@ export function BuildScreen({
                                 setDraftValue('');
                             }}
                         />
-                        <Text dimColor wrap="truncate">Esc отменяет редактирование</Text>
+                        <Text dimColor wrap="truncate">{t('screen.build.editCancel')}</Text>
                     </Box>
                 </Box>
             ) : null}

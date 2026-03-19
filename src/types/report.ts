@@ -26,11 +26,19 @@ export interface ReportDecisionSummary {
     displayName?: string | null;
     modIds?: string[];
     reason: string;
+    decision?: 'keep' | 'exclude' | null;
     decisionOrigin: string | null;
+    arbiterDecision?: string | null;
+    arbiterConfidence?: string | null;
     requiresReview: boolean;
     finalSemanticDecision: string | null;
     finalConfidence: string | null;
     finalDecisionOrigin?: string | null;
+    deepCheckStatus?: string | null;
+    deepCheckDecision?: string | null;
+    actionStatus?: string | null;
+    dependencyAdjusted?: boolean;
+    finalReasons?: string[];
     manualReviewKey?: string | null;
     manualOverrideAction?: 'keep' | 'exclude' | null;
     manualOverrideReason?: string | null;
@@ -41,6 +49,7 @@ export interface ReportDecisionSummary {
         modIds?: string[];
         displayName?: string | null;
         version?: string | null;
+        manifestHints?: Record<string, string> | null;
     } | null;
 }
 

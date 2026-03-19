@@ -22,6 +22,7 @@ function createSummary(report: RunReport): string {
         `- Mode: ${report.run.mode}`,
         `- Dry run: ${report.run.dryRun ? 'yes' : 'no'}`,
         `- Input: ${report.run.inputPath}`,
+        `- Instance dir: ${report.run.instancePath}`,
         `- Build dir: ${report.run.buildDir}`,
         `- Report dir: ${report.run.reportDir}`,
         `- Engines: ${Array.isArray(report.run.enabledEngines) ? report.run.enabledEngines.join(', ') : 'n/a'}`,

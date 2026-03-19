@@ -1,6 +1,17 @@
+import { createRequire } from 'node:module';
+
+import type { MessageKey } from '../../i18n/catalog.js';
+import type { Locale, Translator } from '../../i18n/types.js';
+
 import type { RunFormState, TuiMode } from './app-state.js';
+import { getRunFieldDetails } from './run-fields.js';
+import type { RunFieldKey } from './run-fields.js';
+
+const require = createRequire(import.meta.url);
+const { DEFAULT_REMOTE_REGISTRY_MANIFEST_URL } = require('../../registry/constants.js');
 
 export type SettingsFieldKey =
+    | 'locale'
     | 'uiMode'
     | 'showHints'
     | 'outputPath'
@@ -27,9 +38,11 @@ export interface SettingsFieldDefinition {
     value: string;
     kind: 'text' | 'toggle' | 'enum';
     description: string;
+    activeOptionId?: string | null;
 }
 
 export interface SettingsFieldOptionDescription {
+    id: string;
     label: string;
     description: string;
 }
@@ -41,317 +54,344 @@ export interface SettingsFieldDetails {
     note?: string;
 }
 
-const SETTINGS_FIELD_DETAILS: Record<SettingsFieldKey, SettingsFieldDetails> = {
-    uiMode: {
-        title: 'Режим интерфейса',
-        overview: 'Переключает состав экранов и уровень детализации формы запуска.',
+type T = Translator<MessageKey>;
+
+interface SettingsFieldDetailsMeta {
+    titleKey: MessageKey;
+    overviewKey: MessageKey;
+    options: Array<{
+        id: string;
+        label: string;
+        labelIsKey?: boolean;
+        descriptionKey: MessageKey;
+    }>;
+    noteKey?: MessageKey;
+}
+
+const SHARED_RUN_DETAILS: Partial<Record<SettingsFieldKey, RunFieldKey>> = {
+    outputPath: 'outputPath',
+    reportDir: 'reportDir',
+    serverDirName: 'serverDirName',
+    profile: 'profile',
+    deepCheckMode: 'deepCheckMode',
+    validationMode: 'validationMode',
+    registryMode: 'registryMode'
+};
+
+const SETTINGS_FIELD_DETAILS_META: Partial<Record<SettingsFieldKey, SettingsFieldDetailsMeta>> = {
+    locale: {
+        titleKey: 'field.settings.locale.title',
+        overviewKey: 'field.settings.locale.overview',
         options: [
-            { label: 'simple', description: 'Показывает только основные элементы для обычного запуска.' },
-            { label: 'expert', description: 'Открывает расширенные поля анализа и тонкие настройки pipeline.' }
+            { id: 'ru', label: 'locale.name.ru', labelIsKey: true, descriptionKey: 'field.settings.locale.option.ru' },
+            { id: 'en', label: 'locale.name.en', labelIsKey: true, descriptionKey: 'field.settings.locale.option.en' }
+        ]
+    },
+    uiMode: {
+        titleKey: 'field.settings.uiMode.title',
+        overviewKey: 'field.settings.uiMode.overview',
+        options: [
+            { id: 'simple', label: 'mode.simple', labelIsKey: true, descriptionKey: 'field.settings.uiMode.option.simple' },
+            { id: 'expert', label: 'mode.expert', labelIsKey: true, descriptionKey: 'field.settings.uiMode.option.expert' }
         ]
     },
     showHints: {
-        title: 'Подсказки интерфейса',
-        overview: 'Управляет нижним блоком навигационных подсказок в левом столбце.',
+        titleKey: 'field.settings.showHints.title',
+        overviewKey: 'field.settings.showHints.overview',
         options: [
-            { label: 'on', description: 'Подсказки по стрелкам, режиму и запуску остаются видимыми.' },
-            { label: 'off', description: 'Левый столбец становится чище и не показывает справку по клавишам.' }
+            { id: 'on', label: 'common.value.on', labelIsKey: true, descriptionKey: 'field.settings.showHints.option.on' },
+            { id: 'off', label: 'common.value.off', labelIsKey: true, descriptionKey: 'field.settings.showHints.option.off' }
         ]
-    },
-    outputPath: {
-        title: 'Папка build по умолчанию',
-        overview: 'Корневая директория, внутри которой создаётся итоговая серверная папка.',
-        options: [
-            { label: 'По умолчанию', description: 'Используется стандартный каталог `build/` в корне проекта.' },
-            { label: 'Свой путь', description: 'Итоговая серверная папка создаётся внутри указанной директории.' }
-        ]
-    },
-    reportDir: {
-        title: 'Папка reports по умолчанию',
-        overview: 'Корневая директория для `report.json`, `summary.md` и `events.log`.',
-        options: [
-            { label: 'По умолчанию', description: 'Используется стандартный каталог `reports/` в корне проекта.' },
-            { label: 'Свой путь', description: 'Отчёты запуска сохраняются в указанную директорию.' }
-        ]
-    },
-    serverDirName: {
-        title: 'Имя серверной папки',
-        overview: 'Определяет имя итоговой серверной папки внутри build root.',
-        options: [
-            { label: 'Авто', description: 'Имя строится автоматически по названию инстанса.' },
-            { label: 'Свое имя', description: 'Серверная сборка будет сохранена в папку с указанным именем.' }
-        ],
-        note: 'Это имя каталога, а не полный путь.'
     },
     runIdPrefix: {
-        title: 'Префикс run ID',
-        overview: 'Задаёт префикс для идентификаторов запуска и каталогов отчётов.',
+        titleKey: 'field.settings.runIdPrefix.title',
+        overviewKey: 'field.settings.runIdPrefix.overview',
         options: [
-            { label: 'По умолчанию', description: 'Используется стандартный префикс `run`.' },
-            { label: 'Свой префикс', description: 'Новые отчёты и run ID будут создаваться с указанным префиксом.' }
-        ]
-    },
-    profile: {
-        title: 'Arbiter profile',
-        overview: 'Определяет, насколько осторожно финальный арбитр обращается со спорными модами.',
-        options: [
-            { label: 'safe', description: 'Максимально осторожный режим, чаще оставляет спорные моды на review.' },
-            { label: 'balanced', description: 'Базовый режим с умеренным балансом между keep и remove.' },
-            { label: 'aggressive', description: 'Более жёсткий режим, быстрее исключает клиентские моды.' }
-        ]
-    },
-    deepCheckMode: {
-        title: 'Deep-check',
-        overview: 'Управляет углублённой проверкой спорных модов по содержимому архивов.',
-        options: [
-            { label: 'auto', description: 'Запускается только там, где это действительно нужно.' },
-            { label: 'off', description: 'Углублённая проверка полностью отключена.' },
-            { label: 'force', description: 'Пытается выполнять deep-check принудительно там, где он поддерживается.' }
-        ]
-    },
-    validationMode: {
-        title: 'Validation',
-        overview: 'Задаёт поведение post-build smoke-test после сборки серверной папки.',
-        options: [
-            { label: 'off', description: 'Smoke-test не запускается.' },
-            { label: 'auto', description: 'Запускается только когда найден рабочий server entrypoint.' },
-            { label: 'require', description: 'Нельзя тихо пропустить проверку, иначе run завершается ошибкой.' },
-            { label: 'force', description: 'Жёстко требует успешного прохождения smoke-test.' }
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.settings.runIdPrefix.option.default' },
+            { id: 'customValue', label: 'common.option.customValue', labelIsKey: true, descriptionKey: 'field.settings.runIdPrefix.option.customValue' }
         ]
     },
     validationTimeoutMs: {
-        title: 'Validation timeout',
-        overview: 'Максимальное время ожидания smoke-test в миллисекундах.',
+        titleKey: 'field.settings.validationTimeoutMs.title',
+        overviewKey: 'field.settings.validationTimeoutMs.overview',
         options: [
-            { label: 'По умолчанию', description: 'Используется стандартный timeout проекта.' },
-            { label: 'Свое значение', description: 'Smoke-test завершится по пользовательскому таймауту.' }
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.settings.validationTimeoutMs.option.default' },
+            { id: 'customValue', label: 'common.option.customValue', labelIsKey: true, descriptionKey: 'field.settings.validationTimeoutMs.option.customValue' }
         ]
     },
     validationEntrypointPath: {
-        title: 'Validation entrypoint',
-        overview: 'Явный путь до server launcher для smoke-test.',
+        titleKey: 'field.settings.validationEntrypointPath.title',
+        overviewKey: 'field.settings.validationEntrypointPath.overview',
         options: [
-            { label: 'Авто', description: 'Entrypoint определяется автоматически по собранной серверной папке.' },
-            { label: 'Свой путь', description: 'Validation использует указанный launcher вместо auto-detect.' }
+            { id: 'auto', label: 'common.option.auto', labelIsKey: true, descriptionKey: 'field.settings.validationEntrypointPath.option.auto' },
+            { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.settings.validationEntrypointPath.option.customPath' }
         ]
     },
     validationSaveArtifacts: {
-        title: 'Validation artifacts',
-        overview: 'Определяет, нужно ли сохранять stdout/stderr smoke-test в каталог отчётов.',
+        titleKey: 'field.settings.validationSaveArtifacts.title',
+        overviewKey: 'field.settings.validationSaveArtifacts.overview',
         options: [
-            { label: 'off', description: 'Артефакты сохраняются только по обычной логике проекта.' },
-            { label: 'on', description: 'stdout и stderr validation принудительно записываются в report dir.' }
-        ]
-    },
-    registryMode: {
-        title: 'Registry mode',
-        overview: 'Определяет, откуда загружать effective registry во время запуска.',
-        options: [
-            { label: 'auto', description: 'Пробует remote, затем кэш, затем встроенный fallback.' },
-            { label: 'offline', description: 'Использует только локальные данные без сети.' },
-            { label: 'refresh', description: 'Требует обновление из remote manifest/bundle.' },
-            { label: 'pinned', description: 'Фиксируется на локальном embedded/cached состоянии.' }
+            { id: 'off', label: 'common.value.off', labelIsKey: true, descriptionKey: 'field.settings.validationSaveArtifacts.option.off' },
+            { id: 'on', label: 'common.value.on', labelIsKey: true, descriptionKey: 'field.settings.validationSaveArtifacts.option.on' }
         ]
     },
     registryManifestUrl: {
-        title: 'Registry manifest URL',
-        overview: 'URL удалённого manifest.json для загрузки реестра.',
+        titleKey: 'field.settings.registryManifestUrl.title',
+        overviewKey: 'field.settings.registryManifestUrl.overview',
         options: [
-            { label: 'Не задано', description: 'Используется стандартный источник проекта или локальный fallback.' },
-            { label: 'Указано', description: 'Remote registry будет читать manifest по указанному URL.' }
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.settings.registryManifestUrl.option.default' },
+            { id: 'customValue', label: 'common.option.customValue', labelIsKey: true, descriptionKey: 'field.settings.registryManifestUrl.option.customValue' }
         ]
     },
     registryBundleUrl: {
-        title: 'Registry bundle URL',
-        overview: 'Явный URL bundle-файла реестра.',
+        titleKey: 'field.settings.registryBundleUrl.title',
+        overviewKey: 'field.settings.registryBundleUrl.overview',
         options: [
-            { label: 'Не задано', description: 'Bundle URL берётся из manifest или стандартной конфигурации.' },
-            { label: 'Указано', description: 'Remote registry будет использовать явно заданный bundle URL.' }
-        ],
-        note: 'Для bundle URL обычно нужен и manifest URL.'
+            { id: 'notSet', label: 'common.option.notSet', labelIsKey: true, descriptionKey: 'field.settings.registryBundleUrl.option.notSet' },
+            { id: 'provided', label: 'common.option.provided', labelIsKey: true, descriptionKey: 'field.settings.registryBundleUrl.option.provided' }
+        ]
     },
     registryFilePath: {
-        title: 'Локальный registry file',
-        overview: 'Путь до локального JSON-файла с базовым реестром.',
+        titleKey: 'field.settings.registryFilePath.title',
+        overviewKey: 'field.settings.registryFilePath.overview',
         options: [
-            { label: 'Не задано', description: 'Используется стандартный файл реестра проекта.' },
-            { label: 'Указано', description: 'Базовый registry будет прочитан из указанного файла.' }
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.settings.registryFilePath.option.default' },
+            { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.settings.registryFilePath.option.customPath' }
         ]
     },
     registryOverridesPath: {
-        title: 'Локальные overrides',
-        overview: 'Путь до локального JSON-файла с переопределениями правил.',
+        titleKey: 'field.settings.registryOverridesPath.title',
+        overviewKey: 'field.settings.registryOverridesPath.overview',
         options: [
-            { label: 'Не задано', description: 'Используется стандартный файл overrides проекта.' },
-            { label: 'Указано', description: 'Локальные переопределения будут загружены из указанного файла.' }
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.settings.registryOverridesPath.option.default' },
+            { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.settings.registryOverridesPath.option.customPath' }
         ]
     },
     enabledEngineNames: {
-        title: 'Включённые engines',
-        overview: 'Список движков классификации через запятую, которые нужно принудительно включить.',
+        titleKey: 'field.settings.enabledEngineNames.title',
+        overviewKey: 'field.settings.enabledEngineNames.overview',
         options: [
-            { label: 'По умолчанию', description: 'Используется стандартный набор движков проекта.' },
-            { label: 'Свой список', description: 'Backend запускается только с указанным набором engines.' }
-        ],
-        note: 'Формат: `metadata-engine, registry-engine`.'
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.settings.enabledEngineNames.option.default' },
+            { id: 'customList', label: 'common.option.customList', labelIsKey: true, descriptionKey: 'field.settings.enabledEngineNames.option.customList' }
+        ]
     },
     disabledEngineNames: {
-        title: 'Отключённые engines',
-        overview: 'Список движков классификации через запятую, которые нужно отключить.',
+        titleKey: 'field.settings.disabledEngineNames.title',
+        overviewKey: 'field.settings.disabledEngineNames.overview',
         options: [
-            { label: 'Пусто', description: 'Ни один engine не отключается принудительно.' },
-            { label: 'Свой список', description: 'Указанные engines будут исключены из запуска.' }
-        ],
-        note: 'Формат: `filename-engine` или список через запятую.'
+            { id: 'empty', label: 'common.option.empty', labelIsKey: true, descriptionKey: 'field.settings.disabledEngineNames.option.empty' },
+            { id: 'customList', label: 'common.option.customList', labelIsKey: true, descriptionKey: 'field.settings.disabledEngineNames.option.customList' }
+        ]
     }
 };
 
 export function getSettingsFieldDefinitions({
     form,
+    locale,
     uiMode,
-    showHints
+    showHints,
+    t
 }: {
     form: RunFormState;
+    locale: Locale;
     uiMode: TuiMode;
     showHints: boolean;
+    t: T;
 }): SettingsFieldDefinition[] {
+    const registryManifestIsDefault = !form.registryManifestUrl.trim() || form.registryManifestUrl === DEFAULT_REMOTE_REGISTRY_MANIFEST_URL;
+
     return [
         {
-            key: 'uiMode',
-            label: 'Режим интерфейса',
-            value: uiMode,
+            key: 'locale',
+            label: t('field.settings.locale.label'),
+            value: t(locale === 'ru' ? 'locale.name.ru' : 'locale.name.en'),
             kind: 'enum',
-            description: 'Состав экранов TUI'
+            description: t('field.settings.locale.short'),
+            activeOptionId: locale
+        },
+        {
+            key: 'uiMode',
+            label: t('field.settings.uiMode.label'),
+            value: t(uiMode === 'simple' ? 'mode.simple' : 'mode.expert'),
+            kind: 'enum',
+            description: t('field.settings.uiMode.short'),
+            activeOptionId: uiMode
         },
         {
             key: 'showHints',
-            label: 'Подсказки',
-            value: showHints ? 'on' : 'off',
+            label: t('field.settings.showHints.label'),
+            value: t(showHints ? 'common.value.on' : 'common.value.off'),
             kind: 'toggle',
-            description: 'Помощь по клавишам'
+            description: t('field.settings.showHints.short'),
+            activeOptionId: showHints ? 'on' : 'off'
         },
         {
             key: 'outputPath',
-            label: 'Build root',
-            value: form.outputPath || '<по умолчанию>',
+            label: t('field.settings.outputPath.label'),
+            value: form.outputPath || t('common.placeholder.default'),
             kind: 'text',
-            description: 'Корень серверных сборок'
+            description: t('field.settings.outputPath.short'),
+            activeOptionId: form.outputPath.trim() ? 'customPath' : 'default'
         },
         {
             key: 'reportDir',
-            label: 'Reports root',
-            value: form.reportDir || '<по умолчанию>',
+            label: t('field.settings.reportDir.label'),
+            value: form.reportDir || t('common.placeholder.default'),
             kind: 'text',
-            description: 'Корень папки отчётов'
+            description: t('field.settings.reportDir.short'),
+            activeOptionId: form.reportDir.trim() ? 'customPath' : 'default'
         },
         {
             key: 'serverDirName',
-            label: 'Папка сервера',
-            value: form.serverDirName || '<авто>',
+            label: t('field.settings.serverDirName.label'),
+            value: form.serverDirName || t('common.placeholder.auto'),
             kind: 'text',
-            description: 'Имя папки сервера'
+            description: t('field.settings.serverDirName.short'),
+            activeOptionId: form.serverDirName.trim() ? 'customName' : 'auto'
         },
         {
             key: 'runIdPrefix',
-            label: 'Run ID prefix',
-            value: form.runIdPrefix || '<по умолчанию>',
+            label: t('field.settings.runIdPrefix.label'),
+            value: form.runIdPrefix || t('common.placeholder.default'),
             kind: 'text',
-            description: 'Префикс ID запуска'
+            description: t('field.settings.runIdPrefix.short'),
+            activeOptionId: form.runIdPrefix.trim() ? 'customValue' : 'default'
         },
         {
             key: 'profile',
-            label: 'Arbiter profile',
+            label: t('field.settings.profile.label'),
             value: form.profile,
             kind: 'enum',
-            description: 'Строгость решений арбитра'
+            description: t('field.settings.profile.short'),
+            activeOptionId: form.profile
         },
         {
             key: 'deepCheckMode',
-            label: 'Deep-check',
+            label: t('field.settings.deepCheckMode.label'),
             value: form.deepCheckMode,
             kind: 'enum',
-            description: 'Глубокая проверка модов'
+            description: t('field.settings.deepCheckMode.short'),
+            activeOptionId: form.deepCheckMode
         },
         {
             key: 'validationMode',
-            label: 'Validation mode',
+            label: t('field.settings.validationMode.label'),
             value: form.validationMode,
             kind: 'enum',
-            description: 'Проверка серверной сборки'
+            description: t('field.settings.validationMode.short'),
+            activeOptionId: form.validationMode
         },
         {
             key: 'validationTimeoutMs',
-            label: 'Validation timeout',
-            value: form.validationTimeoutMs || '<по умолчанию>',
+            label: t('field.settings.validationTimeoutMs.label'),
+            value: form.validationTimeoutMs || t('common.placeholder.default'),
             kind: 'text',
-            description: 'Таймаут smoke-test'
+            description: t('field.settings.validationTimeoutMs.short'),
+            activeOptionId: form.validationTimeoutMs.trim() ? 'customValue' : 'default'
         },
         {
             key: 'validationEntrypointPath',
-            label: 'Validation entrypoint',
-            value: form.validationEntrypointPath || '<авто>',
+            label: t('field.settings.validationEntrypointPath.label'),
+            value: form.validationEntrypointPath || t('common.placeholder.auto'),
             kind: 'text',
-            description: 'Явный server launcher'
+            description: t('field.settings.validationEntrypointPath.short'),
+            activeOptionId: form.validationEntrypointPath.trim() ? 'customPath' : 'auto'
         },
         {
             key: 'validationSaveArtifacts',
-            label: 'Validation artifacts',
-            value: form.validationSaveArtifacts ? 'on' : 'off',
+            label: t('field.settings.validationSaveArtifacts.label'),
+            value: t(form.validationSaveArtifacts ? 'common.value.on' : 'common.value.off'),
             kind: 'toggle',
-            description: 'Сохранение логов проверки'
+            description: t('field.settings.validationSaveArtifacts.short'),
+            activeOptionId: form.validationSaveArtifacts ? 'on' : 'off'
         },
         {
             key: 'registryMode',
-            label: 'Registry mode',
+            label: t('field.settings.registryMode.label'),
             value: form.registryMode,
             kind: 'enum',
-            description: 'Источник правил реестра'
+            description: t('field.settings.registryMode.short'),
+            activeOptionId: form.registryMode
         },
         {
             key: 'registryManifestUrl',
-            label: 'Registry manifest URL',
-            value: form.registryManifestUrl || '<не задано>',
+            label: t('field.settings.registryManifestUrl.label'),
+            value: registryManifestIsDefault ? t('common.placeholder.default') : form.registryManifestUrl,
             kind: 'text',
-            description: 'Адрес manifest.json реестра'
+            description: t('field.settings.registryManifestUrl.short'),
+            activeOptionId: registryManifestIsDefault ? 'default' : 'customValue'
         },
         {
             key: 'registryBundleUrl',
-            label: 'Registry bundle URL',
-            value: form.registryBundleUrl || '<не задано>',
+            label: t('field.settings.registryBundleUrl.label'),
+            value: form.registryBundleUrl || t('common.placeholder.notSet'),
             kind: 'text',
-            description: 'Адрес bundle реестра'
+            description: t('field.settings.registryBundleUrl.short'),
+            activeOptionId: form.registryBundleUrl.trim() ? 'provided' : 'notSet'
         },
         {
             key: 'registryFilePath',
-            label: 'Registry file',
-            value: form.registryFilePath || '<по умолчанию>',
+            label: t('field.settings.registryFilePath.label'),
+            value: form.registryFilePath || t('common.placeholder.default'),
             kind: 'text',
-            description: 'Локальный файл реестра'
+            description: t('field.settings.registryFilePath.short'),
+            activeOptionId: form.registryFilePath.trim() ? 'customPath' : 'default'
         },
         {
             key: 'registryOverridesPath',
-            label: 'Registry overrides',
-            value: form.registryOverridesPath || '<по умолчанию>',
+            label: t('field.settings.registryOverridesPath.label'),
+            value: form.registryOverridesPath || t('common.placeholder.default'),
             kind: 'text',
-            description: 'Локальные overrides правил'
+            description: t('field.settings.registryOverridesPath.short'),
+            activeOptionId: form.registryOverridesPath.trim() ? 'customPath' : 'default'
         },
         {
             key: 'enabledEngineNames',
-            label: 'Enabled engines',
-            value: form.enabledEngineNames || '<по умолчанию>',
+            label: t('field.settings.enabledEngineNames.label'),
+            value: form.enabledEngineNames || t('common.placeholder.default'),
             kind: 'text',
-            description: 'Включённые движки анализа'
+            description: t('field.settings.enabledEngineNames.short'),
+            activeOptionId: form.enabledEngineNames.trim() ? 'customList' : 'default'
         },
         {
             key: 'disabledEngineNames',
-            label: 'Disabled engines',
-            value: form.disabledEngineNames || '<пусто>',
+            label: t('field.settings.disabledEngineNames.label'),
+            value: form.disabledEngineNames || t('common.placeholder.empty'),
             kind: 'text',
-            description: 'Отключённые движки анализа'
+            description: t('field.settings.disabledEngineNames.short'),
+            activeOptionId: form.disabledEngineNames.trim() ? 'customList' : 'empty'
         }
     ];
 }
 
-export function getSettingsFieldDetails(fieldKey: SettingsFieldKey): SettingsFieldDetails {
-    return SETTINGS_FIELD_DETAILS[fieldKey];
+export function getSettingsFieldDetails(fieldKey: SettingsFieldKey, t: T): SettingsFieldDetails {
+    const sharedFieldKey = SHARED_RUN_DETAILS[fieldKey];
+    if (sharedFieldKey) {
+        return getRunFieldDetails(sharedFieldKey, t);
+    }
+
+    const meta = SETTINGS_FIELD_DETAILS_META[fieldKey];
+    if (!meta) {
+        return {
+            title: fieldKey,
+            overview: fieldKey,
+            options: []
+        };
+    }
+
+    const details: SettingsFieldDetails = {
+        title: t(meta.titleKey),
+        overview: t(meta.overviewKey),
+        options: meta.options.map((option) => ({
+            id: option.id,
+            label: option.labelIsKey ? t(option.label as MessageKey) : option.label,
+            description: t(option.descriptionKey)
+        }))
+    };
+
+    if (meta.noteKey) {
+        details.note = t(meta.noteKey);
+    }
+
+    return details;
 }

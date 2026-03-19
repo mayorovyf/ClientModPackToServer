@@ -1,12 +1,14 @@
-﻿import React from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 
+import { useLocale } from '../i18n/use-locale.js';
+import { useT } from '../i18n/use-t.js';
 import { translateDecisionReason, translateManualOverrideSummary } from '../lib/translate-reason.js';
 import type { ReviewItem } from '../state/review-items.js';
 
-function formatDateTime(value: string | null): string {
+function formatDateTime(value: string | null, fallback: string): string {
     if (!value) {
-        return 'нет';
+        return fallback;
     }
 
     const date = new Date(value);
@@ -24,21 +26,21 @@ function formatDateTime(value: string | null): string {
     return `${day}.${month}.${year} ${hours}:${minutes}`;
 }
 
-function getStateLabel(item: ReviewItem | null): string {
+function getStateLabel(item: ReviewItem | null, t: ReturnType<typeof useT>): string {
     if (!item) {
-        return 'n/a';
+        return t('common.placeholder.na');
     }
 
     switch (item.state) {
         case 'keep':
-            return 'manual keep';
+            return t('details.review.state.manualKeep');
         case 'exclude':
-            return 'manual exclude';
+            return t('details.review.state.manualExclude');
         case 'history':
-            return 'история решения';
+            return t('details.review.state.history');
         case 'review':
         default:
-            return 'нужна проверка';
+            return t('details.review.state.review');
     }
 }
 
@@ -101,15 +103,19 @@ export function ReviewDetails({
     height: number;
     isFocused: boolean;
 }): React.JSX.Element {
+    const t = useT();
+    const locale = useLocale();
     const displayName = item?.decision.displayName || item?.subject.displayName || null;
     const version = item?.decision.descriptor?.version || item?.subject.version || null;
     const loader = item?.decision.descriptor?.loader || item?.subject.loader || null;
     const modIds = item?.decision.modIds || item?.decision.descriptor?.modIds || item?.subject.modIds || [];
     const lastRunState = item?.lastRunOverrideAction
-        ? `manual ${item.lastRunOverrideAction}`
+        ? t('details.review.lastRun.manual', {
+            action: translateManualOverrideSummary(item.lastRunOverrideAction, locale)
+        })
         : item?.decision.finalSemanticDecision === 'review'
-            ? 'review'
-            : item?.decision.finalSemanticDecision || 'n/a';
+            ? t('details.review.lastRun.review')
+            : item?.decision.finalSemanticDecision || t('common.placeholder.na');
 
     return (
         <Box
@@ -124,7 +130,7 @@ export function ReviewDetails({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="greenBright" wrap="wrap">{item ? item.decision.fileName : 'Спорные моды'}</Text>
+                <Text color="greenBright" wrap="wrap">{item ? item.decision.fileName : t('details.review.title')}</Text>
                 {displayName || version ? (
                     <Text dimColor wrap="wrap">
                         {[displayName, version].filter(Boolean).join(' | ')}
@@ -133,24 +139,24 @@ export function ReviewDetails({
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
                     {item ? (
                         <>
-                            <DetailLine label="Статус" value={getStateLabel(item)} valueColor={getStateColor(item)} />
-                            <DetailLine label="Последний run" value={lastRunState} />
-                            <DetailLine label="Origin" value={item.decision.finalDecisionOrigin || item.decision.decisionOrigin || 'n/a'} />
-                            <DetailLine label="Confidence" value={item.decision.finalConfidence || 'n/a'} />
-                            <DetailLine label="Loader" value={loader || 'n/a'} />
-                            <DetailLine label="Mod IDs" value={modIds.length > 0 ? modIds.join(', ') : 'n/a'} />
+                            <DetailLine label={t('details.review.status')} value={getStateLabel(item, t)} valueColor={getStateColor(item)} />
+                            <DetailLine label={t('details.review.lastRun')} value={lastRunState} />
+                            <DetailLine label={t('details.review.origin')} value={item.decision.finalDecisionOrigin || item.decision.decisionOrigin || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.review.confidence')} value={item.decision.finalConfidence || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.review.loader')} value={loader || t('common.placeholder.na')} />
+                            <DetailLine label={t('details.review.modIds')} value={modIds.length > 0 ? modIds.join(', ') : t('common.placeholder.na')} />
                         </>
                     ) : (
                         <Text dimColor wrap="wrap">
-                            После запуска здесь появится карточка выбранного спорного мода и сохранённого ручного решения.
+                            {t('details.review.empty')}
                         </Text>
                     )}
                 </Box>
 
                 {item ? (
                     <Box marginTop={1} flexDirection="column" minWidth={0}>
-                        <Text color="cyan" wrap="wrap">Причина</Text>
-                        <Text wrap="wrap">{translateDecisionReason(item.decision.reason)}</Text>
+                        <Text color="cyan" wrap="wrap">{t('details.review.reason')}</Text>
+                        <Text wrap="wrap">{translateDecisionReason(item.decision.reason, locale)}</Text>
                     </Box>
                 ) : null}
             </Box>
@@ -161,25 +167,25 @@ export function ReviewDetails({
                         <Text color={notice.level === 'error' ? 'red' : 'green'} wrap="wrap">{notice.message}</Text>
                     </Box>
                 ) : null}
-                <Text color="cyan" wrap="wrap">Ручное решение</Text>
+                <Text color="cyan" wrap="wrap">{t('details.review.manual')}</Text>
                 <DetailLine
-                    label="Сохранено"
-                    value={translateManualOverrideSummary(item?.currentOverrideAction || null)}
+                    label={t('details.review.saved')}
+                    value={translateManualOverrideSummary(item?.currentOverrideAction || null, locale)}
                     valueColor={item?.currentOverrideAction === 'keep' ? 'green' : item?.currentOverrideAction === 'exclude' ? 'red' : 'white'}
                 />
                 <DetailLine
-                    label="Причина"
-                    value={translateDecisionReason(item?.overrideMatch?.entry.reason || 'без пояснения')}
+                    label={t('details.review.savedReason')}
+                    value={translateDecisionReason(item?.overrideMatch?.entry.reason || null, locale)}
                 />
                 <DetailLine
-                    label="Обновлено"
-                    value={formatDateTime(item?.overrideMatch?.entry.updatedAt || null)}
+                    label={t('details.review.updated')}
+                    value={formatDateTime(item?.overrideMatch?.entry.updatedAt || null, t('common.placeholder.na'))}
                 />
-                <DetailLine label="Файл" value={overridesPath} />
+                <DetailLine label={t('details.review.file')} value={overridesPath} />
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <Text dimColor wrap="wrap">K сохраняет keep</Text>
-                    <Text dimColor wrap="wrap">X сохраняет exclude</Text>
-                    <Text dimColor wrap="wrap">C удаляет override</Text>
+                    <Text dimColor wrap="wrap">{t('details.review.action.keep')}</Text>
+                    <Text dimColor wrap="wrap">{t('details.review.action.exclude')}</Text>
+                    <Text dimColor wrap="wrap">{t('details.review.action.clear')}</Text>
                 </Box>
             </Box>
         </Box>

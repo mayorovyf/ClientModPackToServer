@@ -1,30 +1,10 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-import { getRunFieldDefinitions, getRunFieldDetails } from '../state/run-fields.js';
+import { useT } from '../i18n/use-t.js';
 import type { RunFormState, TuiMode } from '../state/app-state.js';
+import { getRunFieldDefinitions, getRunFieldDetails } from '../state/run-fields.js';
 import type { RunFieldKey } from '../state/run-fields.js';
-
-function getActiveOptionLabel(fieldKey: RunFieldKey, fieldValue: string | undefined): string | null {
-    switch (fieldKey) {
-        case 'inputPath':
-            return fieldValue === '<не указана>' ? 'Пусто' : 'Путь указан';
-        case 'outputPath':
-        case 'reportDir':
-            return fieldValue === '<по умолчанию>' ? 'Пусто' : 'Свой путь';
-        case 'serverDirName':
-            return fieldValue === '<авто>' ? 'Авто' : 'Свое имя';
-        case 'dryRun':
-        case 'profile':
-        case 'deepCheckMode':
-        case 'validationMode':
-        case 'registryMode':
-        case 'run':
-            return fieldValue || null;
-        default:
-            return null;
-    }
-}
 
 export function RunFieldDetails({
     fieldKey,
@@ -41,9 +21,10 @@ export function RunFieldDetails({
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
-    const field = getRunFieldDefinitions(form, uiMode, isRunning).find((item) => item.key === fieldKey) || null;
-    const details = getRunFieldDetails(fieldKey);
-    const activeOptionLabel = getActiveOptionLabel(fieldKey, field?.value);
+    const t = useT();
+    const field = getRunFieldDefinitions(form, uiMode, isRunning, t).find((item) => item.key === fieldKey) || null;
+    const details = getRunFieldDetails(fieldKey, t);
+    const activeOptionId = field?.activeOptionId ?? null;
 
     return (
         <Box
@@ -52,7 +33,7 @@ export function RunFieldDetails({
             width="100%"
             height={height}
             borderStyle="round"
-            borderColor="cyan"
+            borderColor={isFocused ? 'green' : 'cyan'}
             paddingX={1}
             paddingY={1}
             minWidth={0}
@@ -65,12 +46,12 @@ export function RunFieldDetails({
             </Box>
 
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Варианты</Text>
+                <Text color="cyan" wrap="wrap">{t('details.options')}</Text>
                 {details.options.map((option) => {
-                    const isActiveOption = activeOptionLabel === option.label;
+                    const isActiveOption = activeOptionId === option.id;
 
                     return (
-                        <Box key={option.label} flexDirection="column" minWidth={0}>
+                        <Box key={option.id} flexDirection="column" minWidth={0}>
                             <Text color={isActiveOption ? 'greenBright' : 'whiteBright'} wrap="wrap">
                                 {option.label}
                             </Text>

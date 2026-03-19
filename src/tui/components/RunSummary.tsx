@@ -2,8 +2,19 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Spinner, StatusMessage } from '@inkjs/ui';
 
+import { useT } from '../i18n/use-t.js';
 import type { RunSessionState } from '../state/app-state.js';
 import { useScrollOffset } from '../hooks/use-scroll-offset.js';
+import type { RunReport } from '../../types/report.js';
+import type { ReportHistoryEntry } from '../state/report-history.js';
+
+function getEventKey(event: RunReport['events'][number] | RunSessionState['events'][number]): string {
+    return 'type' in event ? event.type : `${event.kind}:${event.message}`;
+}
+
+function getEventLabel(event: RunReport['events'][number] | RunSessionState['events'][number]): string {
+    return 'type' in event ? event.type : event.kind;
+}
 
 function getStatusVariant(status: RunSessionState['status']): 'info' | 'success' | 'error' | 'warning' {
     switch (status) {
@@ -36,28 +47,43 @@ function StatPill({
 
 export function RunSummary({
     session,
+    report = null,
+    reportEntry = null,
     compact,
     eventLimit,
     isFocused,
     height
 }: {
     session: RunSessionState;
+    report?: RunReport | null;
+    reportEntry?: ReportHistoryEntry | null;
     compact: boolean;
     eventLimit: number;
     isFocused: boolean;
     height: number;
 }): React.JSX.Element {
-    const reviewCount = session.lastReport?.arbiter?.summary.finalDecisions.review ?? 0;
-    const keptCount = session.lastReport?.stats.kept ?? 0;
-    const excludedCount = session.lastReport?.stats.excluded ?? 0;
-    const validationStatus = session.lastReport?.validation?.status ?? 'n/a';
+    const t = useT();
+    const sourceReport = report || session.lastReport;
+    const isHistorical = Boolean(report);
+    const historicalError = sourceReport?.errors[0]?.message || t('common.value.unknown');
+    const reviewCount = sourceReport?.arbiter?.summary.finalDecisions.review ?? 0;
+    const keptCount = sourceReport?.stats.kept ?? 0;
+    const excludedCount = sourceReport?.stats.excluded ?? 0;
+    const validationStatus = sourceReport?.validation?.status ?? t('common.placeholder.na');
+    const summaryStatus: RunSessionState['status'] = isHistorical
+        ? ((sourceReport?.errors.length ?? 0) > 0 ? 'failed' : 'succeeded')
+        : session.status;
+    const runId = sourceReport?.run.runId || reportEntry?.runId || session.runId;
+    const events = isHistorical ? (sourceReport?.events ?? []) : session.events;
+    const reportPath = sourceReport?.run.jsonReportPath || reportEntry?.jsonReportPath || session.reportPaths.jsonReportPath;
+    const summaryPath = sourceReport?.run.summaryPath || reportEntry?.summaryPath || session.reportPaths.summaryPath;
     const visibleEventLimit = Math.max(1, Math.min(eventLimit, Math.max(height - 15, 1)));
     const { offset, hasOverflow } = useScrollOffset({
-        itemCount: session.events.length,
+        itemCount: events.length,
         viewportSize: visibleEventLimit,
         enabled: isFocused
     });
-    const visibleEvents = session.events.slice(offset, offset + visibleEventLimit);
+    const visibleEvents = events.slice(offset, offset + visibleEventLimit);
 
     return (
         <Box
@@ -72,50 +98,62 @@ export function RunSummary({
             minWidth={0}
         >
             <Box flexDirection="column" minWidth={0}>
-                <Text color="greenBright" wrap="truncate">Последний запуск</Text>
+                <Text color="greenBright" wrap="truncate">{t('runSummary.title')}</Text>
                 <Box marginTop={1} minWidth={0}>
-                    <StatusMessage variant={getStatusVariant(session.status)}>
-                        {session.status === 'running'
-                            ? 'Pipeline выполняется'
-                            : session.status === 'succeeded'
-                                ? 'Последний запуск завершён успешно'
-                                : session.status === 'failed'
-                                    ? `Запуск завершился ошибкой: ${session.lastError || 'unknown'}`
-                                    : 'Запуск ещё не выполнялся'}
+                    <StatusMessage variant={getStatusVariant(summaryStatus)}>
+                        {summaryStatus === 'running'
+                            ? t('runSummary.status.running')
+                            : summaryStatus === 'succeeded'
+                                ? t('runSummary.status.succeeded')
+                                : summaryStatus === 'failed'
+                                    ? t('runSummary.status.failed', { error: isHistorical ? historicalError : (session.lastError || t('common.value.unknown')) })
+                                    : t('runSummary.status.idle')}
                     </StatusMessage>
                 </Box>
-                {session.status === 'running' ? (
+                {summaryStatus === 'running' && !isHistorical ? (
                     <Box marginTop={1} minWidth={0}>
-                        <Spinner label={session.currentStage ? `Этап: ${session.currentStage}` : 'Запуск backend'} />
+                        <Spinner label={session.currentStage ? t('runSummary.spinner.stage', { stage: session.currentStage }) : t('runSummary.spinner.starting')} />
                     </Box>
                 ) : null}
                 <Box marginTop={1} minWidth={0}>
-                    <Text wrap="wrap">Run ID: {session.runId || 'n/a'}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.runId')}: ${runId || t('common.placeholder.na')}`}</Text>
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <StatPill label={compact ? 'KEEP' : 'KEPT'} value={keptCount} backgroundColor="green" />
-                    <StatPill label={compact ? 'EXCL' : 'EXCLUDED'} value={excludedCount} backgroundColor="red" />
-                    <StatPill label="REVIEW" value={reviewCount} backgroundColor="yellow" />
+                    <StatPill
+                        label={compact ? t('runSummary.stat.keep.short') : t('runSummary.stat.keep.full')}
+                        value={keptCount}
+                        backgroundColor="green"
+                    />
+                    <StatPill
+                        label={compact ? t('runSummary.stat.exclude.short') : t('runSummary.stat.exclude.full')}
+                        value={excludedCount}
+                        backgroundColor="red"
+                    />
+                    <StatPill label={t('runSummary.stat.review')} value={reviewCount} backgroundColor="yellow" />
                 </Box>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
-                    <Text wrap="wrap">Validation: {validationStatus}</Text>
-                    <Text wrap="wrap">Отчёт: {session.reportPaths.jsonReportPath || 'n/a'}</Text>
-                    <Text wrap="wrap">Summary: {session.reportPaths.summaryPath || 'n/a'}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.validation')}: ${validationStatus}`}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.report')}: ${reportPath || t('common.placeholder.na')}`}</Text>
+                    <Text wrap="wrap">{`${t('runSummary.summary')}: ${summaryPath || t('common.placeholder.na')}`}</Text>
                 </Box>
             </Box>
             <Box flexDirection="column" minWidth={0}>
-                <Text color="cyan" wrap="wrap">Последние события</Text>
+                <Text color="cyan" wrap="wrap">{t('runSummary.events.title')}</Text>
                 {hasOverflow ? (
                     <Text dimColor wrap="truncate">
-                        {`↑/↓ события | ${offset + 1}-${Math.min(offset + visibleEvents.length, session.events.length)} из ${session.events.length}`}
+                        {t('runSummary.events.scroll', {
+                            start: offset + 1,
+                            end: Math.min(offset + visibleEvents.length, events.length),
+                            total: events.length
+                        })}
                     </Text>
                 ) : null}
                 {visibleEvents.map((event) => (
-                    <Text key={`${event.timestamp}-${event.type}`} dimColor wrap="wrap">
-                        {event.type}
+                    <Text key={`${event.timestamp}-${getEventKey(event)}`} dimColor wrap="wrap">
+                        {getEventLabel(event)}
                     </Text>
                 ))}
-                {visibleEvents.length === 0 ? <Text dimColor wrap="wrap">События ещё не поступали</Text> : null}
+                {visibleEvents.length === 0 ? <Text dimColor wrap="wrap">{t('runSummary.events.empty')}</Text> : null}
             </Box>
         </Box>
     );
