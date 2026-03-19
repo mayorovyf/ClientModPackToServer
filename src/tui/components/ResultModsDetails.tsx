@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import path from 'node:path';
 
 import { useLocale } from '../i18n/use-locale.js';
 import { useT } from '../i18n/use-t.js';
@@ -32,26 +33,37 @@ function formatDateTime(value: string | null, fallback: string): string {
 function DetailLine({
     label,
     value,
-    valueColor
+    valueColor,
+    wrapMode = 'truncate'
 }: {
     label: string;
     value: string;
     valueColor?: 'green' | 'red' | 'yellow' | 'cyan' | 'white';
+    wrapMode?: 'truncate' | 'wrap';
 }): React.JSX.Element {
     return (
         <Box flexDirection="row" minWidth={0}>
-            <Box width={12} minWidth={12}>
+            <Box width={9} minWidth={9}>
                 <Text dimColor wrap="truncate">{label}</Text>
             </Box>
             <Box flexGrow={1} minWidth={0}>
                 {valueColor ? (
-                    <Text color={valueColor} wrap="wrap">{value}</Text>
+                    <Text color={valueColor} wrap={wrapMode}>{value}</Text>
                 ) : (
-                    <Text wrap="wrap">{value}</Text>
+                    <Text wrap={wrapMode}>{value}</Text>
                 )}
             </Box>
         </Box>
     );
+}
+
+function compactPath(value: string): string {
+    if (!value) {
+        return value;
+    }
+
+    const baseName = path.basename(value);
+    return baseName.length < value.length ? `...${path.sep}${baseName}` : value;
 }
 
 function getDecisionColor(item: ResultModItem | null): 'green' | 'red' | 'yellow' | 'white' {
@@ -169,7 +181,11 @@ export function ResultModsDetails({
                         <DetailLine label={t('details.mods.confidence')} value={item.finalConfidence || t('common.placeholder.na')} />
                         <DetailLine label={t('details.mods.loader')} value={item.loader || t('common.placeholder.na')} />
                         <DetailLine label={t('details.mods.origin')} value={item.finalOrigin || t('common.placeholder.na')} />
-                        <DetailLine label={t('details.mods.modIds')} value={modIds.length > 0 ? modIds.join(', ') : t('common.placeholder.na')} />
+                        <DetailLine
+                            label={t('details.mods.modIds')}
+                            value={modIds.length > 0 ? modIds.join(', ') : t('common.placeholder.na')}
+                            wrapMode="wrap"
+                        />
                         <DetailLine
                             label={t('details.mods.manual')}
                             value={item.currentOverrideAction || item.lastRunOverrideAction || t('common.placeholder.na')}
@@ -188,6 +204,7 @@ export function ResultModsDetails({
                             <DetailLine
                                 label={t('details.review.savedReason')}
                                 value={translateDecisionReason(reviewState?.overrideMatch?.entry.reason || null, locale)}
+                                wrapMode="truncate"
                             />
                             <DetailLine
                                 label={t('details.review.updated')}
@@ -209,10 +226,10 @@ export function ResultModsDetails({
                     </Box>
                 ) : null}
                 <Text color="cyan" wrap="wrap">{t('details.mods.reason')}</Text>
-                <Text wrap="wrap">{translateDecisionReason(item?.decision.reason || null, locale) || t('details.mods.reasonEmpty')}</Text>
+                <Text wrap="truncate">{translateDecisionReason(item?.decision.reason || null, locale) || t('details.mods.reasonEmpty')}</Text>
                 <Box marginTop={1} flexDirection="column" minWidth={0}>
                     <Text color="cyan" wrap="wrap">{t('details.review.manual')}</Text>
-                    <DetailLine label={t('details.review.file')} value={reviewOverridesPath} />
+                    <DetailLine label={t('details.review.file')} value={compactPath(reviewOverridesPath)} />
                 </Box>
             </Box>
         </Box>

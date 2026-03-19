@@ -15,9 +15,12 @@ import type {
 } from '../state/app-state.js';
 import type { ReportHistoryState } from '../state/report-history.js';
 import type { RunPreset } from '../state/presets.js';
+import type { ResultCompareItem, ResultCompareSummary } from '../state/result-compare.js';
+import type { ResultProblemItem, ResultProblemsSummary } from '../state/result-problems.js';
 import type { ServerDoctorState } from '../state/server-doctor.js';
 import type { ResultModItem, ResultModsSortMode } from '../state/results-mods.js';
 import type { DecisionReviewState, ReviewItem } from '../state/review-items.js';
+import type { RunPreflightCheck, RunPreflightSummary } from '../state/run-preflight.js';
 import type { RunFieldKey } from '../state/run-fields.js';
 import type { ServerFieldKey } from '../state/server-fields.js';
 import type { SettingsFieldKey } from '../state/settings-fields.js';
@@ -67,6 +70,11 @@ export interface SectionRegistryContext {
     latestBuildDir: string | null;
     selectedRunField: RunFieldKey;
     setSelectedRunField: (fieldKey: RunFieldKey) => void;
+    runPreflightChecks?: RunPreflightCheck[];
+    runPreflightSummary?: RunPreflightSummary;
+    selectedRunPreflightCheck?: RunPreflightCheck | null;
+    selectedRunPreflightCheckId?: string;
+    setSelectedRunPreflightCheckId?: (checkId: string) => void;
     serverForm: ServerFormState;
     setServerForm: (nextForm: ServerFormState) => void;
     serverState: ServerManagerState;
@@ -98,6 +106,16 @@ export interface SectionRegistryContext {
     selectedResultModReviewState?: DecisionReviewState | null;
     selectedResultModId: string;
     setSelectedResultModId: (itemId: string) => void;
+    resultProblems?: ResultProblemItem[];
+    resultProblemsSummary?: ResultProblemsSummary | null;
+    selectedResultProblem?: ResultProblemItem | null;
+    selectedResultProblemId?: string;
+    setSelectedResultProblemId?: (itemId: string) => void;
+    resultCompareItems?: ResultCompareItem[];
+    resultCompareSummary?: ResultCompareSummary | null;
+    selectedResultCompareItem?: ResultCompareItem | null;
+    selectedResultCompareItemId?: string;
+    setSelectedResultCompareItemId?: (itemId: string) => void;
     saveSelectedResultModOverride?: (action: ManualReviewAction) => void;
     confirmSelectedResultModOverride?: () => void;
     clearSelectedResultModOverride?: () => void;
@@ -120,4 +138,5 @@ export interface SectionRegistryContext {
     setSelectedAuthorId: (authorId: string) => void;
     onInteractionChange: (locked: boolean) => void;
     onRun: () => void;
+    onRunWithOverrides?: (overrides: Partial<RunFormState>) => void;
 }

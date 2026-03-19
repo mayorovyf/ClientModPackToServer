@@ -14,7 +14,14 @@ import {
 } from '../state/run-fields.js';
 import type { RunFieldKey } from '../state/run-fields.js';
 
-type EditableTextField = 'inputPath' | 'outputPath' | 'serverDirName' | 'reportDir';
+type EditableTextField =
+    | 'inputPath'
+    | 'outputPath'
+    | 'serverDirName'
+    | 'reportDir'
+    | 'runIdPrefix'
+    | 'validationTimeoutMs'
+    | 'validationEntrypointPath';
 
 function formatRunListValue(value: string, maxLength = 24): string {
     if (value.length <= maxLength) {
@@ -125,6 +132,9 @@ export function BuildScreen({
             case 'outputPath':
             case 'serverDirName':
             case 'reportDir':
+            case 'runIdPrefix':
+            case 'validationTimeoutMs':
+            case 'validationEntrypointPath':
                 setEditingField(selectedField.key);
                 setDraftValue(form[selectedField.key]);
                 return;
@@ -150,6 +160,12 @@ export function BuildScreen({
                 onChange({
                     ...form,
                     validationMode: cycleOption(form.validationMode, VALIDATION_VALUES)
+                });
+                return;
+            case 'validationSaveArtifacts':
+                onChange({
+                    ...form,
+                    validationSaveArtifacts: !form.validationSaveArtifacts
                 });
                 return;
             case 'registryMode':

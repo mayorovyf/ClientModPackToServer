@@ -8,9 +8,9 @@ const { DEFAULT_REMOTE_REGISTRY_MANIFEST_URL } = require('../../registry/constan
 
 export type TuiMode = 'simple' | 'expert';
 export type ScreenId = 'build' | 'server' | 'results' | 'settings';
-export type BuildPageId = 'inputs' | 'run' | 'presets';
+export type BuildPageId = 'paths' | 'strategy' | 'check' | 'launch' | 'presets';
 export type ServerPageId = 'setup' | 'install' | 'doctor' | 'launch' | 'logs';
-export type ResultsPageId = 'overview' | 'validation' | 'reports';
+export type ResultsPageId = 'overview' | 'problems' | 'compare' | 'reports';
 export type SettingsPageId = 'general' | 'registry' | 'about';
 export type RunSessionStatus = 'idle' | 'running' | 'succeeded' | 'failed';
 export type FocusedColumn = 'sidebar' | 'content' | 'details';
@@ -99,15 +99,15 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
 ];
 
 export const PAGE_ORDER_BY_SCREEN: { [K in ScreenId]: readonly SectionPageMap[K][] } = {
-    build: ['inputs', 'run', 'presets'],
+    build: ['paths', 'strategy', 'check', 'launch', 'presets'],
     server: ['setup', 'install', 'doctor', 'launch', 'logs'],
-    results: ['reports', 'overview', 'validation'],
+    results: ['reports', 'overview', 'problems', 'compare'],
     settings: ['general', 'registry', 'about']
 };
 
 export function createDefaultActivePageByScreen(): ActivePageByScreen {
     return {
-        build: 'inputs',
+        build: 'paths',
         server: 'setup',
         results: 'reports',
         settings: 'general'

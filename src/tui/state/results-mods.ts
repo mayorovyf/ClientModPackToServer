@@ -196,7 +196,7 @@ function createResultModItem(
         : Boolean(decision.requiresReview || decision.finalSemanticDecision === 'review');
 
     return {
-        id: decision.manualReviewKey || decision.fileName,
+        id: `file:${decision.fileName}`,
         decision,
         primaryLabel: resolvePrimaryLabel(decision),
         displayName: decision.displayName || decision.descriptor?.displayName || null,

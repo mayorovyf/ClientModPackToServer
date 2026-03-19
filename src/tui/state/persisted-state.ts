@@ -97,8 +97,16 @@ function normalizeActivePageByScreen(value: unknown): ActivePageByScreen {
             : String(defaults[screenId]);
     }
 
+    if (candidate.build === 'inputs') {
+        mutablePages.build = 'paths';
+    }
+
+    if (candidate.build === 'run') {
+        mutablePages.build = 'strategy';
+    }
+
     if (candidate.build === 'validation') {
-        mutablePages.results = 'validation';
+        mutablePages.results = 'problems';
     }
 
     if (candidate.presets === 'list' || candidate.presets === 'details') {
@@ -107,6 +115,10 @@ function normalizeActivePageByScreen(value: unknown): ActivePageByScreen {
 
     if (candidate.reports === 'history') {
         mutablePages.results = 'reports';
+    }
+
+    if (candidate.results === 'validation') {
+        mutablePages.results = 'problems';
     }
 
     if (candidate.results === 'review') {

@@ -53,7 +53,8 @@ function logPreparedRun({
 async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Promise<PreparedRun> {
     const instanceLayout = resolveInstanceLayout(inputPath);
     const runContext = createRunContext({
-        inputPath: instanceLayout.instancePath,
+        inputPath,
+        instancePath: instanceLayout.instancePath,
         modsPath: instanceLayout.modsPath,
         outputRootDir: config.outputRootDir,
         serverDirName: config.serverDirName,

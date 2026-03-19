@@ -240,7 +240,7 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('  node index.js server start --target-dir <dir> [--launcher <path>] [--java <path>] [--jvm-args "<args>"] [--accept-eula]');
     logger.raw('');
     logger.raw('Options:');
-    logger.raw('  --input            Path to the instance directory that contains mods/');
+    logger.raw('  --input            Path to the instance dir, mods/ dir, or Prism root with minecraft/.minecraft');
     logger.raw('  --output           Root directory where server build folders are created');
     logger.raw('  --server-dir-name  Name of the final server build directory');
     logger.raw('  --report-dir       Root directory for run reports');

@@ -22,8 +22,11 @@ import { AUTHOR_PROFILES } from './state/authors.js';
 import { loadPersistedTuiState, savePersistedTuiState } from './state/persisted-state.js';
 import { deleteRunPreset, loadRunPresets, saveRunPreset } from './state/presets.js';
 import { loadReportForHistoryEntry, loadReportHistory, resolveReportRootDir } from './state/report-history.js';
+import { buildResultCompareState, resolveCompareBaselineEntry } from './state/result-compare.js';
+import { buildResultProblems } from './state/result-problems.js';
 import { buildResultModItems } from './state/results-mods.js';
 import { buildDecisionReviewState, buildReviewItems } from './state/review-items.js';
+import { buildRunPreflight } from './state/run-preflight.js';
 import { buildServerDoctorState } from './state/server-doctor.js';
 
 import type { Locale } from '../i18n/types.js';
@@ -100,8 +103,11 @@ export function App(): React.JSX.Element {
     const [selectedAuthorId, setSelectedAuthorId] = useState<string>(AUTHOR_PROFILES[0]?.id ?? '');
     const [selectedReportRunId, setSelectedReportRunId] = useState('');
     const [selectedResultModId, setSelectedResultModId] = useState('');
+    const [selectedResultProblemId, setSelectedResultProblemId] = useState('');
+    const [selectedResultCompareItemId, setSelectedResultCompareItemId] = useState('');
     const [resultModsDisputedOnly, setResultModsDisputedOnly] = useState(false);
     const [resultModsSortMode, setResultModsSortMode] = useState<ResultModsSortMode>('name');
+    const [selectedRunPreflightCheckId, setSelectedRunPreflightCheckId] = useState('');
     const [selectedReviewItemId, setSelectedReviewItemId] = useState('');
     const [selectedSettingsField, setSelectedSettingsField] = useState<SettingsFieldKey>('locale');
     const [selectedPresetId, setSelectedPresetId] = useState('');
@@ -128,6 +134,13 @@ export function App(): React.JSX.Element {
         () => loadRunPresets(),
         [presetRevision]
     );
+    const runPreflight = useMemo(
+        () => buildRunPreflight(form),
+        [form]
+    );
+    const selectedRunPreflightCheck = runPreflight.checks.find((check) => check.id === selectedRunPreflightCheckId)
+        || runPreflight.checks[0]
+        || null;
     const selectedPreset: RunPreset | null = useMemo(
         () => presets.find((preset) => preset.id === selectedPresetId) ?? presets[0] ?? null,
         [presets, selectedPresetId]
@@ -138,6 +151,14 @@ export function App(): React.JSX.Element {
     const selectedReport = useMemo(
         () => loadReportForHistoryEntry(selectedReportEntry) || session.lastReport,
         [selectedReportEntry, session.lastReport]
+    );
+    const baselineReportEntry = useMemo(
+        () => resolveCompareBaselineEntry(reportHistory.entries, selectedReportEntry?.runId || selectedReportRunId),
+        [reportHistory.entries, selectedReportEntry?.runId, selectedReportRunId]
+    );
+    const baselineReport = useMemo(
+        () => loadReportForHistoryEntry(baselineReportEntry),
+        [baselineReportEntry]
     );
     const latestBuildDir = useMemo(
         () => selectedReport?.run.buildDir
@@ -169,6 +190,23 @@ export function App(): React.JSX.Element {
             : allResultModItems,
         [allResultModItems, resultModsDisputedOnly]
     );
+    const baselineReviewOverridesPath = useMemo(
+        () => resolveTuiReviewOverridesPath(baselineReportEntry, baselineReport?.run || null),
+        [baselineReport?.run, baselineReportEntry]
+    );
+    const baselineReviewOverrides = useMemo(
+        () => loadManualReviewOverrides(baselineReviewOverridesPath),
+        [baselineReviewOverridesPath, reviewOverridesRevision]
+    );
+    const baselineResultModItems = useMemo(
+        () => buildResultModItems({
+            report: baselineReport,
+            overrides: baselineReviewOverrides,
+            disputedOnly: false,
+            sortMode: resultModsSortMode
+        }),
+        [baselineReport, baselineReviewOverrides, resultModsSortMode]
+    );
     const resultModDisputedCount = useMemo(
         () => allResultModItems.filter((item) => item.isDisputed).length,
         [allResultModItems]
@@ -186,6 +224,28 @@ export function App(): React.JSX.Element {
     );
     const selectedReviewItem = reviewItems.find((item) => item.id === selectedReviewItemId)
         || reviewItems[0]
+        || null;
+    const resultProblemsState = useMemo(
+        () => buildResultProblems({
+            report: selectedReport,
+            resultModItems: allResultModItems
+        }),
+        [allResultModItems, selectedReport]
+    );
+    const selectedResultProblem = resultProblemsState.items.find((item) => item.id === selectedResultProblemId)
+        || resultProblemsState.items[0]
+        || null;
+    const resultCompareState = useMemo(
+        () => buildResultCompareState({
+            currentReport: selectedReport,
+            baselineReport,
+            currentItems: allResultModItems,
+            baselineItems: baselineResultModItems
+        }),
+        [allResultModItems, baselineReport, baselineResultModItems, selectedReport]
+    );
+    const selectedResultCompareItem = resultCompareState.items.find((item) => item.id === selectedResultCompareItemId)
+        || resultCompareState.items[0]
         || null;
     const serverDoctor = useMemo(() => {
         if (activeScreen !== 'server' || activePageByScreen.server !== 'doctor') {
@@ -217,6 +277,11 @@ export function App(): React.JSX.Element {
         latestBuildDir,
         selectedRunField,
         setSelectedRunField,
+        runPreflightChecks: runPreflight.checks,
+        runPreflightSummary: runPreflight.summary,
+        selectedRunPreflightCheck,
+        selectedRunPreflightCheckId,
+        setSelectedRunPreflightCheckId,
         serverForm,
         setServerForm,
         serverState: serverManager.state,
@@ -254,6 +319,16 @@ export function App(): React.JSX.Element {
         selectedResultModReviewState,
         selectedResultModId,
         setSelectedResultModId,
+        resultProblems: resultProblemsState.items,
+        resultProblemsSummary: resultProblemsState.summary,
+        selectedResultProblem,
+        selectedResultProblemId,
+        setSelectedResultProblemId,
+        resultCompareItems: resultCompareState.items,
+        resultCompareSummary: resultCompareState.summary,
+        selectedResultCompareItem,
+        selectedResultCompareItemId,
+        setSelectedResultCompareItemId,
         saveSelectedResultModOverride,
         confirmSelectedResultModOverride,
         clearSelectedResultModOverride,
@@ -275,7 +350,8 @@ export function App(): React.JSX.Element {
         selectedAuthorId,
         setSelectedAuthorId,
         onInteractionChange: setInteractionLocked,
-        onRun: handleRun
+        onRun: handleRun,
+        onRunWithOverrides: handleRunWithOverrides
     };
     const sectionRegistry = createSectionRegistry(sectionContext);
     const activeSection = sectionRegistry[activeScreen];
@@ -340,6 +416,17 @@ export function App(): React.JSX.Element {
     }, [reportHistory.entries, selectedReportRunId]);
 
     useEffect(() => {
+        if (!selectedRunPreflightCheckId && runPreflight.checks[0]?.id) {
+            setSelectedRunPreflightCheckId(runPreflight.checks[0].id);
+            return;
+        }
+
+        if (selectedRunPreflightCheckId && !runPreflight.checks.some((check) => check.id === selectedRunPreflightCheckId)) {
+            setSelectedRunPreflightCheckId(runPreflight.checks[0]?.id ?? '');
+        }
+    }, [runPreflight.checks, selectedRunPreflightCheckId]);
+
+    useEffect(() => {
         if (!selectedResultModId && resultModItems[0]?.id) {
             setSelectedResultModId(resultModItems[0].id);
             return;
@@ -349,6 +436,28 @@ export function App(): React.JSX.Element {
             setSelectedResultModId(resultModItems[0]?.id ?? '');
         }
     }, [resultModItems, selectedResultModId]);
+
+    useEffect(() => {
+        if (!selectedResultProblemId && resultProblemsState.items[0]?.id) {
+            setSelectedResultProblemId(resultProblemsState.items[0].id);
+            return;
+        }
+
+        if (selectedResultProblemId && !resultProblemsState.items.some((item) => item.id === selectedResultProblemId)) {
+            setSelectedResultProblemId(resultProblemsState.items[0]?.id ?? '');
+        }
+    }, [resultProblemsState.items, selectedResultProblemId]);
+
+    useEffect(() => {
+        if (!selectedResultCompareItemId && resultCompareState.items[0]?.id) {
+            setSelectedResultCompareItemId(resultCompareState.items[0].id);
+            return;
+        }
+
+        if (selectedResultCompareItemId && !resultCompareState.items.some((item) => item.id === selectedResultCompareItemId)) {
+            setSelectedResultCompareItemId(resultCompareState.items[0]?.id ?? '');
+        }
+    }, [resultCompareState.items, selectedResultCompareItemId]);
 
     useEffect(() => {
         if (!selectedReviewItemId && reviewItems[0]?.id) {
@@ -440,17 +549,32 @@ export function App(): React.JSX.Element {
         serverEntrypointCacheRef.current.set(`${targetDir}\n${explicitEntrypointPath}`, resolvedEntrypointPath);
     }, [serverForm.explicitEntrypointPath, serverForm.targetDir, serverManager.state.resolvedEntrypointPath]);
 
-    function handleRun(): void {
-        if (!form.inputPath.trim()) {
+    function runWithForm(nextForm: RunFormState): void {
+        const nextPreflight = buildRunPreflight(nextForm);
+
+        if (!nextPreflight.summary.canRun) {
+            const blockingCheck = nextPreflight.checks.find((check) => check.severity === 'error');
+
             setAppNotice({
                 level: 'error',
-                message: t('app.notice.inputRequired')
+                message: blockingCheck?.summary || t('app.notice.inputRequired')
             });
             return;
         }
 
         setAppNotice(null);
-        void startRun(form);
+        void startRun(nextForm);
+    }
+
+    function handleRun(): void {
+        runWithForm(form);
+    }
+
+    function handleRunWithOverrides(overrides: Partial<RunFormState>): void {
+        runWithForm({
+            ...form,
+            ...overrides
+        });
     }
 
     function refreshPresets(nextSelectedPresetId?: string): void {
@@ -475,7 +599,7 @@ export function App(): React.JSX.Element {
 
         setForm(selectedPreset.form);
         setActiveScreen('build');
-        setActivePage('build', 'inputs');
+        setActivePage('build', 'paths');
         setFocusedColumn('content');
         setAppNotice({
             level: 'success',

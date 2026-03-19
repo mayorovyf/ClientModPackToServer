@@ -8,10 +8,14 @@ export type RunFieldKey =
     | 'outputPath'
     | 'serverDirName'
     | 'reportDir'
+    | 'runIdPrefix'
     | 'dryRun'
     | 'profile'
     | 'deepCheckMode'
     | 'validationMode'
+    | 'validationTimeoutMs'
+    | 'validationEntrypointPath'
+    | 'validationSaveArtifacts'
     | 'registryMode'
     | 'run';
 
@@ -91,6 +95,14 @@ const RUN_FIELD_DETAILS_META: Record<RunFieldKey, RunFieldDetailsMeta> = {
             { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.run.reportDir.option.customPath' }
         ]
     },
+    runIdPrefix: {
+        titleKey: 'field.run.runIdPrefix.title',
+        overviewKey: 'field.run.runIdPrefix.overview',
+        options: [
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.run.runIdPrefix.option.default' },
+            { id: 'customValue', label: 'common.option.customValue', labelIsKey: true, descriptionKey: 'field.run.runIdPrefix.option.customValue' }
+        ]
+    },
     dryRun: {
         titleKey: 'field.run.dryRun.title',
         overviewKey: 'field.run.dryRun.overview',
@@ -125,6 +137,30 @@ const RUN_FIELD_DETAILS_META: Record<RunFieldKey, RunFieldDetailsMeta> = {
             { id: 'auto', label: 'auto', descriptionKey: 'field.run.validationMode.option.auto' },
             { id: 'require', label: 'require', descriptionKey: 'field.run.validationMode.option.require' },
             { id: 'force', label: 'force', descriptionKey: 'field.run.validationMode.option.force' }
+        ]
+    },
+    validationTimeoutMs: {
+        titleKey: 'field.run.validationTimeoutMs.title',
+        overviewKey: 'field.run.validationTimeoutMs.overview',
+        options: [
+            { id: 'default', label: 'common.option.default', labelIsKey: true, descriptionKey: 'field.run.validationTimeoutMs.option.default' },
+            { id: 'customValue', label: 'common.option.customValue', labelIsKey: true, descriptionKey: 'field.run.validationTimeoutMs.option.customValue' }
+        ]
+    },
+    validationEntrypointPath: {
+        titleKey: 'field.run.validationEntrypointPath.title',
+        overviewKey: 'field.run.validationEntrypointPath.overview',
+        options: [
+            { id: 'auto', label: 'common.option.auto', labelIsKey: true, descriptionKey: 'field.run.validationEntrypointPath.option.auto' },
+            { id: 'customPath', label: 'common.option.customPath', labelIsKey: true, descriptionKey: 'field.run.validationEntrypointPath.option.customPath' }
+        ]
+    },
+    validationSaveArtifacts: {
+        titleKey: 'field.run.validationSaveArtifacts.title',
+        overviewKey: 'field.run.validationSaveArtifacts.overview',
+        options: [
+            { id: 'off', label: 'common.value.off', labelIsKey: true, descriptionKey: 'field.run.validationSaveArtifacts.option.off' },
+            { id: 'on', label: 'common.value.on', labelIsKey: true, descriptionKey: 'field.run.validationSaveArtifacts.option.on' }
         ]
     },
     registryMode: {
@@ -198,6 +234,14 @@ export function getRunFieldDefinitions(
             activeOptionId: form.reportDir.trim() ? 'customPath' : 'default'
         },
         {
+            key: 'runIdPrefix',
+            label: t('field.run.runIdPrefix.label'),
+            value: form.runIdPrefix || getPlaceholder(t, 'common.placeholder.default'),
+            kind: 'text',
+            description: t('field.run.runIdPrefix.short'),
+            activeOptionId: form.runIdPrefix.trim() ? 'customValue' : 'default'
+        },
+        {
             key: 'dryRun',
             label: t('field.run.dryRun.label'),
             value: getRunFieldValueLabel(form.dryRun ? 'on' : 'off', t),
@@ -232,6 +276,30 @@ export function getRunFieldDefinitions(
                 kind: 'enum',
                 description: t('field.run.validationMode.short'),
                 activeOptionId: form.validationMode
+            },
+            {
+                key: 'validationTimeoutMs',
+                label: t('field.run.validationTimeoutMs.label'),
+                value: form.validationTimeoutMs || getPlaceholder(t, 'common.placeholder.default'),
+                kind: 'text',
+                description: t('field.run.validationTimeoutMs.short'),
+                activeOptionId: form.validationTimeoutMs.trim() ? 'customValue' : 'default'
+            },
+            {
+                key: 'validationEntrypointPath',
+                label: t('field.run.validationEntrypointPath.label'),
+                value: form.validationEntrypointPath || getPlaceholder(t, 'common.placeholder.auto'),
+                kind: 'text',
+                description: t('field.run.validationEntrypointPath.short'),
+                activeOptionId: form.validationEntrypointPath.trim() ? 'customPath' : 'auto'
+            },
+            {
+                key: 'validationSaveArtifacts',
+                label: t('field.run.validationSaveArtifacts.label'),
+                value: getRunFieldValueLabel(form.validationSaveArtifacts ? 'on' : 'off', t),
+                kind: 'toggle',
+                description: t('field.run.validationSaveArtifacts.short'),
+                activeOptionId: form.validationSaveArtifacts ? 'on' : 'off'
             },
             {
                 key: 'registryMode',

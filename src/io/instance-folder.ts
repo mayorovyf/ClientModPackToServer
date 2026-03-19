@@ -7,6 +7,7 @@ interface InstanceLayout {
     instancePath: string;
     modsPath: string;
     inputKind: 'instance' | 'mods-directory';
+    instanceSource: 'direct' | 'mods-directory' | 'minecraft-subdir' | 'dot-minecraft-subdir';
 }
 
 function validateDirectory(directoryPath: string, label: string): void {
@@ -32,7 +33,32 @@ function resolveInstanceLayout(inputPath: string): InstanceLayout {
         return {
             instancePath: normalizedInputPath,
             modsPath: directModsPath,
-            inputKind: 'instance'
+            inputKind: 'instance',
+            instanceSource: 'direct'
+        };
+    }
+
+    const nestedInstanceCandidates = [
+        {
+            instancePath: path.join(normalizedInputPath, 'minecraft'),
+            instanceSource: 'minecraft-subdir'
+        },
+        {
+            instancePath: path.join(normalizedInputPath, '.minecraft'),
+            instanceSource: 'dot-minecraft-subdir'
+        }
+    ] as const;
+
+    for (const candidate of nestedInstanceCandidates) {
+        const nestedModsPath = path.join(candidate.instancePath, 'mods');
+
+        if (fs.existsSync(nestedModsPath) && fs.statSync(nestedModsPath).isDirectory()) {
+            return {
+                instancePath: candidate.instancePath,
+                modsPath: nestedModsPath,
+                inputKind: 'instance',
+                instanceSource: candidate.instanceSource
+            };
         };
     }
 
@@ -43,11 +69,14 @@ function resolveInstanceLayout(inputPath: string): InstanceLayout {
         return {
             instancePath,
             modsPath: normalizedInputPath,
-            inputKind: 'mods-directory'
+            inputKind: 'mods-directory',
+            instanceSource: 'mods-directory'
         };
     }
 
-    throw new PathValidationError(`Instance directory must contain a mods folder: ${normalizedInputPath}`);
+    throw new PathValidationError(
+        `Instance directory must contain mods/, minecraft/mods/ or .minecraft/mods/: ${normalizedInputPath}`
+    );
 }
 
 module.exports = {

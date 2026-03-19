@@ -92,6 +92,20 @@ export function Sidebar({
 }): React.JSX.Element {
     const t = useT();
     const screenSpecificHints = showHints ? getScreenSpecificHints(activeScreen, activePageId, compact, t) : [];
+    const globalHints = showHints
+        ? [
+            ...screenSpecificHints,
+            ...(hasMultiplePages ? [t('sidebar.hint.pages')] : []),
+            t('sidebar.hint.columns'),
+            t('sidebar.hint.move'),
+            t('sidebar.hint.sections'),
+            t('sidebar.hint.toggleMode'),
+            t('sidebar.hint.run'),
+            t('sidebar.hint.exit')
+        ]
+        : [];
+    const reservedLines = compact ? 12 : 14;
+    const visibleHints = globalHints.slice(0, Math.max(0, height - reservedLines));
 
     return (
         <Box
@@ -118,7 +132,7 @@ export function Sidebar({
                         const isActive = item.id === activeScreen;
 
                         return (
-                            <Box key={item.id} marginBottom={1}>
+                            <Box key={item.id}>
                                 <Box flexDirection="row" alignItems="center" minWidth={0}>
                                     <Box width={2} minWidth={2}>
                                         <Text color={isActive ? 'greenBright' : 'white'}>
@@ -140,17 +154,9 @@ export function Sidebar({
             <Box flexDirection="column" minWidth={0}>
                 {showHints ? (
                     <>
-                        {screenSpecificHints.map((hint) => (
+                        {visibleHints.map((hint) => (
                             <Text key={hint} dimColor wrap="truncate">{hint}</Text>
                         ))}
-                        {hasMultiplePages ? <Text dimColor wrap="truncate">{t('sidebar.hint.pages')}</Text> : null}
-                        {screenSpecificHints.length > 0 ? <Text dimColor wrap="truncate"> </Text> : null}
-                        <Text dimColor wrap="truncate">{t('sidebar.hint.columns')}</Text>
-                        <Text dimColor wrap="truncate">{t('sidebar.hint.move')}</Text>
-                        <Text dimColor wrap="truncate">{t('sidebar.hint.sections')}</Text>
-                        <Text dimColor wrap="truncate">{t('sidebar.hint.toggleMode')}</Text>
-                        <Text dimColor wrap="truncate">{t('sidebar.hint.run')}</Text>
-                        <Text dimColor wrap="truncate">{t('sidebar.hint.exit')}</Text>
                     </>
                 ) : null}
             </Box>

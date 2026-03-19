@@ -7,6 +7,7 @@ import type { RunContext } from '../types/run';
 
 interface CreateRunContextOptions {
     inputPath: string;
+    instancePath?: string;
     modsPath?: string;
     outputRootDir: string;
     serverDirName?: string | null;
@@ -42,6 +43,7 @@ function deriveDefaultServerDirName(sourcePath: string): string {
 
 function createRunContext({
     inputPath,
+    instancePath = inputPath,
     modsPath = inputPath,
     outputRootDir,
     serverDirName = null,
@@ -79,7 +81,7 @@ function createRunContext({
         serverDirName: resolvedServerDirName,
         startedAt,
         inputPath,
-        instancePath: inputPath,
+        instancePath,
         modsPath,
         outputRootDir,
         reportRootDir,

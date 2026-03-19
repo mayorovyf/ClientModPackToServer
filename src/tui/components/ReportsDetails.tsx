@@ -28,22 +28,24 @@ function formatDateTime(value: string | null): string {
 function DetailLine({
     label,
     value,
-    valueColor
+    valueColor,
+    wrapMode = 'truncate'
 }: {
     label: string;
     value: string;
     valueColor?: 'green' | 'yellow' | 'red' | 'cyan' | 'white';
+    wrapMode?: 'truncate' | 'wrap';
 }): React.JSX.Element {
     return (
         <Box flexDirection="row" minWidth={0}>
-            <Box width={12} minWidth={12}>
+            <Box width={9} minWidth={9}>
                 <Text dimColor wrap="truncate">{label}</Text>
             </Box>
             <Box flexGrow={1} minWidth={0}>
                 {valueColor ? (
-                    <Text color={valueColor} wrap="wrap">{value}</Text>
+                    <Text color={valueColor} wrap={wrapMode}>{value}</Text>
                 ) : (
-                    <Text wrap="wrap">{value}</Text>
+                    <Text wrap={wrapMode}>{value}</Text>
                 )}
             </Box>
         </Box>
