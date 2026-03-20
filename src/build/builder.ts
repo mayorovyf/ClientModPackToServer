@@ -18,6 +18,7 @@ import type { ClassificationContext, ConfidenceLevel, FinalClassification, RoleT
 import type { ModDescriptor } from '../types/descriptor';
 import type { ReportEvent, ReportIssue, RunReport } from '../types/report';
 import type { RunContext } from '../types/run';
+import type { RuntimeTopologyId, TopologyArtifactPartitionKind } from '../types/topology';
 import type { ValidationDecisionLike, ValidationError, ValidationResult, ValidationStageResult } from '../types/validation';
 
 type LogLevel = 'info' | 'warn' | 'error' | 'success';
@@ -104,6 +105,9 @@ interface PipelineDecision extends ValidationDecisionLike {
     deepCheckDecision: SemanticDecision | string | null;
     deepCheckConfidence: string | null;
     deepCheckChangedDecision: boolean;
+    selectedRuntimeTopologyId: RuntimeTopologyId | null;
+    topologyPartition: TopologyArtifactPartitionKind | null;
+    topologyReason: string | null;
     actionStatus: string;
     destinationPath: string | null;
     error: ValidationError | null;
@@ -567,11 +571,32 @@ function applyBuildActions({
     }
 
     for (const [index, decision] of decisions.entries()) {
+        const forcedTopologyExclude = decision.topologyPartition === 'topology-incompatible-artifact';
+
         if (decision.decision === 'exclude') {
             const excludedDecision = finalizeDecision(decision, {
                 actionStatus: runContext.dryRun ? 'would-exclude' : 'excluded'
             });
             const excludedMessage = `${runContext.dryRun ? 'Would exclude' : 'Excluded'}: ${decision.fileName}`;
+
+            record('info', runContext.dryRun ? 'dry-run' : 'build', excludedMessage);
+            finalized.push(excludedDecision);
+            progressReporter.onBuildActionCompleted({
+                ...excludedDecision,
+                index: index + 1,
+                total
+            });
+            continue;
+        }
+
+        if (forcedTopologyExclude) {
+            const excludedDecision = finalizeDecision(decision, {
+                decision: 'exclude',
+                reason: decision.topologyReason || decision.reason,
+                decisionOrigin: decision.decisionOrigin || 'runtime-topology',
+                actionStatus: runContext.dryRun ? 'would-exclude' : 'excluded'
+            });
+            const excludedMessage = `${runContext.dryRun ? 'Would exclude' : 'Excluded'}: ${decision.fileName} (topology-incompatible)`;
 
             record('info', runContext.dryRun ? 'dry-run' : 'build', excludedMessage);
             finalized.push(excludedDecision);

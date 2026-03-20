@@ -15,6 +15,11 @@ export type BridgedEcosystemId = 'fabric' | 'quilt' | 'forge' | 'neoforge';
 export type RuntimeTopologyAssessmentKind = 'supported' | 'pending' | 'unsupported' | 'blocked-by-trust-policy';
 export type TrustedArtifactProvenance = 'source-instance' | 'explicit-validation-entrypoint' | 'managed-server-installer';
 export type JavaProfileId = 'auto' | 'java-17' | 'java-21';
+export type TopologyArtifactPartitionKind =
+    | 'target-runtime-artifact'
+    | 'connector-layer-artifact'
+    | 'topology-incompatible-artifact'
+    | 'unresolved-artifact';
 
 export interface TopologyWhitelistEntry {
     topologyId: RuntimeTopologyId;

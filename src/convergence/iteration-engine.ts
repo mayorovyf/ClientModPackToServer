@@ -7,6 +7,7 @@ const { applyManualReviewOverrides, resolveReviewOverridesPath } = require('../r
 const { detectPackRuntime } = require('../runtime/pack-runtime');
 const { ensureServerEulaAccepted } = require('../server/runtime');
 const { installDetectedServerCore } = require('../server/build-core');
+const { applyTopologyArtifactPartitioning } = require('../topology/artifact-partitioning');
 const { createEmptyValidationReport } = require('../validation/report-model');
 const { runValidationStage } = require('../validation/run-validation');
 const {
@@ -92,6 +93,18 @@ function applyCandidateDecisionFixes({
     return decisions.map((decision) => {
         if (decision.manualOverrideAction) {
             return decision;
+        }
+
+        if (decision.topologyPartition === 'topology-incompatible-artifact') {
+            return {
+                ...decision,
+                decision: 'exclude',
+                reason: decision.topologyReason || decision.reason,
+                decisionOrigin: 'runtime-topology',
+                finalSemanticDecision: 'remove',
+                finalDecisionOrigin: 'runtime-topology',
+                finalReasons: appendReason(decision.finalReasons, decision.topologyReason || decision.reason)
+            };
         }
 
         if (keepSet.has(decision.fileName) && decision.decision !== 'keep') {
@@ -188,7 +201,16 @@ async function runInitialCandidateIteration({
     collector.record('info', 'analysis', `Discovered .jar files: ${classifiedDecisions.length}`);
 
     let currentClassificationContext = effectiveClassificationContext;
-    let currentClassifiedDecisions = classifiedDecisions;
+    let currentRuntimeDetection = detectPackRuntime({
+        runContext,
+        decisions: classifiedDecisions
+    });
+    let currentClassifiedDecisions = applyTopologyArtifactPartitioning({
+        decisions: classifiedDecisions,
+        runContext,
+        runtimeDetection: currentRuntimeDetection,
+        record: collector.record
+    }).decisions;
 
     effectiveProgressReporter.onStageStarted({
         stage: 'dependency',
@@ -267,12 +289,22 @@ async function runInitialCandidateIteration({
             probeKnowledge: probeRun.updatedKnowledge,
             enabledEngines: effectiveClassificationContext.enabledEngines
         }) as ClassificationContextLike;
-        currentClassifiedDecisions = reclassifyDecisions({
+        const reclassifiedDecisions = reclassifyDecisions({
             decisions: classifiedDecisions,
             classificationContext: currentClassificationContext as ClassificationContext,
             runContext,
             record: collector.record
         });
+        currentRuntimeDetection = detectPackRuntime({
+            runContext,
+            decisions: reclassifiedDecisions
+        });
+        currentClassifiedDecisions = applyTopologyArtifactPartitioning({
+            decisions: reclassifiedDecisions,
+            runContext,
+            runtimeDetection: currentRuntimeDetection,
+            record: collector.record
+        }).decisions;
         dependencyStage = runDependencyStage({
             decisions: currentClassifiedDecisions,
             runContext,

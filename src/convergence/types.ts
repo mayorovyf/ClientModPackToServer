@@ -4,6 +4,7 @@ import type { LoaderKind } from '../types/metadata';
 import type { TerminalOutcomeId } from '../types/outcome';
 import type { RunReport } from '../types/report';
 import type { BridgedEcosystemId, ConnectorLayerId, RuntimeTopologyId } from '../types/topology';
+import type { TopologyArtifactPartitionKind } from '../types/topology';
 import type { ValidationEntrypointKind, ValidationStatus } from '../types/validation';
 import type { FailureFamily, NormalizedFailureAnalysis } from '../failure/family';
 
@@ -63,6 +64,8 @@ export interface CandidateModDecisionSummary {
     actionStatus: string | null;
     roleType: RoleType | null;
     reason: string;
+    topologyPartition: TopologyArtifactPartitionKind | null;
+    topologyReason: string | null;
 }
 
 export interface CandidateState {

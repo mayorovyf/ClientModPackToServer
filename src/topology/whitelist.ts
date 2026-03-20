@@ -65,7 +65,7 @@ const RUNTIME_TOPOLOGY_WHITELIST: TopologyWhitelistEntry[] = [
     {
         topologyId: 'neoforge-sinytra-fabric-bridge',
         summary: 'NeoForge base runtime with Sinytra Connector bridging Fabric artifacts.',
-        supportLevel: 'pending',
+        supportLevel: 'supported',
         topologyClass: 'connector-based',
         baseLoader: 'neoforge',
         connectorLayer: 'sinytra-connector',

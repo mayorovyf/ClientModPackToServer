@@ -13,6 +13,7 @@ import type { CandidateTrace } from '../convergence/types';
 import type { NormalizedFailureAnalysis } from '../failure/family';
 import type { MinimalRecipe } from '../recipe/types';
 import type { BuildServerCoreInstallReport, PackRuntimeDetection } from './runtime-detection';
+import type { RuntimeTopologyId, TopologyArtifactPartitionKind } from './topology';
 
 export interface ReportIssue {
     fileName: string | null;
@@ -60,6 +61,9 @@ export interface ReportDecisionSummary {
     probeReason?: string | null;
     probeConfidence?: string | null;
     probeLogPath?: string | null;
+    selectedRuntimeTopologyId?: RuntimeTopologyId | null;
+    topologyPartition?: TopologyArtifactPartitionKind | null;
+    topologyReason?: string | null;
     descriptor?: {
         fileName?: string;
         loader?: string;

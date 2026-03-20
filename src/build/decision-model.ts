@@ -1,4 +1,5 @@
 import type { ConfidenceLevel, FinalClassification, RoleType, SemanticDecision } from '../types/classification';
+import type { RuntimeTopologyId, TopologyArtifactPartitionKind } from '../types/topology';
 
 interface FileDecision {
     fileName: string;
@@ -45,6 +46,9 @@ interface FileDecision {
     deepCheckDecision: SemanticDecision | null;
     deepCheckConfidence: string | null;
     deepCheckChangedDecision: boolean;
+    selectedRuntimeTopologyId: RuntimeTopologyId | null;
+    topologyPartition: TopologyArtifactPartitionKind | null;
+    topologyReason: string | null;
     actionStatus: string;
     destinationPath: string | null;
     error: unknown;
@@ -111,6 +115,9 @@ function createFileDecision({
         deepCheckDecision: null,
         deepCheckConfidence: null,
         deepCheckChangedDecision: false,
+        selectedRuntimeTopologyId: null,
+        topologyPartition: null,
+        topologyReason: null,
         actionStatus: shouldExclude ? 'excluded' : 'pending',
         destinationPath: null,
         error: null

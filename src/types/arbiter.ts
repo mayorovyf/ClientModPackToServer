@@ -1,5 +1,6 @@
 import type { ConfidenceLevel, EngineEvidence, FinalClassification, SemanticDecision } from './classification';
 import type { ModDescriptor } from './descriptor';
+import type { RuntimeTopologyId, TopologyArtifactPartitionKind } from './topology';
 
 export type ArbiterBuildAction = 'keep' | 'exclude';
 export type ArbiterProfile = 'safe' | 'balanced' | 'aggressive';
@@ -47,6 +48,9 @@ export interface ArbiterInput {
         optionalBy: unknown[];
         incompatibleWith: unknown[];
     };
+    selectedRuntimeTopologyId: RuntimeTopologyId | null;
+    topologyPartition: TopologyArtifactPartitionKind | null;
+    topologyReason: string | null;
     profile: ArbiterProfile;
 }
 

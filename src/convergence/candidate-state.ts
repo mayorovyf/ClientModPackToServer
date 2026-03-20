@@ -145,7 +145,9 @@ function createCandidateState({
         buildDecision: decision.decision || null,
         actionStatus: decision.actionStatus || null,
         roleType: decision.finalRoleType || null,
-        reason: decision.reason
+        reason: decision.reason,
+        topologyPartition: decision.topologyPartition || null,
+        topologyReason: decision.topologyReason || null
     }));
     const stateDigest = createStateDigest({
         fingerprintDigest: fingerprint.digest,

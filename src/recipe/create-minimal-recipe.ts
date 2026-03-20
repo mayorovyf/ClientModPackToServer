@@ -71,6 +71,7 @@ function createMinimalRecipe({
         schemaVersion: '1.0',
         sourceRunId: runContext.runId,
         inputFingerprint: fingerprint,
+        selectedRuntimeTopologyId: currentCandidate ? currentCandidate.runtimeTopologyId : null,
         selectedLoader: currentCandidate ? currentCandidate.loader : null,
         selectedCore: currentCandidate ? currentCandidate.core : null,
         selectedJavaProfile: currentCandidate ? currentCandidate.javaProfile : null,
@@ -83,6 +84,15 @@ function createMinimalRecipe({
             remove: uniqueSorted(decisions.filter((decision) => decision.decision === 'exclude').map((decision) => decision.fileName)),
             add: []
         },
+        artifactDecisions: decisions
+            .map((decision) => ({
+                fileName: decision.fileName,
+                buildDecision: decision.decision || null,
+                actionStatus: decision.actionStatus || null,
+                topologyPartition: decision.topologyPartition || null,
+                topologyReason: decision.topologyReason || null
+            }))
+            .sort((left, right) => left.fileName.localeCompare(right.fileName)),
         appliedFixes,
         candidateIds: candidateTrace.candidates.map((candidate) => candidate.candidateId),
         finalOutcome: resolveRecipeOutcome(report)

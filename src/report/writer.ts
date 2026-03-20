@@ -20,6 +20,17 @@ function createSummary(report: RunReport): string {
     const currentCandidate = report.candidateTrace?.candidates.find((candidate) => candidate.candidateId === report.candidateTrace?.currentCandidateId)
         || report.candidateTrace?.candidates[report.candidateTrace.candidates.length - 1]
         || null;
+    const topologyPartitionCounts = (report.decisions || []).reduce((counts, decision) => {
+        const partition = decision.topologyPartition || 'unresolved-artifact';
+
+        counts[partition] = (counts[partition] || 0) + 1;
+        return counts;
+    }, {
+        'target-runtime-artifact': 0,
+        'connector-layer-artifact': 0,
+        'topology-incompatible-artifact': 0,
+        'unresolved-artifact': 0
+    } as Record<string, number>);
     const lines = [
         '# Run Summary',
         '',
@@ -89,6 +100,7 @@ function createSummary(report: RunReport): string {
         '## Recipe',
         '',
         `- Schema version: ${report.recipe ? report.recipe.schemaVersion : 'n/a'}`,
+        `- Selected runtime topology: ${report.recipe ? (report.recipe.selectedRuntimeTopologyId || 'n/a') : 'n/a'}`,
         `- Selected loader: ${report.recipe ? (report.recipe.selectedLoader || 'n/a') : 'n/a'}`,
         `- Selected core: ${report.recipe ? (report.recipe.selectedCore || 'n/a') : 'n/a'}`,
         `- Selected Java profile: ${report.recipe ? (report.recipe.selectedJavaProfile || 'n/a') : 'n/a'}`,
@@ -96,6 +108,7 @@ function createSummary(report: RunReport): string {
         `- Keep decisions: ${report.recipe ? report.recipe.decisions.keep.length : 0}`,
         `- Remove decisions: ${report.recipe ? report.recipe.decisions.remove.length : 0}`,
         `- Add decisions: ${report.recipe ? report.recipe.decisions.add.length : 0}`,
+        `- Artifact decisions: ${report.recipe ? report.recipe.artifactDecisions.length : 0}`,
         `- Applied fixes: ${report.recipe ? report.recipe.appliedFixes.length : 0}`,
         `- Recipe outcome status: ${report.recipe ? report.recipe.finalOutcome.status : 'n/a'}`,
         `- Recipe terminal outcome: ${report.recipe ? (report.recipe.finalOutcome.terminalOutcomeId || 'n/a') : 'n/a'}`,
@@ -142,6 +155,10 @@ function createSummary(report: RunReport): string {
         `- Unknown: ${report.parsing.loaders.unknown}`,
         `- Files with warnings: ${report.parsing.filesWithWarnings}`,
         `- Files with errors: ${report.parsing.filesWithErrors}`,
+        `- Target runtime artifacts: ${topologyPartitionCounts['target-runtime-artifact']}`,
+        `- Connector-layer artifacts: ${topologyPartitionCounts['connector-layer-artifact']}`,
+        `- Topology-incompatible artifacts: ${topologyPartitionCounts['topology-incompatible-artifact']}`,
+        `- Unresolved artifacts: ${topologyPartitionCounts['unresolved-artifact']}`,
         '',
         '## Classification',
         '',

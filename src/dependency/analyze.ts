@@ -15,15 +15,21 @@ function analyzeDependencies({
     mode?: DependencyValidationMode;
     record?: (level: string, kind: string, message: string) => void;
 }) {
-    record('info', 'graph', `Building dependency graph for ${decisions.length} jar(s)`);
-    const initialGraph: DependencyGraph = buildDependencyGraph(decisions);
+    const topologyEligibleDecisions = decisions.filter((decision) => decision.topologyPartition !== 'topology-incompatible-artifact');
+
+    record(
+        'info',
+        'graph',
+        `Building dependency graph for ${topologyEligibleDecisions.length}/${decisions.length} topology-eligible jar(s)`
+    );
+    const initialGraph: DependencyGraph = buildDependencyGraph(topologyEligibleDecisions);
     record(
         'info',
         'graph',
         `Dependency graph built: nodes=${initialGraph.summary.totalNodes}, edges=${initialGraph.summary.totalEdges}, ambiguousProviders=${initialGraph.summary.ambiguousProviderIds}`
     );
     const propagation = applyDependencyRolePropagation({
-        decisions,
+        decisions: topologyEligibleDecisions,
         graph: initialGraph,
         record
     });
@@ -43,9 +49,12 @@ function analyzeDependencies({
         `Dependency validation complete: findings=${validation.summary.totalFindings}, preserved=${validation.summary.preservedByDependency}, missingRequired=${validation.summary.missingRequired}`
     );
 
-    const adjustedDecisions = propagation.decisions.map((decision: Record<string, any>) =>
-        finalizeDecision(decision, validation.decisionUpdatesByFile[decision.fileName] || {})
-    );
+    const propagatedDecisionByFile = new Map(propagation.decisions.map((decision: Record<string, any>) => [decision.fileName, decision]));
+    const adjustedDecisions = decisions.map((decision: Record<string, any>) => {
+        const effectiveDecision = propagatedDecisionByFile.get(decision.fileName) || decision;
+
+        return finalizeDecision(effectiveDecision, validation.decisionUpdatesByFile[decision.fileName] || {});
+    });
     const reportedProviderIndex = {
         ...graph.providerIndex,
         byId: Object.fromEntries(

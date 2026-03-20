@@ -176,6 +176,36 @@ function arbitrateDecision(input: ArbiterInput): ArbiterResult {
         && STRONG_ENGINE_CONFIDENCE.has(result.confidence)
     )) || null;
 
+    if (input.topologyPartition === 'topology-incompatible-artifact') {
+        return createArbiterResult({
+            finalDecision: ARBITER_DECISIONS.remove,
+            finalConfidence: ARBITER_CONFIDENCE.high,
+            reason: input.topologyReason || 'Artifact is incompatible with the selected runtime topology',
+            reasons: [input.topologyReason || 'Artifact is incompatible with the selected runtime topology'],
+            decisionOrigin: 'runtime-topology',
+            recommendedBuildAction: ARBITER_BUILD_ACTIONS.exclude,
+            winningEvidence: createWinningEvidence({
+                type: 'runtime-topology',
+                reason: input.topologyReason || 'Artifact is incompatible with the selected runtime topology'
+            })
+        });
+    }
+
+    if (input.topologyPartition === 'connector-layer-artifact') {
+        return createArbiterResult({
+            finalDecision: ARBITER_DECISIONS.keep,
+            finalConfidence: ARBITER_CONFIDENCE.high,
+            reason: input.topologyReason || 'Artifact belongs to the selected connector layer and must stay in the candidate',
+            reasons: [input.topologyReason || 'Artifact belongs to the selected connector layer and must stay in the candidate'],
+            decisionOrigin: 'runtime-topology',
+            recommendedBuildAction: ARBITER_BUILD_ACTIONS.keep,
+            winningEvidence: createWinningEvidence({
+                type: 'runtime-topology',
+                reason: input.topologyReason || 'Artifact belongs to the selected connector layer and must stay in the candidate'
+            })
+        });
+    }
+
     if (dependencyState.preservedByDependency) {
         return createArbiterResult({
             finalDecision: ARBITER_DECISIONS.keep,

@@ -27,6 +27,9 @@ function createArbiterInput({
             optionalBy: [],
             incompatibleWith: []
         },
+        selectedRuntimeTopologyId: decision.selectedRuntimeTopologyId || null,
+        topologyPartition: decision.topologyPartition || null,
+        topologyReason: decision.topologyReason || null,
         profile: runContext.arbiterProfile
     };
 }
