@@ -5,7 +5,8 @@ import type {
     EngineDecision,
     EngineError,
     EngineEvidence,
-    EngineResult
+    EngineResult,
+    RoleType
 } from '../types/classification';
 
 function normalizeEngineName(engine: unknown): string {
@@ -32,6 +33,24 @@ function normalizeConfidence(confidence: unknown): ConfidenceLevel {
     return Object.values(CONFIDENCE_LEVELS).includes(confidence as string)
         ? confidence as ConfidenceLevel
         : CONFIDENCE_LEVELS.none;
+}
+
+function normalizeRoleType(roleType: unknown): RoleType {
+    const value = String(roleType || '').trim().toLowerCase();
+
+    switch (value) {
+        case 'client-ui':
+        case 'client-visual':
+        case 'client-qol':
+        case 'client-library':
+        case 'common-library':
+        case 'common-gameplay':
+        case 'common-optimization':
+        case 'compat-client':
+            return value;
+        default:
+            return 'unknown';
+    }
 }
 
 function normalizeTextList(values: unknown): string[] {
@@ -120,7 +139,10 @@ function createEngineResult({
     warnings = [],
     error = null,
     matchedRule = null,
-    matchedRuleSource = null
+    matchedRuleSource = null,
+    roleType = 'unknown',
+    roleConfidence = CONFIDENCE_LEVELS.none,
+    roleReason = null
 }: {
     engine: unknown;
     decision?: unknown;
@@ -131,6 +153,9 @@ function createEngineResult({
     error?: unknown;
     matchedRule?: unknown;
     matchedRuleSource?: unknown;
+    roleType?: unknown;
+    roleConfidence?: unknown;
+    roleReason?: unknown;
 }): EngineResult {
     return {
         engine: normalizeEngineName(engine),
@@ -141,7 +166,10 @@ function createEngineResult({
         warnings: normalizeTextList(warnings),
         error: normalizeError(error),
         matchedRule: matchedRule ? String(matchedRule) : null,
-        matchedRuleSource: matchedRuleSource ? String(matchedRuleSource) : null
+        matchedRuleSource: matchedRuleSource ? String(matchedRuleSource) : null,
+        roleType: normalizeRoleType(roleType),
+        roleConfidence: normalizeConfidence(roleConfidence),
+        roleReason: roleReason ? String(roleReason) : null
     };
 }
 
@@ -185,5 +213,6 @@ module.exports = {
     createEngineResult,
     normalizeConfidence,
     normalizeDecision,
-    normalizeEngineName
+    normalizeEngineName,
+    normalizeRoleType
 };

@@ -19,7 +19,7 @@ const { runValidationStage } = require('../validation/run-validation');
 const { applyManualReviewOverrides, resolveReviewOverridesPath } = require('../review/manual-overrides');
 
 import type { ApplicationLogger, BuildProgressReporter, ClassificationContextLike } from '../types/app';
-import type { FinalClassification, SemanticDecision } from '../types/classification';
+import type { ConfidenceLevel, FinalClassification, RoleType, SemanticDecision } from '../types/classification';
 import type { ModDescriptor } from '../types/descriptor';
 import type { ReportEvent, ReportIssue, RunReport } from '../types/report';
 import type { RunContext } from '../types/run';
@@ -95,6 +95,10 @@ interface PipelineDecision extends ValidationDecisionLike {
     finalConfidence: string | null;
     finalDecisionOrigin: string | null;
     finalReasons: string[];
+    finalRoleType: RoleType | null;
+    roleConfidence: ConfidenceLevel | null;
+    roleOrigin: string | null;
+    roleReason: string | null;
     requiresReview: boolean;
     requiresDeepCheck: boolean;
     deepCheck: {
@@ -1005,10 +1009,11 @@ async function runBuildPipeline({
         const engine = decision.classification ? decision.classification.winningEngine || 'conservative-default' : 'unknown';
         const semantic = decision.finalSemanticDecision || decision.arbiterDecision || 'unknown';
         const confidence = decision.finalConfidence || decision.arbiterConfidence || 'none';
+        const roleType = decision.finalRoleType || 'unknown';
         collector.record(
             'info',
             'decision',
-            `Decision ${decision.decision}: ${decision.fileName} | semantic: ${semantic} | confidence: ${confidence} | engine: ${engine} | origin: ${decision.decisionOrigin} | ${decision.reason}`
+            `Decision ${decision.decision}: ${decision.fileName} | semantic: ${semantic} | role: ${roleType} | confidence: ${confidence} | engine: ${engine} | origin: ${decision.decisionOrigin} | ${decision.reason}`
         );
     }
 

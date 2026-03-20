@@ -3,12 +3,8 @@ const path = require('path');
 
 const { DECLARED_SIDES, LOADER_TYPES } = require('./constants');
 
-import type {
-    DependencyDescriptor,
-    MetadataIssue,
-    SideHint
-} from '../types/metadata';
-import type { DescriptorPatch, DescriptorSummary, ModDescriptor } from '../types/descriptor';
+import type { DependencyDescriptor, MetadataIssue, SideHint } from '../types/metadata';
+import type { ArchiveIndex, DescriptorPatch, DescriptorSummary, ModDescriptor } from '../types/descriptor';
 
 function dedupeStrings(values: unknown[] = []): string[] {
     return [...new Set(values.filter(Boolean).map((value) => String(value).trim()).filter(Boolean))];
@@ -81,8 +77,31 @@ function createModDescriptor(filePath: string): ModDescriptor {
         incompatibilities: [],
         provides: [],
         manifestHints: {},
+        archiveIndex: null,
         parsingWarnings: [],
         parsingErrors: []
+    };
+}
+
+function mergeArchiveIndex(current: ArchiveIndex | null, next: ArchiveIndex | null | undefined): ArchiveIndex | null {
+    if (!next) {
+        return current;
+    }
+
+    if (!current) {
+        return next;
+    }
+
+    return {
+        entryCount: Math.max(current.entryCount, next.entryCount),
+        classEntryCount: Math.max(current.classEntryCount, next.classEntryCount),
+        assetEntryCount: Math.max(current.assetEntryCount, next.assetEntryCount),
+        mixinConfigCount: Math.max(current.mixinConfigCount, next.mixinConfigCount),
+        clientReferenceCount: Math.max(current.clientReferenceCount, next.clientReferenceCount),
+        hasClientCodeReferences: current.hasClientCodeReferences || next.hasClientCodeReferences,
+        hintCategories: dedupeStrings([...current.hintCategories, ...next.hintCategories]) as ArchiveIndex['hintCategories'],
+        sampleEntries: dedupeStrings([...current.sampleEntries, ...next.sampleEntries]).slice(0, 12),
+        bytecode: next.bytecode || current.bytecode || null
     };
 }
 
@@ -115,6 +134,7 @@ function mergeDescriptor(descriptor: ModDescriptor, patch: DescriptorPatch = {})
         ...descriptor.manifestHints,
         ...(patch.manifestHints || {})
     };
+    descriptor.archiveIndex = mergeArchiveIndex(descriptor.archiveIndex, patch.archiveIndex);
 
     if (!descriptor.displayName && patch.displayName) {
         descriptor.displayName = patch.displayName;
@@ -166,6 +186,7 @@ function summarizeDescriptor(descriptor: ModDescriptor): DescriptorSummary {
         dependencies: descriptor.dependencies.length,
         optionalDependencies: descriptor.optionalDependencies.length,
         incompatibilities: descriptor.incompatibilities.length,
+        archiveIndex: descriptor.archiveIndex,
         parsingWarnings: descriptor.parsingWarnings.length,
         parsingErrors: descriptor.parsingErrors.length
     };

@@ -5,7 +5,7 @@ const { resolveDefaultBuildAction } = require('./profiles');
 import type { ArbiterInput, ArbiterResult, ArbiterSummary } from '../types/arbiter';
 import type { EngineEvidence, EngineResult } from '../types/classification';
 
-const ENGINE_PRIORITY = ['metadata-engine', 'registry-engine', 'filename-engine'];
+const ENGINE_PRIORITY = ['metadata-engine', 'forge-bytecode-engine', 'forge-semantic-engine', 'registry-engine', 'filename-engine'];
 const BLOCKING_FINDING_TYPES = new Set(['missing-required', 'provider-ambiguous', 'incompatibility']);
 
 function chooseBestResult(results: EngineResult[] = [], decision: string): EngineResult | null {

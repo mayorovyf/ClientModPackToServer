@@ -1,5 +1,6 @@
 import type { ArbiterSummary } from './arbiter';
-import type { ClassificationSnapshot } from './classification';
+import type { ArchiveIndex } from './descriptor';
+import type { ClassificationSnapshot, ClassificationStats, RoleSignal, RoleType } from './classification';
 import type { DeepCheckResult } from './deep-check';
 import type { DependencyGraphSummary } from './dependency';
 import type { RegistryRuntimeState } from './registry';
@@ -34,6 +35,11 @@ export interface ReportDecisionSummary {
     finalSemanticDecision: string | null;
     finalConfidence: string | null;
     finalDecisionOrigin?: string | null;
+    finalRoleType?: RoleType | null;
+    roleConfidence?: string | null;
+    roleOrigin?: string | null;
+    roleReason?: string | null;
+    roleSignals?: RoleSignal[];
     deepCheckStatus?: string | null;
     deepCheckDecision?: string | null;
     actionStatus?: string | null;
@@ -50,6 +56,7 @@ export interface ReportDecisionSummary {
         displayName?: string | null;
         version?: string | null;
         manifestHints?: Record<string, string> | null;
+        archiveIndex?: ArchiveIndex | null;
     } | null;
 }
 
@@ -75,14 +82,7 @@ export interface RunReport {
         filesWithWarnings: number;
         filesWithErrors: number;
     };
-    classification: {
-        finalDecisions: {
-            keep: number;
-            remove: number;
-        };
-        conflicts: number;
-        fallbackFinalDecisions: number;
-        filesWithEngineErrors: number;
+    classification: ClassificationStats & {
         snapshots?: ClassificationSnapshot[];
     };
     dependencyGraph?: {

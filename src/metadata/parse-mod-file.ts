@@ -1,6 +1,7 @@
 const { createArchiveHandle } = require('../jar/archive-reader');
 const { ArchiveReadError } = require('../core/errors');
 const { DECLARED_SIDES, LOADER_TYPES } = require('./constants');
+const { buildArchiveIndex } = require('./archive-index');
 const {
     addParsingError,
     addParsingWarning,
@@ -21,6 +22,7 @@ import type { LoaderKind } from '../types/metadata';
 interface ArchiveHandle {
     entries: string[];
     hasEntry(entryPath: string): boolean;
+    readEntry(entryPath: string): Buffer | null;
     readText(entryPath: string): string | null;
 }
 
@@ -110,6 +112,22 @@ function parseModFile(filePath: string): ModDescriptor {
     }
 
     if (descriptor.loader === LOADER_TYPES.unknown) {
+        try {
+            descriptor.archiveIndex = buildArchiveIndex(archive, descriptor);
+        } catch (error: unknown) {
+            const issueError = error as Error & { code?: string };
+
+            addParsingWarning(
+                descriptor,
+                createParsingIssue({
+                    code: issueError.code || 'ARCHIVE_INDEX_ERROR',
+                    message: issueError.message,
+                    source: 'archive-index',
+                    fatal: false
+                })
+            );
+        }
+
         addParsingWarning(descriptor, createUnknownMetadataWarning());
         descriptor.declaredSide = DECLARED_SIDES.unknown;
         return descriptor;
@@ -127,6 +145,22 @@ function parseModFile(filePath: string): ModDescriptor {
                 code: issueError.code || 'PRIMARY_METADATA_READ_ERROR',
                 message: issueError.message,
                 source: descriptor.metadataFilesFound.find((item: string) => item !== 'META-INF/MANIFEST.MF') || 'metadata',
+                fatal: false
+            })
+        );
+    }
+
+    try {
+        descriptor.archiveIndex = buildArchiveIndex(archive, descriptor);
+    } catch (error: unknown) {
+        const issueError = error as Error & { code?: string };
+
+        addParsingWarning(
+            descriptor,
+            createParsingIssue({
+                code: issueError.code || 'ARCHIVE_INDEX_ERROR',
+                message: issueError.message,
+                source: 'archive-index',
                 fatal: false
             })
         );

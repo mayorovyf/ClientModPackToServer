@@ -7,6 +7,36 @@ import type {
     SideHint
 } from './metadata';
 
+export type ArchiveHintCategory = 'ui' | 'visual' | 'qol' | 'optimization' | 'library' | 'compat';
+
+export interface BytecodeReachabilityIndex {
+    analyzedClassCount: number;
+    truncated: boolean;
+    rootClasses: string[];
+    rootClientReferenceCount: number;
+    rootCommonReferenceCount: number;
+    rootServerReferenceCount: number;
+    deepClientReferenceCount: number;
+    deepCommonReferenceCount: number;
+    deepServerReferenceCount: number;
+    rootClientReferenceSamples: string[];
+    rootCommonReferenceSamples: string[];
+    rootServerReferenceSamples: string[];
+    deepClientReferenceSamples: string[];
+}
+
+export interface ArchiveIndex {
+    entryCount: number;
+    classEntryCount: number;
+    assetEntryCount: number;
+    mixinConfigCount: number;
+    clientReferenceCount: number;
+    hasClientCodeReferences: boolean;
+    hintCategories: ArchiveHintCategory[];
+    sampleEntries: string[];
+    bytecode: BytecodeReachabilityIndex | null;
+}
+
 export interface ModDescriptor {
     fileName: string;
     filePath: string;
@@ -24,6 +54,7 @@ export interface ModDescriptor {
     incompatibilities: DependencyDescriptor[];
     provides: string[];
     manifestHints: Record<string, string>;
+    archiveIndex: ArchiveIndex | null;
     parsingWarnings: MetadataWarning[];
     parsingErrors: MetadataError[];
 }
@@ -42,6 +73,7 @@ export interface DescriptorPatch {
     incompatibilities?: DependencyDescriptor[];
     provides?: string[];
     manifestHints?: Record<string, string>;
+    archiveIndex?: ArchiveIndex | null;
     parsingWarnings?: MetadataWarning[];
     parsingErrors?: MetadataError[];
 }
@@ -57,6 +89,7 @@ export interface DescriptorSummary {
     dependencies: number;
     optionalDependencies: number;
     incompatibilities: number;
+    archiveIndex?: ArchiveIndex | null;
     parsingWarnings: number;
     parsingErrors: number;
 }

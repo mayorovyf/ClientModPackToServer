@@ -2,10 +2,20 @@ import type { ModDescriptor } from './descriptor';
 import type { EffectiveRegistry, RegistryRule } from './registry';
 import type { RunContext } from './run';
 
-export type EngineName = 'metadata-engine' | 'registry-engine' | 'filename-engine' | string;
+export type EngineName = 'metadata-engine' | 'forge-bytecode-engine' | 'forge-semantic-engine' | 'registry-engine' | 'filename-engine' | string;
 export type EngineDecision = 'keep' | 'remove' | 'unknown' | 'error';
 export type SemanticDecision = 'keep' | 'remove' | 'review' | 'unknown';
 export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'none';
+export type RoleType =
+    | 'client-ui'
+    | 'client-visual'
+    | 'client-qol'
+    | 'client-library'
+    | 'common-library'
+    | 'common-gameplay'
+    | 'common-optimization'
+    | 'compat-client'
+    | 'unknown';
 
 export interface EngineEvidence {
     type: string;
@@ -28,6 +38,16 @@ export interface EngineResult {
     error: EngineError | null;
     matchedRule: string | null;
     matchedRuleSource: string | null;
+    roleType: RoleType;
+    roleConfidence: ConfidenceLevel;
+    roleReason: string | null;
+}
+
+export interface RoleSignal {
+    engine: EngineName;
+    roleType: RoleType;
+    confidence: ConfidenceLevel;
+    reason: string;
 }
 
 export interface ClassificationConflict {
@@ -43,6 +63,11 @@ export interface FinalClassification {
     winningEngine: string | null;
     matchedRule: string | null;
     matchedRuleSource: string | null;
+    finalRoleType: RoleType;
+    roleConfidence: ConfidenceLevel;
+    roleReason: string | null;
+    roleOrigin: string | null;
+    roleSignals: RoleSignal[];
     usedFallback: boolean;
     conflict: ClassificationConflict;
     results: EngineResult[];
@@ -73,6 +98,7 @@ export interface ClassificationStats {
     conflicts: number;
     fallbackFinalDecisions: number;
     filesWithEngineErrors: number;
+    roleTypes: Record<RoleType, number>;
     byEngine: Record<string, {
         keep: number;
         remove: number;

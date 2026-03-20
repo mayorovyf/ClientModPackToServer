@@ -1,4 +1,4 @@
-import type { FinalClassification, SemanticDecision } from '../types/classification';
+import type { ConfidenceLevel, FinalClassification, RoleType, SemanticDecision } from '../types/classification';
 
 interface FileDecision {
     fileName: string;
@@ -34,6 +34,10 @@ interface FileDecision {
     finalConfidence: string | null;
     finalDecisionOrigin: string;
     finalReasons: string[];
+    finalRoleType: RoleType | null;
+    roleConfidence: ConfidenceLevel | null;
+    roleOrigin: string | null;
+    roleReason: string | null;
     requiresReview: boolean;
     requiresDeepCheck: boolean;
     deepCheck: unknown;
@@ -96,6 +100,10 @@ function createFileDecision({
         finalConfidence: classification ? classification.confidence : null,
         finalDecisionOrigin: 'classification',
         finalReasons: classification ? [classification.reason] : [],
+        finalRoleType: classification ? classification.finalRoleType : 'unknown',
+        roleConfidence: classification ? classification.roleConfidence : null,
+        roleOrigin: classification ? classification.roleOrigin : null,
+        roleReason: classification ? classification.roleReason : null,
         requiresReview: false,
         requiresDeepCheck: false,
         deepCheck: null,
