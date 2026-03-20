@@ -57,7 +57,17 @@ function getEntrypointKind(filePath: string): ValidationEntrypointKind | null {
     }
 }
 
+function isInsideModsDirectory(filePath: string): boolean {
+    return filePath
+        .split(path.sep)
+        .some((segment) => segment.trim().toLowerCase() === 'mods');
+}
+
 function getCandidatePriority(filePath: string): number | null {
+    if (isInsideModsDirectory(filePath)) {
+        return null;
+    }
+
     const baseName = path.basename(filePath).toLowerCase();
 
     if (baseName === 'server.jar') {

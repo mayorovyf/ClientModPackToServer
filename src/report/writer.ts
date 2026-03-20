@@ -54,6 +54,8 @@ function createSummary(report: RunReport): string {
         `- Guarded actions: ${report.releaseContract ? report.releaseContract.trustPolicy.guardedActions.length : 0}`,
         `- Manual-only actions: ${report.releaseContract ? report.releaseContract.trustPolicy.manualOnlyActions.length : 0}`,
         `- Forbidden actions: ${report.releaseContract ? report.releaseContract.trustPolicy.forbiddenActions.length : 0}`,
+        `- Terminal outcome: ${report.terminalOutcome ? report.terminalOutcome.id : 'n/a'}`,
+        `- Terminal explanation: ${report.terminalOutcome ? report.terminalOutcome.explanation : 'n/a'}`,
         '',
         '## Candidate Trace',
         '',
@@ -63,6 +65,10 @@ function createSummary(report: RunReport): string {
         `- Search budget max candidate states: ${report.candidateTrace ? report.candidateTrace.searchBudget.maxCandidateStates : 0}`,
         `- Search budget max retries: ${report.candidateTrace ? report.candidateTrace.searchBudget.maxRetries : 0}`,
         `- Search budget max guarded fixes: ${report.candidateTrace ? report.candidateTrace.searchBudget.maxGuardedFixes : 0}`,
+        `- Search budget consumed candidate states: ${report.candidateTrace ? report.candidateTrace.searchBudget.consumedCandidateStates : 0}`,
+        `- Search budget consumed retries: ${report.candidateTrace ? report.candidateTrace.searchBudget.consumedRetries : 0}`,
+        `- Search budget consumed guarded fixes: ${report.candidateTrace ? report.candidateTrace.searchBudget.consumedGuardedFixes : 0}`,
+        `- Search budget consumed wall-clock (ms): ${report.candidateTrace ? report.candidateTrace.searchBudget.consumedWallClockMs : 0}`,
         `- Search budget exhausted: ${report.candidateTrace ? (report.candidateTrace.searchBudget.exhausted ? 'yes' : 'no') : 'n/a'}`,
         '',
         '## Recipe',
@@ -78,6 +84,7 @@ function createSummary(report: RunReport): string {
         `- Applied fixes: ${report.recipe ? report.recipe.appliedFixes.length : 0}`,
         `- Recipe outcome status: ${report.recipe ? report.recipe.finalOutcome.status : 'n/a'}`,
         `- Recipe terminal outcome: ${report.recipe ? (report.recipe.finalOutcome.terminalOutcomeId || 'n/a') : 'n/a'}`,
+        `- Recipe explanation: ${report.recipe ? report.recipe.finalOutcome.explanation : 'n/a'}`,
         '',
         '## Stats',
         '',
@@ -225,6 +232,11 @@ function createSummary(report: RunReport): string {
         lines.push(`- Build completed with ${report.errors.length} aggregated errors.`);
     } else {
         lines.push('- Build completed without aggregated errors.');
+    }
+
+    if (report.terminalOutcome) {
+        lines.push(`- Terminal outcome: ${report.terminalOutcome.id}.`);
+        lines.push(`- Explanation: ${report.terminalOutcome.explanation}`);
     }
 
     return `${lines.join('\n')}\n`;

@@ -158,6 +158,10 @@ function hasTrustedDependencyCandidateEvidence(validation: ValidationResult | nu
     ));
 }
 
+function hasEulaEvidence(validation: ValidationResult | null | undefined): boolean {
+    return /eula|accept the eula|eula\.txt/i.test(collectValidationText(validation));
+}
+
 function resolveValidationFailureFamily(validation: ValidationResult | null | undefined): FailureFamily | null {
     if (!validation || !validation.runAttempted || validation.status === 'not-run' || validation.status === 'skipped' || validation.status === 'passed') {
         return null;
@@ -283,10 +287,20 @@ function resolveFailureConfidence({
     return family === 'unknown-startup-failure' ? 'low' : 'medium';
 }
 
-function resolveRecommendedActions(family: FailureFamily, trustPolicy: TrustPolicyContract): TrustPolicyAction[] {
+function resolveRecommendedActions(
+    family: FailureFamily,
+    trustPolicy: TrustPolicyContract,
+    validation: ValidationResult | null | undefined
+): TrustPolicyAction[] {
     const allowedByContract = new Set(trustPolicy.actions.map((action) => action.action));
 
-    return FAMILY_ACTIONS[family].filter((action) => allowedByContract.has(action));
+    const actions = [...FAMILY_ACTIONS[family]];
+
+    if (family === 'unknown-startup-failure' && hasEulaEvidence(validation)) {
+        actions.push('accept-eula');
+    }
+
+    return [...new Set(actions)].filter((action) => allowedByContract.has(action));
 }
 
 function evaluateRecommendedActions({
@@ -346,7 +360,7 @@ function normalizeFailureAnalysis({
         return null;
     }
 
-    const recommendedActions = resolveRecommendedActions(family, trustPolicy);
+    const recommendedActions = resolveRecommendedActions(family, trustPolicy, validation);
     const actionDecisions = evaluateRecommendedActions({
         actions: recommendedActions,
         family,

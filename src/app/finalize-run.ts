@@ -89,7 +89,7 @@ function applyPhase1ArtifactsToReport({
     report: RunReport;
     runContext: RunContext;
 }): RunReport {
-    const candidateTrace = createSyntheticCandidateTrace({
+    const candidateTrace = report.candidateTrace || createSyntheticCandidateTrace({
         runContext,
         report
     });
@@ -148,16 +148,18 @@ function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFina
     runLogger.info(`Support boundary: ${report.releaseContract ? report.releaseContract.supportBoundary.status : 'n/a'}`);
     runLogger.info(`Primary terminal outcomes: ${report.releaseContract ? report.releaseContract.terminalOutcomes.primaryOutcomes.join(', ') : 'n/a'}`);
     runLogger.info(`Failure family: ${report.failureAnalysis ? (report.failureAnalysis.family || report.failureAnalysis.kind) : 'n/a'}`);
-    runLogger.info(`Synthetic candidates: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`);
+    runLogger.info(`Terminal outcome: ${report.terminalOutcome ? report.terminalOutcome.id : 'n/a'}`);
+    runLogger.info(`Candidates: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`);
 
     if (runContext.dryRun) {
         runLogger.warn('Dry-run completed: build output was not created.');
     } else {
-        runLogger.success(`Build ready: ${runContext.buildModsDir}`);
+        runLogger.success(`Build ready: ${report.run.buildModsDir}`);
     }
 }
 
 function finalizeRun({ report, runContext, runLogger, registryRuntime }: FinalizeRunParams): FinalizedApplicationRun {
+    const effectiveRunContext = report.run as RunContext;
     const enrichedReport = applyPhase1ArtifactsToReport({
         report: applyPhase3FailureAnalysisToReport({
             report: applyPhase0ContractToReport({
@@ -165,11 +167,11 @@ function finalizeRun({ report, runContext, runLogger, registryRuntime }: Finaliz
                     report,
                     runContext,
                     registryRuntime
-                }),
-                runContext
+                    }),
+                runContext: effectiveRunContext
             })
         }),
-        runContext
+        runContext: effectiveRunContext
     });
     const reportFiles = writeRunReports(runContext, enrichedReport);
 

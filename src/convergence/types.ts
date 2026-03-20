@@ -1,6 +1,7 @@
 import type { RoleType } from '../types/classification';
 import type { InstanceInputKind, InstanceSource } from '../types/intake';
 import type { LoaderKind } from '../types/metadata';
+import type { TerminalOutcomeId } from '../types/outcome';
 import type { RunReport } from '../types/report';
 import type { ValidationEntrypointKind, ValidationStatus } from '../types/validation';
 import type { FailureFamily, NormalizedFailureAnalysis } from '../failure/family';
@@ -67,10 +68,12 @@ export interface CandidateState {
     candidateId: string;
     parentCandidateId: string | null;
     iteration: number;
+    stateDigest: string;
     fingerprint: CandidateFingerprint;
     loader: LoaderKind | null;
     core: string | null;
     javaProfile: string | null;
+    validationTimeoutMs: number | null;
     launchProfile: {
         validationEntrypointKind: ValidationEntrypointKind | null;
         validationEntrypointPath: string | null;
@@ -81,6 +84,8 @@ export interface CandidateState {
     failureFamily: FailureFamily | null;
     failureAnalysis: NormalizedFailureAnalysis | null;
     evidenceSummary: string[];
+    terminalOutcomeId: TerminalOutcomeId | null;
+    shortExplanation: string | null;
     outcomeStatus: 'not-run' | 'passed' | 'failed' | 'skipped';
 }
 

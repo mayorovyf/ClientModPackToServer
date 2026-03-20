@@ -8,6 +8,14 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function resolveRecipeOutcome(report: RunReport): MinimalRecipe['finalOutcome'] {
+    if (report.terminalOutcome) {
+        return {
+            status: 'resolved',
+            terminalOutcomeId: report.terminalOutcome.id,
+            explanation: report.terminalOutcome.explanation
+        };
+    }
+
     if (report.releaseContract?.supportBoundary.status === 'unsupported') {
         return {
             status: 'resolved',
@@ -16,10 +24,18 @@ function resolveRecipeOutcome(report: RunReport): MinimalRecipe['finalOutcome'] 
         };
     }
 
+    if (report.failureAnalysis?.kind === 'policy-blocked') {
+        return {
+            status: 'resolved',
+            terminalOutcomeId: 'not-automatable-within-boundaries',
+            explanation: report.failureAnalysis.explanation
+        };
+    }
+
     return {
         status: 'provisional',
         terminalOutcomeId: null,
-        explanation: 'The synthetic initial candidate has been materialized, but convergence loop terminal outcomes are not implemented yet.'
+        explanation: 'Candidate history has been materialized, but no resolved terminal outcome was attached to this run.'
     };
 }
 
@@ -32,9 +48,11 @@ function createMinimalRecipe({
     report: RunReport;
     candidateTrace: CandidateTrace;
 }): MinimalRecipe {
-    const initialCandidate = candidateTrace.candidates[0];
+    const currentCandidate = candidateTrace.candidates.find((candidate) => candidate.candidateId === candidateTrace.currentCandidateId)
+        || candidateTrace.candidates[candidateTrace.candidates.length - 1]
+        || candidateTrace.candidates[0];
     const decisions = report.decisions || [];
-    const fingerprint = initialCandidate ? initialCandidate.fingerprint : {
+    const fingerprint = currentCandidate ? currentCandidate.fingerprint : {
         algorithm: 'sha256' as const,
         digest: '',
         totalFiles: 0,
@@ -43,19 +61,19 @@ function createMinimalRecipe({
         instanceSource: runContext.instanceSource,
         files: []
     };
-    const launchProfile = initialCandidate ? initialCandidate.launchProfile : {
+    const launchProfile = currentCandidate ? currentCandidate.launchProfile : {
         validationEntrypointKind: null,
         validationEntrypointPath: null
     };
-    const appliedFixes = initialCandidate ? [...initialCandidate.appliedFixes] : [];
+    const appliedFixes = currentCandidate ? [...currentCandidate.appliedFixes] : [];
 
     return {
         schemaVersion: '1.0',
         sourceRunId: runContext.runId,
         inputFingerprint: fingerprint,
-        selectedLoader: initialCandidate ? initialCandidate.loader : null,
-        selectedCore: initialCandidate ? initialCandidate.core : null,
-        selectedJavaProfile: initialCandidate ? initialCandidate.javaProfile : null,
+        selectedLoader: currentCandidate ? currentCandidate.loader : null,
+        selectedCore: currentCandidate ? currentCandidate.core : null,
+        selectedJavaProfile: currentCandidate ? currentCandidate.javaProfile : null,
         launchProfile: {
             validationEntrypointKind: launchProfile.validationEntrypointKind,
             validationEntrypointPath: launchProfile.validationEntrypointPath

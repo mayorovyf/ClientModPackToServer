@@ -7,7 +7,7 @@ import type { RegistryRuntimeState } from './registry';
 import type { RunContext } from './run';
 import type { ProbeSummary } from './probe';
 import type { ValidationResult } from './validation';
-import type { TerminalOutcomeContract } from './outcome';
+import type { ResolvedTerminalOutcome, TerminalOutcomeContract } from './outcome';
 import type { SupportBoundaryAssessment, TrustPolicyContract } from './policy';
 import type { CandidateTrace } from '../convergence/types';
 import type { NormalizedFailureAnalysis } from '../failure/family';
@@ -137,6 +137,7 @@ export interface RunReport {
         trustPolicy: TrustPolicyContract;
         terminalOutcomes: TerminalOutcomeContract;
     };
+    terminalOutcome?: ResolvedTerminalOutcome | null;
     failureAnalysis?: NormalizedFailureAnalysis | null;
     candidateTrace?: CandidateTrace;
     recipe?: MinimalRecipe;

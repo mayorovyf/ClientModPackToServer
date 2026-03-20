@@ -4,6 +4,7 @@ const { listJarFiles } = require('../io/mods-folder');
 const { buildParsingStats } = require('../metadata/parse-mod-file');
 const { createEmptyProbeSummary, runProbeStage } = require('../probe/run-probe-stage');
 const { applyManualReviewOverrides, resolveReviewOverridesPath } = require('../review/manual-overrides');
+const { ensureServerEulaAccepted } = require('../server/runtime');
 const { createEmptyValidationReport } = require('../validation/report-model');
 const { runValidationStage } = require('../validation/run-validation');
 const {
@@ -18,7 +19,7 @@ const {
     runArbiterStage,
     runDeepCheckStage
 } = require('../build/builder');
-const { createInitialCandidateState } = require('./candidate-state');
+const { createCandidateState } = require('./candidate-state');
 
 import type { ApplicationLogger, BuildProgressReporter, ClassificationContextLike } from '../types/app';
 import type { ClassificationContext } from '../types/classification';
@@ -26,7 +27,13 @@ import type { ProbeSummary } from '../types/probe';
 import type { RunReport } from '../types/report';
 import type { RunContext } from '../types/run';
 import type { ValidationError, ValidationResult, ValidationStageResult } from '../types/validation';
-import type { CandidateIterationResult } from './types';
+import type { AppliedFix, CandidateIterationResult } from './types';
+
+interface CandidateIterationMutations {
+    forcedExcludes?: string[];
+    forcedKeeps?: string[];
+    acceptEula?: boolean;
+}
 
 interface RunInitialCandidateIterationParams {
     modsPath: string;
@@ -35,6 +42,11 @@ interface RunInitialCandidateIterationParams {
     runContext: RunContext;
     logger?: ApplicationLogger | null;
     progressReporter?: BuildProgressReporter | null;
+    candidateId?: string;
+    parentCandidateId?: string | null;
+    iteration?: number;
+    appliedFixes?: AppliedFix[];
+    mutations?: CandidateIterationMutations;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -57,17 +69,84 @@ function createEmptyValidation(mode: RunContext['validationMode'], error: Valida
     });
 }
 
+function appendReason(existingReasons: string[] | null | undefined, nextReason: string): string[] {
+    return [...new Set([...(existingReasons || []), nextReason])];
+}
+
+function applyCandidateDecisionFixes({
+    decisions,
+    forcedExcludes = [],
+    forcedKeeps = [],
+    record
+}: {
+    decisions: Array<Record<string, any>>;
+    forcedExcludes?: string[];
+    forcedKeeps?: string[];
+    record: (level: string, kind: string, message: string) => void;
+}): Array<Record<string, any>> {
+    const excludeSet = new Set(forcedExcludes);
+    const keepSet = new Set(forcedKeeps);
+
+    return decisions.map((decision) => {
+        if (decision.manualOverrideAction) {
+            return decision;
+        }
+
+        if (keepSet.has(decision.fileName) && decision.decision !== 'keep') {
+            const reason = `Convergence fix forced keep for trusted dependency recovery: ${decision.fileName}`;
+            record('info', 'analysis', reason);
+
+            return {
+                ...decision,
+                decision: 'keep',
+                reason,
+                decisionOrigin: 'convergence-fix',
+                finalSemanticDecision: 'keep',
+                finalDecisionOrigin: 'convergence-fix',
+                finalReasons: appendReason(decision.finalReasons, reason)
+            };
+        }
+
+        if (excludeSet.has(decision.fileName) && decision.decision !== 'exclude') {
+            const reason = `Convergence fix forced exclude for confirmed client-only suspect: ${decision.fileName}`;
+            record('info', 'analysis', reason);
+
+            return {
+                ...decision,
+                decision: 'exclude',
+                reason,
+                decisionOrigin: 'convergence-fix',
+                finalSemanticDecision: 'remove',
+                finalDecisionOrigin: 'convergence-fix',
+                finalReasons: appendReason(decision.finalReasons, reason)
+            };
+        }
+
+        return decision;
+    });
+}
+
 async function runInitialCandidateIteration({
     modsPath,
     blockList = [],
     classificationContext = null,
     runContext,
     logger = null,
-    progressReporter = null
+    progressReporter = null,
+    candidateId = `${runContext.runId}:candidate-0`,
+    parentCandidateId = null,
+    iteration = 0,
+    appliedFixes = [],
+    mutations = {}
 }: RunInitialCandidateIterationParams): Promise<CandidateIterationResult> {
     const effectiveProgressReporter = progressReporter || createNoopProgressReporter();
     const effectiveClassificationContext = (classificationContext || createClassificationContext({ blockList })) as ClassificationContextLike;
     const collector = createEventCollector(logger);
+    const effectiveMutations = {
+        forcedExcludes: Array.isArray(mutations?.forcedExcludes) ? mutations.forcedExcludes : [],
+        forcedKeeps: Array.isArray(mutations?.forcedKeeps) ? mutations.forcedKeeps : [],
+        acceptEula: Boolean(mutations?.acceptEula)
+    };
 
     collector.record('info', 'analysis', `Run mode: ${runContext.mode}`);
     collector.record('info', 'analysis', `Input directory: ${runContext.inputPath}`);
@@ -230,7 +309,7 @@ async function runInitialCandidateIteration({
         overridesPath: reviewOverridesPath,
         record: collector.record
     });
-    const decisions = manualReviewStage.decisions.map((decision: Record<string, any>) => {
+    const decisionsWithProbe = manualReviewStage.decisions.map((decision: Record<string, any>) => {
         const probeOutcome = probeOutcomeByFile.get(decision.fileName);
 
         if (!probeOutcome) {
@@ -244,6 +323,12 @@ async function runInitialCandidateIteration({
             probeConfidence: probeOutcome.confidence,
             probeLogPath: probeOutcome.logPath || null
         };
+    });
+    const decisions = applyCandidateDecisionFixes({
+        decisions: decisionsWithProbe,
+        forcedExcludes: effectiveMutations.forcedExcludes,
+        forcedKeeps: effectiveMutations.forcedKeeps,
+        record: collector.record
     });
 
     for (const decision of decisions) {
@@ -270,6 +355,12 @@ async function runInitialCandidateIteration({
         progressReporter: effectiveProgressReporter
     });
     const stats = buildStats(finalizedDecisions);
+
+    if (!runContext.dryRun && effectiveMutations.acceptEula) {
+        const eulaPath = ensureServerEulaAccepted(runContext.buildDir);
+        collector.record('info', 'build', `Convergence fix accepted EULA: ${eulaPath}`);
+    }
+
     effectiveProgressReporter.onStageCompleted({
         stage: 'build',
         total: finalizedDecisions.length,
@@ -385,9 +476,13 @@ async function runInitialCandidateIteration({
         warnings: issues.warnings,
         errors: issues.errors
     };
-    const candidate = createInitialCandidateState({
+    const candidate = createCandidateState({
         runContext,
-        report
+        report,
+        candidateId,
+        parentCandidateId,
+        iteration,
+        appliedFixes
     });
 
     return {

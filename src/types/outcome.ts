@@ -21,3 +21,17 @@ export interface TerminalOutcomeContract {
     reservedOutcomes: TerminalOutcomeId[];
     definitions: TerminalOutcomeDefinition[];
 }
+
+export type TerminalOutcomeReasonCode =
+    | 'success-contract-met'
+    | 'outside-support-boundary'
+    | 'policy-blocked'
+    | 'no-safe-action-left'
+    | 'duplicate-failing-state'
+    | 'search-budget-exhausted';
+
+export interface ResolvedTerminalOutcome {
+    id: TerminalOutcomeId;
+    reasonCode: TerminalOutcomeReasonCode;
+    explanation: string;
+}
