@@ -204,6 +204,7 @@ function createSummary(report: RunReport): string {
         `- Suspect jar hints: ${report.failureAnalysis ? report.failureAnalysis.suspectSet.jarHints.join(', ') || 'n/a' : 'n/a'}`,
         `- Allowed actions: ${report.failureAnalysis ? report.failureAnalysis.allowedActions.join(', ') || 'n/a' : 'n/a'}`,
         `- Blocked actions: ${report.failureAnalysis ? report.failureAnalysis.blockedActions.join(', ') || 'n/a' : 'n/a'}`,
+        `- Blocked action reasons: ${report.failureAnalysis ? report.failureAnalysis.blockedActionReasons.join(' | ') || 'n/a' : 'n/a'}`,
         '',
         '## Report Issues',
         '',

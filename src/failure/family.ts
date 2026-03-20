@@ -123,6 +123,10 @@ function hasIssueKind(issues: ValidationIssue[], kind: ValidationIssue['kind']):
     return issues.some((issue) => issue.kind === kind);
 }
 
+function listIssuesByKind(issues: ValidationIssue[], kind: ValidationIssue['kind']): ValidationIssue[] {
+    return issues.filter((issue) => issue.kind === kind);
+}
+
 function hasClientClassLoadingHints(text: string): boolean {
     return /net[/.]minecraft[/.]client|client[/.]gui|environment type server|client-only/i.test(text);
 }
@@ -135,6 +139,25 @@ function isLikelyEntrypointFailure(text: string): boolean {
     return /validation entrypoint was not found|could not find or load main class|unable to access jarfile|entrypoint was not found/i.test(text);
 }
 
+function isLikelyLaunchCommandFailure(text: string): boolean {
+    return /could not find or load main class|could not resolve main class|command shape|launcher/i.test(text);
+}
+
+function isLikelyEntrypointSelectionFailure(text: string): boolean {
+    return /validation entrypoint was not found|unable to access jarfile|no main manifest attribute|entrypoint was not found/i.test(text);
+}
+
+function hasTrustedDependencyCandidateEvidence(validation: ValidationResult | null | undefined): boolean {
+    if (!validation) {
+        return false;
+    }
+
+    return listIssuesByKind(validation.issues || [], 'missing-dependency').some((issue) => (
+        issue.suspectedModIds.length > 0
+        || issue.jarHints.length > 0
+    ));
+}
+
 function resolveValidationFailureFamily(validation: ValidationResult | null | undefined): FailureFamily | null {
     if (!validation || !validation.runAttempted || validation.status === 'not-run' || validation.status === 'skipped' || validation.status === 'passed') {
         return null;
@@ -143,16 +166,22 @@ function resolveValidationFailureFamily(validation: ValidationResult | null | un
     const issues = validation.issues || [];
     const evidenceText = collectValidationText(validation);
 
-    if (validation.status === 'timed-out') {
-        return 'timeout-before-ready';
-    }
-
     if (isLikelyEntrypointFailure(evidenceText)) {
         return 'wrong-core-or-entrypoint';
     }
 
     if (isLikelyJavaRuntimeFailure(evidenceText)) {
         return 'wrong-java-or-launch-profile';
+    }
+
+    if (hasIssueKind(issues, 'java-runtime')) {
+        return 'wrong-java-or-launch-profile';
+    }
+
+    if (hasIssueKind(issues, 'launch-profile')) {
+        return isLikelyEntrypointSelectionFailure(evidenceText)
+            ? 'wrong-core-or-entrypoint'
+            : 'wrong-java-or-launch-profile';
     }
 
     if (hasIssueKind(issues, 'missing-dependency')) {
@@ -169,6 +198,10 @@ function resolveValidationFailureFamily(validation: ValidationResult | null | un
 
     if (hasIssueKind(issues, 'class-loading') && hasClientClassLoadingHints(evidenceText)) {
         return 'client-only-or-side-mismatch';
+    }
+
+    if (validation.status === 'timed-out') {
+        return 'timeout-before-ready';
     }
 
     if (validation.status === 'error' && !validation.entrypoint) {
@@ -202,7 +235,35 @@ function resolveFailureConfidence({
     }
 
     if (family === 'timeout-before-ready') {
+        return 'medium';
+    }
+
+    if (family === 'wrong-java-or-launch-profile') {
         return 'high';
+    }
+
+    if (family === 'missing-trusted-dependency') {
+        return hasTrustedDependencyCandidateEvidence(validation) ? 'high' : 'medium';
+    }
+
+    if (family === 'wrong-core-or-entrypoint') {
+        if (!validation?.entrypoint || hasIssueKind(validation.issues || [], 'entrypoint-crash') || hasIssueKind(validation.issues || [], 'launch-profile')) {
+            return 'high';
+        }
+
+        return 'medium';
+    }
+
+    if (family === 'client-only-or-side-mismatch') {
+        if (hasIssueKind(validation.issues || [], 'side-mismatch')) {
+            return 'high';
+        }
+
+        if (hasIssueKind(validation.issues || [], 'class-loading') && hasClientClassLoadingHints(collectValidationText(validation))) {
+            return 'high';
+        }
+
+        return 'medium';
     }
 
     const issueConfidence = maxConfidence((validation.issues || []).map((issue) => issue.confidence));
@@ -228,8 +289,24 @@ function resolveRecommendedActions(family: FailureFamily, trustPolicy: TrustPoli
     return FAMILY_ACTIONS[family].filter((action) => allowedByContract.has(action));
 }
 
-function evaluateRecommendedActions(actions: TrustPolicyAction[]): TrustPolicyActionDecision[] {
-    return actions.map((action) => evaluateTrustPolicyAction(action));
+function evaluateRecommendedActions({
+    actions,
+    family,
+    validation
+}: {
+    actions: TrustPolicyAction[];
+    family: FailureFamily;
+    validation: ValidationResult | null | undefined;
+}): TrustPolicyActionDecision[] {
+    return actions.map((action) => {
+        if (action === 'add-trusted-dependency') {
+            return evaluateTrustPolicyAction(action, {
+                trustedSource: hasTrustedDependencyCandidateEvidence(validation) ? null : false
+            });
+        }
+
+        return evaluateTrustPolicyAction(action);
+    });
 }
 
 function inferPreliminaryFailureFamily(validation: ValidationResult | null | undefined): FailureFamily | null {
@@ -270,7 +347,11 @@ function normalizeFailureAnalysis({
     }
 
     const recommendedActions = resolveRecommendedActions(family, trustPolicy);
-    const actionDecisions = evaluateRecommendedActions(recommendedActions);
+    const actionDecisions = evaluateRecommendedActions({
+        actions: recommendedActions,
+        family,
+        validation
+    });
     const allowedActions = uniqueSorted(actionDecisions.filter((decision) => decision.allowed).map((decision) => decision.action)) as TrustPolicyAction[];
     const blockedActions = uniqueSorted(actionDecisions.filter((decision) => !decision.allowed).map((decision) => decision.action)) as TrustPolicyAction[];
     const blockedActionReasons = uniqueSorted(actionDecisions.map((decision) => decision.denialReason || null));

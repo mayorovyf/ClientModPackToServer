@@ -8,6 +8,8 @@ export type ValidationIssueKind =
     | 'missing-dependency'
     | 'side-mismatch'
     | 'class-loading'
+    | 'java-runtime'
+    | 'launch-profile'
     | 'mixin-failure'
     | 'entrypoint-crash'
     | 'unknown-critical'

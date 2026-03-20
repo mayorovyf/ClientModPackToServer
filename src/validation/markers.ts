@@ -33,6 +33,14 @@ const FAILURE_MARKERS = Object.freeze([
         pattern: /ClassNotFoundException|NoClassDefFoundError/i
     },
     {
+        label: 'java-runtime',
+        pattern: /UnsupportedClassVersionError|unsupported class file major version|compiled by a more recent version of the Java Runtime|Could not create the Java Virtual Machine|A JNI error has occurred|Invalid maximum heap size|Unsupported major\.minor version/i
+    },
+    {
+        label: 'launch-profile',
+        pattern: /Could not find or load main class|Unable to access jarfile|no main manifest attribute|entrypoint was not found/i
+    },
+    {
         label: 'mixin-failure',
         pattern: /Mixin(?:\s\w+)* failed|MixinTransformerError|Mixin apply failed/i
     },

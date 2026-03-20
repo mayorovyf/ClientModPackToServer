@@ -87,6 +87,8 @@ export const enTuiPanels = {
     'screen.problems.issueKind.missing-dependency': 'missing dependency',
     'screen.problems.issueKind.side-mismatch': 'side mismatch',
     'screen.problems.issueKind.class-loading': 'class loading',
+    'screen.problems.issueKind.java-runtime': 'java runtime',
+    'screen.problems.issueKind.launch-profile': 'launch profile',
     'screen.problems.issueKind.mixin-failure': 'mixin failure',
     'screen.problems.issueKind.entrypoint-crash': 'entrypoint crash',
     'screen.problems.issueKind.unknown-critical': 'critical',

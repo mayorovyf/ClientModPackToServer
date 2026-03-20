@@ -113,6 +113,76 @@ function parseClassLoadingIssues(text: string): ValidationIssue[] {
     return issues;
 }
 
+function parseJavaRuntimeIssues(text: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const patterns = [
+        /UnsupportedClassVersionError[^\r\n]*/ig,
+        /unsupported class file major version[^\r\n]*/ig,
+        /compiled by a more recent version of the Java Runtime[^\r\n]*/ig,
+        /Unsupported major\.minor version[^\r\n]*/ig,
+        /Could not create the Java Virtual Machine[^\r\n]*/ig,
+        /A JNI error has occurred[^\r\n]*/ig,
+        /Invalid maximum heap size[^\r\n]*/ig,
+        /Could not reserve enough space[^\r\n]*/ig,
+        /Error: LinkageError occurred while loading main class[^\r\n]*/ig
+    ];
+
+    for (const pattern of patterns) {
+        let match = pattern.exec(text);
+
+        while (match) {
+            const evidence = match[0].replace(/\s+/g, ' ').trim();
+
+            issues.push({
+                kind: 'java-runtime',
+                message: 'Validation detected a Java runtime mismatch or bootstrap failure',
+                evidence,
+                modIds: [],
+                suspectedModIds: [],
+                jarHints: extractJarHints(evidence),
+                confidence: 'high'
+            });
+
+            match = pattern.exec(text);
+        }
+    }
+
+    return issues;
+}
+
+function parseLaunchProfileIssues(text: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const patterns = [
+        /Could not find or load main class[^\r\n]*/ig,
+        /Unable to access jarfile[^\r\n]*/ig,
+        /no main manifest attribute[^\r\n]*/ig,
+        /entrypoint was not found[^\r\n]*/ig,
+        /Could not resolve main class[^\r\n]*/ig
+    ];
+
+    for (const pattern of patterns) {
+        let match = pattern.exec(text);
+
+        while (match) {
+            const evidence = match[0].replace(/\s+/g, ' ').trim();
+
+            issues.push({
+                kind: 'launch-profile',
+                message: 'Validation detected a launch profile or entrypoint bootstrap mismatch',
+                evidence,
+                modIds: [],
+                suspectedModIds: [],
+                jarHints: extractJarHints(evidence),
+                confidence: 'high'
+            });
+
+            match = pattern.exec(text);
+        }
+    }
+
+    return issues;
+}
+
 function parseMixinIssues(text: string): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
     const patterns = [
@@ -238,6 +308,8 @@ function parseValidationIssues(text: string | null | undefined): ValidationParse
         ...parseMissingDependencyIssues(normalizedText),
         ...parseSideMismatchIssues(normalizedText),
         ...parseClassLoadingIssues(normalizedText),
+        ...parseJavaRuntimeIssues(normalizedText),
+        ...parseLaunchProfileIssues(normalizedText),
         ...parseMixinIssues(normalizedText),
         ...parseEntrypointIssues(normalizedText)
     ]);

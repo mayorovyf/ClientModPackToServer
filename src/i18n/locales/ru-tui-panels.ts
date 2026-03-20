@@ -200,6 +200,8 @@ export const ruTuiPanels = {
     'screen.problems.kind.disputed': 'спорный мод',
     'screen.problems.severity.blocking': 'BLOCK',
     'screen.problems.severity.warning': 'WARN',
+    'screen.problems.issueKind.java-runtime': 'РѕС€РёР±РєР° Java runtime',
+    'screen.problems.issueKind.launch-profile': 'РѕС€РёР±РєР° launch profile',
     'screen.problems.issueKind.missing-dependency': 'нехватка зависимости',
     'screen.problems.issueKind.side-mismatch': 'неверная сторона',
     'screen.problems.issueKind.class-loading': 'ошибка загрузки класса',

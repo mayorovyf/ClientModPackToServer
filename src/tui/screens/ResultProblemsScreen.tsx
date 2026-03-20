@@ -42,6 +42,10 @@ function getProblemKindLabel(item: ResultProblemItem, t: ReturnType<typeof useT>
                     return t('screen.problems.issueKind.side-mismatch');
                 case 'class-loading':
                     return t('screen.problems.issueKind.class-loading');
+                case 'java-runtime':
+                    return t('screen.problems.issueKind.java-runtime');
+                case 'launch-profile':
+                    return t('screen.problems.issueKind.launch-profile');
                 case 'mixin-failure':
                     return t('screen.problems.issueKind.mixin-failure');
                 case 'entrypoint-crash':

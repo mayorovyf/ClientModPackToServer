@@ -31,6 +31,8 @@ export interface ResultProblemsSummary {
 const BLOCKING_VALIDATION_ISSUE_KINDS = new Set<ValidationIssueKind>([
     'missing-dependency',
     'class-loading',
+    'java-runtime',
+    'launch-profile',
     'mixin-failure',
     'entrypoint-crash',
     'unknown-critical',
