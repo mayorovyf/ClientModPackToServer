@@ -236,10 +236,14 @@ function buildValidationCheck(form: RunFormState): RunPreflightCheck {
     if (!explicitEntrypointPath) {
         return {
             id: 'validation',
-            severity: form.validationMode === 'force' || form.validationMode === 'require' ? 'warning' : 'ok',
+            severity: form.installServerCore ? 'ok' : (form.validationMode === 'force' || form.validationMode === 'require' ? 'warning' : 'ok'),
             title: 'Validation',
-            summary: 'Launcher will be auto-detected after the build',
-            details: 'No explicit validation entrypoint is set. The pipeline will rely on launcher auto-detection.'
+            summary: form.installServerCore
+                ? 'Launcher will be auto-detected after managed core installation'
+                : 'Launcher will be auto-detected after the build',
+            details: form.installServerCore
+                ? 'No explicit validation entrypoint is set. The pipeline will first try to install a managed server core and then auto-detect its launcher.'
+                : 'No explicit validation entrypoint is set. The pipeline will rely on launcher auto-detection.'
         };
     }
 

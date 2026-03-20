@@ -12,6 +12,7 @@ import type { SupportBoundaryAssessment, TrustPolicyContract } from './policy';
 import type { CandidateTrace } from '../convergence/types';
 import type { NormalizedFailureAnalysis } from '../failure/family';
 import type { MinimalRecipe } from '../recipe/types';
+import type { BuildServerCoreInstallReport, PackRuntimeDetection } from './runtime-detection';
 
 export interface ReportIssue {
     fileName: string | null;
@@ -139,6 +140,8 @@ export interface RunReport {
     };
     terminalOutcome?: ResolvedTerminalOutcome | null;
     failureAnalysis?: NormalizedFailureAnalysis | null;
+    runtimeDetection?: PackRuntimeDetection | null;
+    serverCoreInstall?: BuildServerCoreInstallReport | null;
     candidateTrace?: CandidateTrace;
     recipe?: MinimalRecipe;
     decisions?: ReportDecisionSummary[];

@@ -95,6 +95,28 @@ function createSummary(report: RunReport): string {
         `- Recipe terminal outcome: ${report.recipe ? (report.recipe.finalOutcome.terminalOutcomeId || 'n/a') : 'n/a'}`,
         `- Recipe explanation: ${report.recipe ? report.recipe.finalOutcome.explanation : 'n/a'}`,
         '',
+        '## Runtime Detection',
+        '',
+        `- Status: ${report.runtimeDetection ? report.runtimeDetection.status : 'n/a'}`,
+        `- Source: ${report.runtimeDetection ? report.runtimeDetection.source : 'n/a'}`,
+        `- Confidence: ${report.runtimeDetection ? report.runtimeDetection.confidence : 'n/a'}`,
+        `- Loader: ${report.runtimeDetection ? (report.runtimeDetection.loader || 'n/a') : 'n/a'}`,
+        `- Loader version: ${report.runtimeDetection ? (report.runtimeDetection.loaderVersion || 'n/a') : 'n/a'}`,
+        `- Minecraft version: ${report.runtimeDetection ? (report.runtimeDetection.minecraftVersion || 'n/a') : 'n/a'}`,
+        `- Supported server core: ${report.runtimeDetection ? (report.runtimeDetection.supportedServerCore || 'n/a') : 'n/a'}`,
+        `- Warnings: ${report.runtimeDetection ? (report.runtimeDetection.warnings.join(' | ') || 'n/a') : 'n/a'}`,
+        '',
+        '## Server Core',
+        '',
+        `- Enabled by config: ${report.serverCoreInstall ? (report.serverCoreInstall.enabledByConfig ? 'yes' : 'no') : 'n/a'}`,
+        `- Requested: ${report.serverCoreInstall ? (report.serverCoreInstall.requested ? 'yes' : 'no') : 'n/a'}`,
+        `- Status: ${report.serverCoreInstall ? report.serverCoreInstall.status : 'n/a'}`,
+        `- Core type: ${report.serverCoreInstall ? (report.serverCoreInstall.coreType || 'n/a') : 'n/a'}`,
+        `- Minecraft version: ${report.serverCoreInstall ? (report.serverCoreInstall.minecraftVersion || 'n/a') : 'n/a'}`,
+        `- Loader version: ${report.serverCoreInstall ? (report.serverCoreInstall.loaderVersion || 'n/a') : 'n/a'}`,
+        `- Entrypoint: ${report.serverCoreInstall ? (report.serverCoreInstall.entrypointPath || 'n/a') : 'n/a'}`,
+        `- Reason: ${report.serverCoreInstall ? (report.serverCoreInstall.reason || 'n/a') : 'n/a'}`,
+        '',
         '## Stats',
         '',
         `- Total .jar files: ${report.stats.totalJarFiles}`,
@@ -234,7 +256,7 @@ function createSummary(report: RunReport): string {
     if (report.run.dryRun) {
         lines.push('- Build output was not created because dry-run is enabled.');
     } else {
-        lines.push(`- Build output created at: ${report.run.buildModsDir}`);
+        lines.push(`- Build output created at: ${report.run.buildDir}`);
     }
 
     if (report.errors.length > 0) {

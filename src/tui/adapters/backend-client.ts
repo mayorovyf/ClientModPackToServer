@@ -84,6 +84,12 @@ export function buildHeadlessRunnerArgs(form: RunFormState): string[] {
         args.push('--validation-save-artifacts');
     }
 
+    if (form.installServerCore) {
+        args.push('--install-server-core');
+    } else {
+        args.push('--skip-server-core-install');
+    }
+
     if (form.registryManifestUrl.trim()) {
         args.push('--registry-manifest-url', form.registryManifestUrl.trim());
     }

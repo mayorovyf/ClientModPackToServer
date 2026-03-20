@@ -161,6 +161,7 @@ function normalizeRunFormState(value: unknown): RunFormState {
         validationTimeoutMs: normalizeString(candidate.validationTimeoutMs),
         validationEntrypointPath: normalizeString(candidate.validationEntrypointPath),
         validationSaveArtifacts: normalizeBoolean(candidate.validationSaveArtifacts, defaults.validationSaveArtifacts),
+        installServerCore: normalizeBoolean(candidate.installServerCore, defaults.installServerCore),
         registryMode: candidate.registryMode === 'offline'
             || candidate.registryMode === 'refresh'
             || candidate.registryMode === 'pinned'

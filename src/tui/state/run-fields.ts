@@ -16,6 +16,7 @@ export type RunFieldKey =
     | 'validationTimeoutMs'
     | 'validationEntrypointPath'
     | 'validationSaveArtifacts'
+    | 'installServerCore'
     | 'registryMode'
     | 'run';
 
@@ -163,6 +164,14 @@ const RUN_FIELD_DETAILS_META: Record<RunFieldKey, RunFieldDetailsMeta> = {
             { id: 'on', label: 'common.value.on', labelIsKey: true, descriptionKey: 'field.run.validationSaveArtifacts.option.on' }
         ]
     },
+    installServerCore: {
+        titleKey: 'field.run.installServerCore.title',
+        overviewKey: 'field.run.installServerCore.overview',
+        options: [
+            { id: 'off', label: 'common.value.off', labelIsKey: true, descriptionKey: 'field.run.installServerCore.option.off' },
+            { id: 'on', label: 'common.value.on', labelIsKey: true, descriptionKey: 'field.run.installServerCore.option.on' }
+        ]
+    },
     registryMode: {
         titleKey: 'field.run.registryMode.title',
         overviewKey: 'field.run.registryMode.overview',
@@ -300,6 +309,14 @@ export function getRunFieldDefinitions(
                 kind: 'toggle',
                 description: t('field.run.validationSaveArtifacts.short'),
                 activeOptionId: form.validationSaveArtifacts ? 'on' : 'off'
+            },
+            {
+                key: 'installServerCore',
+                label: t('field.run.installServerCore.label'),
+                value: getRunFieldValueLabel(form.installServerCore ? 'on' : 'off', t),
+                kind: 'toggle',
+                description: t('field.run.installServerCore.short'),
+                activeOptionId: form.installServerCore ? 'on' : 'off'
             },
             {
                 key: 'registryMode',

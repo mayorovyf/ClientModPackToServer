@@ -55,6 +55,7 @@ function logPreparedRun({
     logger.info(`Validation mode: ${runContext.validationMode}`);
     logger.info(`Validation timeout: ${runContext.validationTimeoutMs}ms`);
     logger.info(`Validation entrypoint: ${runContext.validationEntrypointPath || 'auto-detect'}`);
+    logger.info(`Install server core: ${runContext.installServerCore ? 'enabled' : 'disabled'}`);
     logger.info(`Probe mode: ${runContext.probeMode}`);
     logger.info(`Probe timeout: ${runContext.probeTimeoutMs}ms`);
     logger.info(`Probe knowledge: ${runContext.probeKnowledgePath}`);
@@ -86,6 +87,7 @@ async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Prom
         validationTimeoutMs: config.validationTimeoutMs,
         validationEntrypointPath: config.validationEntrypointPath,
         validationSaveArtifacts: config.validationSaveArtifacts,
+        installServerCore: config.installServerCore,
         probeMode: config.probeMode,
         probeTimeoutMs: config.probeTimeoutMs,
         probeKnowledgePath: config.probeKnowledgePath,

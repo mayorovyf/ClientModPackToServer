@@ -351,4 +351,10 @@ export const ruTuiFields = {
     'field.run.validationSaveArtifacts.overview': 'Определяет, нужно ли всегда сохранять stdout и stderr validation в report dir.',
     'field.run.validationSaveArtifacts.option.off': 'Артефакты validation следуют стандартной политике проекта.',
     'field.run.validationSaveArtifacts.option.on': 'Артефакты validation всегда пишутся в report dir.'
+    ,'field.run.installServerCore.label': 'Ядро сервера',
+    'field.run.installServerCore.short': 'Добавлять managed core в итоговую серверную папку',
+    'field.run.installServerCore.title': 'Установка managed server core',
+    'field.run.installServerCore.overview': 'Определяет, нужно ли перед validation автоматически поставить в собранный build managed Fabric, Forge или NeoForge core.',
+    'field.run.installServerCore.option.off': 'Pipeline оставляет собранную серверную папку как есть и не добавляет managed core автоматически.',
+    'field.run.installServerCore.option.on': 'Pipeline определяет runtime пака и пытается поставить подходящий managed core перед validation.'
 } as const;

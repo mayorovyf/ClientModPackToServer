@@ -9,6 +9,7 @@ import type {
     ProbeMode
 } from './config';
 import type { InstanceInputKind, InstanceSource } from './intake';
+import type { PackRuntimeDetection } from './runtime-detection';
 
 export interface RunPaths {
     inputPath: string;
@@ -45,6 +46,7 @@ export interface RunContext extends RunPaths {
     validationTimeoutMs: number;
     validationEntrypointPath: string | null;
     validationSaveArtifacts: boolean;
+    installServerCore: boolean;
     probeMode: ProbeMode;
     probeTimeoutMs: number;
     probeKnowledgePath: string;
@@ -54,4 +56,5 @@ export interface RunContext extends RunPaths {
     registryBundleUrl: string | null;
     registryCacheDir: string | null;
     localOverridesPath: string | null;
+    detectedRuntime?: PackRuntimeDetection | null;
 }

@@ -22,10 +22,11 @@ type ValueFlag =
     | '--probe'
     | '--probe-timeout-ms'
     | '--probe-knowledge'
-    | '--probe-max-mods';
+    | '--probe-max-mods'
+    | '--server-core-install';
 
 type MultiValueFlag = '--engine' | '--disable-engine';
-type BooleanFlag = '--dry-run' | '--help' | '--validation-save-artifacts';
+type BooleanFlag = '--dry-run' | '--help' | '--validation-save-artifacts' | '--install-server-core' | '--skip-server-core-install';
 
 interface ParsedCliOptions {
     inputPath: string | null;
@@ -45,6 +46,7 @@ interface ParsedCliOptions {
     validationTimeoutMs: string | null;
     validationEntrypointPath: string | null;
     validationSaveArtifacts: boolean;
+    installServerCore: boolean | null;
     probeMode: CliOptions['probeMode'];
     probeTimeoutMs: string | null;
     probeKnowledgePath: string | null;
@@ -75,10 +77,11 @@ const VALUE_FLAGS = new Set<ValueFlag>([
     '--probe',
     '--probe-timeout-ms',
     '--probe-knowledge',
-    '--probe-max-mods'
+    '--probe-max-mods',
+    '--server-core-install'
 ]);
 const MULTI_VALUE_FLAGS = new Set<MultiValueFlag>(['--engine', '--disable-engine']);
-const BOOLEAN_FLAGS = new Set<BooleanFlag>(['--dry-run', '--help', '--validation-save-artifacts']);
+const BOOLEAN_FLAGS = new Set<BooleanFlag>(['--dry-run', '--help', '--validation-save-artifacts', '--install-server-core', '--skip-server-core-install']);
 
 function splitFlag(token: string): { key: string; value: string | null } {
     const eqIndex = token.indexOf('=');
@@ -122,6 +125,7 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
         validationTimeoutMs: null,
         validationEntrypointPath: null,
         validationSaveArtifacts: false,
+        installServerCore: null,
         probeMode: null,
         probeTimeoutMs: null,
         probeKnowledgePath: null,
@@ -152,6 +156,14 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
 
             if (key === '--validation-save-artifacts') {
                 options.validationSaveArtifacts = true;
+            }
+
+            if (key === '--install-server-core') {
+                options.installServerCore = true;
+            }
+
+            if (key === '--skip-server-core-install') {
+                options.installServerCore = false;
             }
 
             continue;
@@ -230,6 +242,12 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
             case '--validation-entrypoint':
                 options.validationEntrypointPath = resolvedValue;
                 break;
+            case '--server-core-install':
+                if (resolvedValue !== 'on' && resolvedValue !== 'off') {
+                    throw new RunConfigurationError(`Argument ${key} must be "on" or "off"`);
+                }
+                options.installServerCore = resolvedValue === 'on';
+                break;
             case '--probe':
                 options.probeMode = resolvedValue as ParsedCliOptions['probeMode'];
                 break;
@@ -257,6 +275,7 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('                [--registry-mode <auto|offline|refresh|pinned>] [--registry-manifest-url <url>] [--registry-bundle-url <url>]');
     logger.raw('                [--profile <safe|balanced|aggressive>] [--deep-check <auto|off|force>]');
     logger.raw('                [--validation <off|auto|require|force>] [--validation-timeout-ms <ms>] [--validation-entrypoint <path>]');
+    logger.raw('                [--install-server-core | --skip-server-core-install | --server-core-install <on|off>]');
     logger.raw('                [--probe <off|auto|force>] [--probe-timeout-ms <ms>] [--probe-knowledge <path>] [--probe-max-mods <n>]');
     logger.raw('                [--validation-save-artifacts]');
     logger.raw('  node index.js preset list');
@@ -289,6 +308,9 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('  --validation-timeout-ms Timeout in milliseconds for smoke-test');
     logger.raw('  --validation-entrypoint Explicit path to server launcher for smoke-test');
     logger.raw('  --validation-save-artifacts Save validation stdout/stderr artifacts into report dir');
+    logger.raw('  --install-server-core Install a managed server core into the generated build directory');
+    logger.raw('  --skip-server-core-install Disable managed server core installation for the generated build');
+    logger.raw('  --server-core-install Explicitly set server core installation: on or off');
     logger.raw('  --probe            Dedicated server probe mode: off, auto, or force');
     logger.raw('  --probe-timeout-ms Timeout in milliseconds for one probe run');
     logger.raw('  --probe-knowledge  Path to persistent probe knowledge JSON file');

@@ -27,6 +27,7 @@ export interface CliOptions {
     validationTimeoutMs?: number | string | null;
     validationEntrypointPath?: string | null;
     validationSaveArtifacts?: boolean;
+    installServerCore?: boolean | null;
     probeMode?: ProbeMode | null;
     probeTimeoutMs?: number | string | null;
     probeKnowledgePath?: string | null;
@@ -71,6 +72,7 @@ export interface RuntimeConfig {
     validationTimeoutMs: number;
     validationEntrypointPath: string | null;
     validationSaveArtifacts: boolean;
+    installServerCore: boolean;
     probeMode: ProbeMode;
     probeTimeoutMs: number;
     probeKnowledgePath: string;

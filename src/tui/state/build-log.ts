@@ -26,6 +26,7 @@ const STAGE_IDS = [
     'deep-check',
     'probe',
     'build',
+    'server-core',
     'validation',
     'report'
 ] as const;
@@ -67,6 +68,8 @@ function getStageLabel(stageId: string, t: Translator<MessageKey>): string {
             return t('buildLog.plan.probe');
         case 'build':
             return t('buildLog.plan.build');
+        case 'server-core':
+            return t('buildLog.plan.serverCore');
         case 'validation':
             return t('buildLog.plan.validation');
         case 'report':
@@ -92,6 +95,8 @@ function getStageDescription(stageId: string, t: Translator<MessageKey>): string
             return t('buildLog.description.probe');
         case 'build':
             return t('buildLog.description.build');
+        case 'server-core':
+            return t('buildLog.description.serverCore');
         case 'validation':
             return t('buildLog.description.validation');
         case 'report':

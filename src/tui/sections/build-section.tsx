@@ -27,6 +27,7 @@ const BUILD_STRATEGY_FIELD_KEYS: RunFieldKey[] = [
     'validationTimeoutMs',
     'validationEntrypointPath',
     'validationSaveArtifacts',
+    'installServerCore',
     'registryMode'
 ];
 

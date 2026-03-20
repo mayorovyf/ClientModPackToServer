@@ -27,6 +27,7 @@ interface CreateRunContextOptions {
     validationTimeoutMs?: number;
     validationEntrypointPath?: string | null;
     validationSaveArtifacts?: boolean;
+    installServerCore?: boolean;
     probeMode?: ProbeMode;
     probeTimeoutMs?: number;
     probeKnowledgePath?: string;
@@ -69,6 +70,7 @@ function createRunContext({
     validationTimeoutMs = 15000,
     validationEntrypointPath = null,
     validationSaveArtifacts = false,
+    installServerCore = false,
     probeMode = 'auto',
     probeTimeoutMs = 12000,
     probeKnowledgePath = path.join(process.cwd(), 'data', 'probe-knowledge.json'),
@@ -120,6 +122,7 @@ function createRunContext({
         validationTimeoutMs,
         validationEntrypointPath,
         validationSaveArtifacts,
+        installServerCore,
         probeMode,
         probeTimeoutMs,
         probeKnowledgePath,

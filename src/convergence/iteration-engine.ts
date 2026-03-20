@@ -4,7 +4,9 @@ const { listJarFiles } = require('../io/mods-folder');
 const { buildParsingStats } = require('../metadata/parse-mod-file');
 const { createEmptyProbeSummary, runProbeStage } = require('../probe/run-probe-stage');
 const { applyManualReviewOverrides, resolveReviewOverridesPath } = require('../review/manual-overrides');
+const { detectPackRuntime } = require('../runtime/pack-runtime');
 const { ensureServerEulaAccepted } = require('../server/runtime');
+const { installDetectedServerCore } = require('../server/build-core');
 const { createEmptyValidationReport } = require('../validation/report-model');
 const { runValidationStage } = require('../validation/run-validation');
 const {
@@ -368,31 +370,80 @@ async function runInitialCandidateIteration({
         summary: stats
     });
 
+    const runtimeDetection = detectPackRuntime({
+        runContext,
+        decisions: finalizedDecisions
+    });
+    collector.record('info', 'analysis', `Detected runtime loader: ${runtimeDetection.loader || 'unknown'}`);
+    collector.record('info', 'analysis', `Detected runtime Minecraft version: ${runtimeDetection.minecraftVersion || 'unknown'}`);
+    collector.record('info', 'analysis', `Detected runtime loader version: ${runtimeDetection.loaderVersion || 'unknown'}`);
+
+    effectiveProgressReporter.onStageStarted({
+        stage: 'server-core',
+        total: finalizedDecisions.length,
+        enabled: runContext.installServerCore
+    });
+    const serverCoreInstall = await installDetectedServerCore({
+        runContext,
+        runtimeDetection,
+        record: collector.record
+    });
+    effectiveProgressReporter.onStageCompleted({
+        stage: 'server-core',
+        total: finalizedDecisions.length,
+        status: serverCoreInstall.status,
+        summary: {
+            coreType: serverCoreInstall.coreType,
+            minecraftVersion: serverCoreInstall.minecraftVersion,
+            loaderVersion: serverCoreInstall.loaderVersion,
+            entrypointPath: serverCoreInstall.entrypointPath,
+            reason: serverCoreInstall.reason
+        },
+        skipReason: serverCoreInstall.status === 'skipped' || serverCoreInstall.status === 'not-requested'
+            ? serverCoreInstall.reason
+            : null
+    });
+
     let validationStage: ValidationStageResult = {
         validation: createEmptyValidation(runContext.validationMode)
     };
+    const validationRunContext = serverCoreInstall.entrypointPath && !runContext.validationEntrypointPath
+        ? {
+            ...runContext,
+            validationEntrypointPath: serverCoreInstall.entrypointPath
+        }
+        : runContext;
 
     effectiveProgressReporter.onStageStarted({
         stage: 'validation',
         total: finalizedDecisions.length,
-        mode: runContext.validationMode
+        mode: validationRunContext.validationMode
     });
-    try {
-        validationStage = await runValidationStage({
-            decisions: finalizedDecisions,
-            runContext,
-            record: collector.record
-        });
-    } catch (error) {
-        const serializedError = {
-            code: getErrorCode(error, 'VALIDATION_STAGE_ERROR'),
-            message: getErrorMessage(error)
-        };
-
-        collector.record('error', 'validation-error', `Validation stage crashed: ${getErrorMessage(error)}`);
+    if (serverCoreInstall.status === 'failed' && validationRunContext.validationMode !== 'off') {
         validationStage = {
-            validation: createEmptyValidation(runContext.validationMode, serializedError)
+            validation: createEmptyValidation(validationRunContext.validationMode, {
+                code: 'SERVER_CORE_INSTALL_FAILED',
+                message: serverCoreInstall.reason || 'Managed server core installation failed before validation'
+            })
         };
+    } else {
+        try {
+            validationStage = await runValidationStage({
+                decisions: finalizedDecisions,
+                runContext: validationRunContext,
+                record: collector.record
+            });
+        } catch (error) {
+            const serializedError = {
+                code: getErrorCode(error, 'VALIDATION_STAGE_ERROR'),
+                message: getErrorMessage(error)
+            };
+
+            collector.record('error', 'validation-error', `Validation stage crashed: ${getErrorMessage(error)}`);
+            validationStage = {
+                validation: createEmptyValidation(validationRunContext.validationMode, serializedError)
+            };
+        }
     }
     effectiveProgressReporter.onStageCompleted({
         stage: 'validation',
@@ -444,6 +495,15 @@ async function runInitialCandidateIteration({
         });
     }
 
+    for (const warning of runtimeDetection.warnings || []) {
+        issues.warnings.push({
+            fileName: null,
+            source: 'runtime-detection',
+            code: 'RUNTIME_DETECTION_WARNING',
+            message: warning
+        });
+    }
+
     for (const error of validationStage.validation.errors || []) {
         issues.errors.push({
             fileName: null,
@@ -454,9 +514,27 @@ async function runInitialCandidateIteration({
         });
     }
 
+    if (serverCoreInstall.status === 'failed' && serverCoreInstall.reason) {
+        issues.errors.push({
+            fileName: null,
+            source: 'server-core',
+            code: 'SERVER_CORE_INSTALL_FAILED',
+            message: serverCoreInstall.reason,
+            fatal: false
+        });
+    } else if ((serverCoreInstall.status === 'skipped' || serverCoreInstall.status === 'not-requested') && serverCoreInstall.reason) {
+        issues.warnings.push({
+            fileName: null,
+            source: 'server-core',
+            code: 'SERVER_CORE_INSTALL_SKIPPED',
+            message: serverCoreInstall.reason
+        });
+    }
+
     const report: RunReport = {
         run: {
-            ...runContext,
+            ...validationRunContext,
+            detectedRuntime: runtimeDetection,
             completedAt,
             enabledEngines: currentClassificationContext.enabledEngines,
             registryFilePath: currentClassificationContext.localRegistry?.filePath ?? null,
@@ -471,6 +549,8 @@ async function runInitialCandidateIteration({
         validation: validationStage.validation,
         probe: probeStage,
         manualReview: manualReviewStage.summary,
+        runtimeDetection,
+        serverCoreInstall,
         decisions: finalizedDecisions,
         events: collector.events,
         warnings: issues.warnings,

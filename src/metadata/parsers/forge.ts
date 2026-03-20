@@ -43,6 +43,9 @@ function parseModsToml(content: string | null): DescriptorPatch {
         optionalDependencies: dependencyData.optionalDependencies,
         incompatibilities: dependencyData.incompatibilities,
         provides: [],
+        manifestHints: {
+            loaderVersion: parsed.loaderVersion ? String(parsed.loaderVersion) : ''
+        },
         parsingWarnings: mods.length > 1
             ? [
                   createParsingIssue({

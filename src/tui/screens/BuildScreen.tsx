@@ -187,6 +187,12 @@ export function BuildScreen({
                     validationSaveArtifacts: !form.validationSaveArtifacts
                 });
                 return;
+            case 'installServerCore':
+                onChange({
+                    ...form,
+                    installServerCore: !form.installServerCore
+                });
+                return;
             case 'registryMode':
                 onChange({
                     ...form,

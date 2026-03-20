@@ -11,6 +11,10 @@ import type { RunContext } from '../types/run';
 import type { LoaderKind } from '../types/metadata';
 
 function detectSingleLoader(report: RunReport): LoaderKind | null {
+    if (report.runtimeDetection?.loader) {
+        return report.runtimeDetection.loader;
+    }
+
     const loaders = new Set(
         (report.decisions || [])
             .map((decision) => decision?.descriptor?.loader)
@@ -145,7 +149,7 @@ function createCandidateState({
     }));
     const stateDigest = createStateDigest({
         fingerprintDigest: fingerprint.digest,
-        core: null,
+        core: report.serverCoreInstall?.coreType || report.runtimeDetection?.supportedServerCore || null,
         javaProfile: null,
         validationTimeoutMs: runContext.validationTimeoutMs,
         launchProfile,
@@ -159,7 +163,7 @@ function createCandidateState({
         stateDigest,
         fingerprint,
         loader: detectSingleLoader(report),
-        core: null,
+        core: report.serverCoreInstall?.coreType || report.runtimeDetection?.supportedServerCore || null,
         javaProfile: null,
         validationTimeoutMs: runContext.validationTimeoutMs,
         launchProfile,

@@ -50,6 +50,7 @@ export interface RunFormState {
     validationTimeoutMs: string;
     validationEntrypointPath: string;
     validationSaveArtifacts: boolean;
+    installServerCore: boolean;
     registryMode: RegistryMode;
     registryManifestUrl: string;
     registryBundleUrl: string;
@@ -136,6 +137,7 @@ export function createDefaultRunFormState(): RunFormState {
         validationTimeoutMs: '',
         validationEntrypointPath: '',
         validationSaveArtifacts: false,
+        installServerCore: true,
         registryMode: 'auto',
         registryManifestUrl: DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
         registryBundleUrl: '',

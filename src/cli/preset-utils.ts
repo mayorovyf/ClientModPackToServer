@@ -54,6 +54,10 @@ export function applyCliOptionsToRunForm(cliOptions: CliOptions, baseForm?: RunF
         initialForm.validationEntrypointPath = cliOptions.validationEntrypointPath;
     }
 
+    if (cliOptions.installServerCore !== null && cliOptions.installServerCore !== undefined) {
+        initialForm.installServerCore = Boolean(cliOptions.installServerCore);
+    }
+
     if (cliOptions.registryMode) {
         initialForm.registryMode = cliOptions.registryMode;
     }
@@ -112,6 +116,7 @@ export function runFormToCliOptions(form: RunFormState): CliOptions {
         validationTimeoutMs: form.validationTimeoutMs.trim() || null,
         validationEntrypointPath: form.validationEntrypointPath.trim() || null,
         validationSaveArtifacts: form.validationSaveArtifacts,
+        installServerCore: form.installServerCore,
         engineNames: splitEngineNames(form.enabledEngineNames),
         disabledEngineNames: splitEngineNames(form.disabledEngineNames),
         dryRun: form.dryRun,
@@ -139,6 +144,7 @@ export function mergeCliOptions(baseOptions: CliOptions, overrideOptions: CliOpt
         validationTimeoutMs: overrideOptions.validationTimeoutMs ?? baseOptions.validationTimeoutMs ?? null,
         validationEntrypointPath: overrideOptions.validationEntrypointPath ?? baseOptions.validationEntrypointPath ?? null,
         validationSaveArtifacts: Boolean(baseOptions.validationSaveArtifacts || overrideOptions.validationSaveArtifacts),
+        installServerCore: overrideOptions.installServerCore ?? baseOptions.installServerCore ?? null,
         engineNames: overrideOptions.engineNames && overrideOptions.engineNames.length > 0
             ? overrideOptions.engineNames
             : baseOptions.engineNames ?? [],
