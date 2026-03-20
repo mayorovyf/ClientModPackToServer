@@ -1,10 +1,10 @@
 import React from 'react';
 
+import { BuildLogDetails } from '../components/BuildLogDetails.js';
 import { BuildPreflightDetails } from '../components/BuildPreflightDetails.js';
 import { PresetComparisonDetails } from '../components/PresetComparisonDetails.js';
 import { RunFieldDetails } from '../components/RunFieldDetails.js';
-import { RunSummary } from '../components/RunSummary.js';
-import { BuildLaunchScreen } from '../screens/BuildLaunchScreen.js';
+import { BuildLogScreen } from '../screens/BuildLogScreen.js';
 import { BuildPreflightScreen } from '../screens/BuildPreflightScreen.js';
 import { BuildScreen } from '../screens/BuildScreen.js';
 import { PresetsScreen } from '../screens/PresetsScreen.js';
@@ -12,6 +12,7 @@ import { PresetsScreen } from '../screens/PresetsScreen.js';
 import type { MessageKey } from '../../i18n/catalog.js';
 import type { Translator } from '../../i18n/types.js';
 import type { RunFormState, RunSessionState, TuiMode } from '../state/app-state.js';
+import type { BuildLogItem } from '../state/build-log.js';
 import type { RunPreset } from '../state/presets.js';
 import type { RunPreflightCheck, RunPreflightSummary } from '../state/run-preflight.js';
 import type { RunFieldKey } from '../state/run-fields.js';
@@ -34,6 +35,9 @@ export function createBuildSection({
     form,
     uiMode,
     session,
+    buildLogItems,
+    selectedBuildLogItem,
+    selectedBuildLogItemId,
     selectedRunField,
     preflightChecks,
     preflightSummary,
@@ -45,8 +49,8 @@ export function createBuildSection({
     compact,
     onChange,
     onRun,
-    onRunWithOverrides,
     onInteractionChange,
+    onSelectedBuildLogItemIdChange,
     onSelectedFieldChange,
     onSelectedPreflightCheckIdChange,
     onSelectedPresetIdChange,
@@ -59,6 +63,9 @@ export function createBuildSection({
     form: RunFormState;
     uiMode: TuiMode;
     session: RunSessionState;
+    buildLogItems: BuildLogItem[];
+    selectedBuildLogItem: BuildLogItem | null;
+    selectedBuildLogItemId: string;
     selectedRunField: RunFieldKey;
     preflightChecks: RunPreflightCheck[];
     preflightSummary: RunPreflightSummary | null;
@@ -70,8 +77,8 @@ export function createBuildSection({
     compact: boolean;
     onChange: (nextForm: RunFormState) => void;
     onRun: () => void;
-    onRunWithOverrides: (overrides: Partial<RunFormState>) => void;
     onInteractionChange: (isLocked: boolean) => void;
+    onSelectedBuildLogItemIdChange: (itemId: string) => void;
     onSelectedFieldChange: (fieldKey: RunFieldKey) => void;
     onSelectedPreflightCheckIdChange: (checkId: string) => void;
     onSelectedPresetIdChange: (presetId: string) => void;
@@ -196,35 +203,31 @@ export function createBuildSection({
             },
             {
                 id: 'launch',
-                label: t('page.build.launch'),
+                label: t('page.build.log'),
                 chromeColor: 'yellow',
                 hasDetails: true,
                 renderContent: ({ contentHeight, isContentFocused }) => (
-                    <BuildLaunchScreen
-                        form={form}
+                    <BuildLogScreen
+                        items={buildLogItems}
+                        selectedItemId={selectedBuildLogItemId}
+                        onSelectedItemChange={onSelectedBuildLogItemIdChange}
                         session={session}
-                        preflight={effectivePreflightSummary}
-                        onRunCurrent={onRun}
-                        onRunDryRunOnce={() => onRunWithOverrides({ dryRun: true })}
-                        onRunFullBuildOnce={() => onRunWithOverrides({ dryRun: false })}
                         isFocused={isContentFocused}
                         height={contentHeight}
                     />
                 ),
                 renderDetails: ({ detailsHeight, isDetailsFocused }) => (
-                    <RunSummary
-                        session={session}
-                        compact={compact}
-                        eventLimit={8}
+                    <BuildLogDetails
+                        item={selectedBuildLogItem}
                         isFocused={isDetailsFocused}
                         height={detailsHeight}
                     />
                 ),
                 getStatusMessage: () => session.status === 'running'
-                    ? t('section.build.launch.running')
-                    : effectivePreflightSummary.canRun
-                        ? t('section.build.launch.ready')
-                        : t('section.build.launch.blocked')
+                    ? t('section.build.log.running')
+                    : buildLogItems.some((item) => item.kind === 'event')
+                        ? t('section.build.log.ready')
+                        : t('section.build.log.empty')
             },
             {
                 id: 'presets',

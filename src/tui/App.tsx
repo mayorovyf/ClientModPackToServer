@@ -19,6 +19,7 @@ import { LocaleContext } from './i18n/LocaleContext.js';
 import { createSectionRegistry } from './sections/registry.js';
 import { NAVIGATION_ITEMS } from './state/app-state.js';
 import { AUTHOR_PROFILES } from './state/authors.js';
+import { buildRunLogItems } from './state/build-log.js';
 import { loadPersistedTuiState, savePersistedTuiState } from './state/persisted-state.js';
 import { deleteRunPreset, loadRunPresets, saveRunPreset } from './state/presets.js';
 import { loadReportForHistoryEntry, loadReportHistory, resolveReportRootDir } from './state/report-history.js';
@@ -99,6 +100,7 @@ export function App(): React.JSX.Element {
     const [focusedColumn, setFocusedColumn] = useState<FocusedColumn>('content');
     const [interactionLocked, setInteractionLocked] = useState(false);
     const [selectedRunField, setSelectedRunField] = useState<RunFieldKey>('inputPath');
+    const [selectedBuildLogItemId, setSelectedBuildLogItemId] = useState('');
     const [selectedServerField, setSelectedServerField] = useState<ServerFieldKey>('targetDir');
     const [selectedAuthorId, setSelectedAuthorId] = useState<string>(AUTHOR_PROFILES[0]?.id ?? '');
     const [selectedReportRunId, setSelectedReportRunId] = useState('');
@@ -120,6 +122,7 @@ export function App(): React.JSX.Element {
     const { session, startRun, cancelRun } = useBackendRun();
     const serverManager = useServerManager();
     const serverEntrypointCacheRef = useRef<Map<string, string | null>>(new Map());
+    const lastBuildLogItemIdRef = useRef('');
     const t = useMemo(() => createTranslator(locale), [locale]);
 
     const reportRootDir = useMemo(
@@ -138,8 +141,20 @@ export function App(): React.JSX.Element {
         () => buildRunPreflight(form),
         [form]
     );
+    const buildLogItems = useMemo(
+        () => buildRunLogItems({
+            form,
+            session,
+            preflight: runPreflight.summary,
+            t
+        }),
+        [form, runPreflight.summary, session, t]
+    );
     const selectedRunPreflightCheck = runPreflight.checks.find((check) => check.id === selectedRunPreflightCheckId)
         || runPreflight.checks[0]
+        || null;
+    const selectedBuildLogItem = buildLogItems.find((item) => item.id === selectedBuildLogItemId)
+        || buildLogItems[buildLogItems.length - 1]
         || null;
     const selectedPreset: RunPreset | null = useMemo(
         () => presets.find((preset) => preset.id === selectedPresetId) ?? presets[0] ?? null,
@@ -274,6 +289,10 @@ export function App(): React.JSX.Element {
         setShowHints,
         session,
         compact: layout.compact,
+        buildLogItems,
+        selectedBuildLogItem,
+        selectedBuildLogItemId,
+        setSelectedBuildLogItemId,
         latestBuildDir,
         selectedRunField,
         setSelectedRunField,
@@ -350,8 +369,7 @@ export function App(): React.JSX.Element {
         selectedAuthorId,
         setSelectedAuthorId,
         onInteractionChange: setInteractionLocked,
-        onRun: handleRun,
-        onRunWithOverrides: handleRunWithOverrides
+        onRun: handleRun
     };
     const sectionRegistry = createSectionRegistry(sectionContext);
     const activeSection = sectionRegistry[activeScreen];
@@ -403,6 +421,19 @@ export function App(): React.JSX.Element {
             setPersistenceError(error instanceof Error ? error.message : String(error));
         }
     }, [activePageByScreen, activeScreen, form, locale, serverForm, showHints, uiMode]);
+
+    useEffect(() => {
+        const lastItemId = buildLogItems[buildLogItems.length - 1]?.id ?? '';
+        const previousLastItemId = lastBuildLogItemIdRef.current;
+
+        if (!selectedBuildLogItemId
+            || !buildLogItems.some((item) => item.id === selectedBuildLogItemId)
+            || selectedBuildLogItemId === previousLastItemId) {
+            setSelectedBuildLogItemId(lastItemId);
+        }
+
+        lastBuildLogItemIdRef.current = lastItemId;
+    }, [buildLogItems, selectedBuildLogItemId]);
 
     useEffect(() => {
         if (!selectedReportRunId && reportHistory.entries[0]?.runId) {
@@ -568,13 +599,6 @@ export function App(): React.JSX.Element {
 
     function handleRun(): void {
         runWithForm(form);
-    }
-
-    function handleRunWithOverrides(overrides: Partial<RunFormState>): void {
-        runWithForm({
-            ...form,
-            ...overrides
-        });
     }
 
     function refreshPresets(nextSelectedPresetId?: string): void {

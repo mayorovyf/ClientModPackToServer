@@ -200,7 +200,7 @@ export function cycleOption<T extends string>(currentValue: T, values: readonly 
 
 export function appendBackendEvent(events: BackendEvent[], event: BackendEvent): BackendEvent[] {
     const nextEvents = [...events, event];
-    return nextEvents.slice(-40);
+    return nextEvents.slice(-1000);
 }
 
 export function applyBackendEvent(session: RunSessionState, event: BackendEvent): RunSessionState {

@@ -18,6 +18,7 @@ import type { RunPreset } from '../state/presets.js';
 import type { ResultCompareItem, ResultCompareSummary } from '../state/result-compare.js';
 import type { ResultProblemItem, ResultProblemsSummary } from '../state/result-problems.js';
 import type { ServerDoctorState } from '../state/server-doctor.js';
+import type { BuildLogItem } from '../state/build-log.js';
 import type { ResultModItem, ResultModsSortMode } from '../state/results-mods.js';
 import type { DecisionReviewState, ReviewItem } from '../state/review-items.js';
 import type { RunPreflightCheck, RunPreflightSummary } from '../state/run-preflight.js';
@@ -67,6 +68,10 @@ export interface SectionRegistryContext {
     setShowHints: (nextValue: boolean) => void;
     session: RunSessionState;
     compact: boolean;
+    buildLogItems?: BuildLogItem[];
+    selectedBuildLogItem?: BuildLogItem | null;
+    selectedBuildLogItemId?: string;
+    setSelectedBuildLogItemId?: (itemId: string) => void;
     latestBuildDir: string | null;
     selectedRunField: RunFieldKey;
     setSelectedRunField: (fieldKey: RunFieldKey) => void;
@@ -138,5 +143,4 @@ export interface SectionRegistryContext {
     setSelectedAuthorId: (authorId: string) => void;
     onInteractionChange: (locked: boolean) => void;
     onRun: () => void;
-    onRunWithOverrides?: (overrides: Partial<RunFormState>) => void;
 }

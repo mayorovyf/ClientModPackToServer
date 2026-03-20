@@ -19,6 +19,10 @@ export function createSectionRegistry(context: SectionRegistryContext): Record<S
         setShowHints,
         session,
         compact,
+        buildLogItems = [],
+        selectedBuildLogItem = null,
+        selectedBuildLogItemId = '',
+        setSelectedBuildLogItemId = () => {},
         latestBuildDir,
         selectedRunField,
         setSelectedRunField,
@@ -89,8 +93,7 @@ export function createSectionRegistry(context: SectionRegistryContext): Record<S
         selectedAuthorId,
         setSelectedAuthorId,
         onInteractionChange,
-        onRun,
-        onRunWithOverrides = () => {}
+        onRun
     } = context;
 
     return {
@@ -99,6 +102,9 @@ export function createSectionRegistry(context: SectionRegistryContext): Record<S
             form,
             uiMode,
             session,
+            buildLogItems,
+            selectedBuildLogItem,
+            selectedBuildLogItemId,
             selectedRunField,
             preflightChecks: runPreflightChecks,
             preflightSummary: runPreflightSummary,
@@ -110,8 +116,8 @@ export function createSectionRegistry(context: SectionRegistryContext): Record<S
             compact,
             onChange: setForm,
             onRun,
-            onRunWithOverrides,
             onInteractionChange,
+            onSelectedBuildLogItemIdChange: setSelectedBuildLogItemId,
             onSelectedFieldChange: setSelectedRunField,
             onSelectedPreflightCheckIdChange: setSelectedRunPreflightCheckId,
             onSelectedPresetIdChange: setSelectedPresetId,
