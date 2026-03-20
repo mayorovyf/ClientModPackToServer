@@ -1,11 +1,10 @@
 import type { InstanceInputKind, InstanceSource } from './intake';
-import type { LoaderKind } from './metadata';
 import type { ValidationEntrypointKind } from './validation';
 import type { ManagedServerEntrypointKind, ServerCoreType } from '../server/types';
+import type { RuntimeTopologyAssessment } from './topology';
 
 export type SupportBoundaryFacetStatus = 'supported' | 'unsupported' | 'pending';
 export type SupportBoundaryStatus = 'supported' | 'unsupported';
-export type LoaderProfileKind = 'single-loader' | 'hybrid-loader' | 'unresolved';
 export type SupportBoundaryTier = 'tier-a';
 export type TrustPolicyDisposition = 'safe-by-default' | 'guarded' | 'manual-only' | 'forbidden';
 export type TrustPolicyAction =
@@ -32,15 +31,6 @@ export interface SupportBoundaryLayoutCheck {
     instanceSource: InstanceSource;
     supportedInputKinds: InstanceInputKind[];
     supportedInstanceSources: InstanceSource[];
-}
-
-export interface SupportBoundaryLoaderProfileCheck {
-    status: SupportBoundaryFacetStatus;
-    code: string;
-    summary: string;
-    profile: LoaderProfileKind;
-    detectedLoaders: LoaderKind[];
-    supportedLoaders: LoaderKind[];
 }
 
 export interface SupportBoundaryEntrypointCheck {
@@ -70,7 +60,7 @@ export interface SupportBoundaryAssessment {
     reasons: string[];
     pendingCheckCodes: string[];
     layout: SupportBoundaryLayoutCheck;
-    loaderProfile: SupportBoundaryLoaderProfileCheck;
+    runtimeTopology: RuntimeTopologyAssessment;
     validationEntrypoint: SupportBoundaryEntrypointCheck;
     managedServer: SupportBoundaryManagedServerCheck;
 }

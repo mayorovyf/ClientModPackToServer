@@ -1,13 +1,14 @@
 const { getEntrypointKind } = require('../validation/entrypoint-resolver');
+const { assessRuntimeTopology } = require('../topology/assessment');
 const {
     SUPPORTED_LAYOUT_INPUT_KINDS,
     SUPPORTED_LAYOUT_SOURCES,
-    SUPPORTED_LOADERS,
     SUPPORTED_VALIDATION_ENTRYPOINT_KINDS,
     SUPPORTED_MANAGED_SERVER_ENTRYPOINT_KINDS,
     SUPPORTED_SERVER_CORE_TYPES
 } = require('./constants');
 
+import type { PackRuntimeDetection } from '../types/runtime-detection';
 import type { ValidationEntrypoint } from '../types/validation';
 import type { SupportBoundaryAssessment, SupportBoundaryFacetStatus } from '../types/policy';
 import type { RunContext } from '../types/run';
@@ -23,12 +24,22 @@ function deriveAssessmentStatus(checkStatuses: SupportBoundaryFacetStatus[]): 's
 function buildAssessmentSummary({
     status,
     isFinal,
-    hasPendingChecks
+    hasPendingChecks,
+    runtimeTopology
 }: {
     status: 'supported' | 'unsupported';
     isFinal: boolean;
     hasPendingChecks: boolean;
+    runtimeTopology: SupportBoundaryAssessment['runtimeTopology'];
 }): string {
+    if (runtimeTopology.assessment === 'pending' && isFinal) {
+        return 'Scenario maps to a runtime topology that is recognized by the whitelist, but it is still pending and not inside the automated Tier A boundary.';
+    }
+
+    if (runtimeTopology.assessment === 'blocked-by-trust-policy') {
+        return 'Scenario requires a connector or topology-specific step that is blocked by the Tier A trust policy.';
+    }
+
     if (status === 'unsupported') {
         return 'Scenario is outside the Tier A support boundary.';
     }
@@ -56,67 +67,6 @@ function buildLayoutCheck(runContext: RunContext): SupportBoundaryAssessment['la
         instanceSource: runContext.instanceSource,
         supportedInputKinds: [...SUPPORTED_LAYOUT_INPUT_KINDS],
         supportedInstanceSources: [...SUPPORTED_LAYOUT_SOURCES]
-    };
-}
-
-function buildLoaderProfileCheck({
-    decisions,
-    isFinal
-}: {
-    decisions?: Array<Record<string, any>> | null;
-    isFinal: boolean;
-}): SupportBoundaryAssessment['loaderProfile'] {
-    if (!Array.isArray(decisions)) {
-        return {
-            status: 'pending',
-            code: 'LOADER_PROFILE_PENDING',
-            summary: 'Loader profile will be resolved after static analysis.',
-            profile: 'unresolved',
-            detectedLoaders: [],
-            supportedLoaders: [...SUPPORTED_LOADERS]
-        };
-    }
-
-    const detectedLoaders = toSortedUniqueList(decisions
-        .map((decision) => decision?.descriptor?.loader)
-        .filter((loader) => typeof loader === 'string' && loader !== 'unknown')) as SupportBoundaryAssessment['loaderProfile']['detectedLoaders'];
-
-    if (detectedLoaders.length === 0) {
-        return {
-            status: isFinal ? 'unsupported' : 'pending',
-            code: isFinal ? 'LOADER_PROFILE_UNRESOLVED' : 'LOADER_PROFILE_PENDING',
-            summary: isFinal
-                ? 'Static analysis could not determine a supported single-loader profile.'
-                : 'Loader profile has not been resolved yet.',
-            profile: 'unresolved',
-            detectedLoaders,
-            supportedLoaders: [...SUPPORTED_LOADERS]
-        };
-    }
-
-    if (detectedLoaders.length > 1) {
-        return {
-            status: 'unsupported',
-            code: 'HYBRID_LOADER_PACK',
-            summary: `Detected multiple loaders: ${detectedLoaders.join(', ')}.`,
-            profile: 'hybrid-loader',
-            detectedLoaders,
-            supportedLoaders: [...SUPPORTED_LOADERS]
-        };
-    }
-
-    const [loader] = detectedLoaders;
-    const supported = SUPPORTED_LOADERS.includes(loader);
-
-    return {
-        status: supported ? 'supported' : 'unsupported',
-        code: supported ? 'SINGLE_LOADER_SUPPORTED' : 'LOADER_UNSUPPORTED',
-        summary: supported
-            ? `Detected single-loader pack: ${loader}.`
-            : `Detected loader ${loader}, which is outside the Tier A whitelist.`,
-        profile: 'single-loader',
-        detectedLoaders,
-        supportedLoaders: [...SUPPORTED_LOADERS]
     };
 }
 
@@ -173,7 +123,21 @@ function buildValidationEntrypointCheck({
     };
 }
 
-function buildManagedServerCheck(): SupportBoundaryAssessment['managedServer'] {
+function buildManagedServerCheck({
+    runtimeTopology
+}: {
+    runtimeTopology: SupportBoundaryAssessment['runtimeTopology'];
+}): SupportBoundaryAssessment['managedServer'] {
+    if (runtimeTopology.matchedWhitelistEntry) {
+        return {
+            status: 'supported',
+            code: 'MANAGED_SERVER_TOPOLOGY_WHITELIST_READY',
+            summary: `Managed server operations are constrained by runtime topology ${runtimeTopology.matchedWhitelistEntry.topologyId}.`,
+            supportedCoreTypes: [...runtimeTopology.matchedWhitelistEntry.allowedCoreTypes],
+            supportedEntrypointKinds: [...runtimeTopology.matchedWhitelistEntry.allowedManagedEntrypointKinds]
+        };
+    }
+
     return {
         status: 'supported',
         code: 'MANAGED_SERVER_WHITELIST_READY',
@@ -198,25 +162,31 @@ function collectPendingCheckCodes(checks: Array<{ status: SupportBoundaryFacetSt
 function assessSupportBoundary({
     runContext,
     decisions = null,
+    runtimeDetection = null,
     validationEntrypoint = null,
     isFinal = false
 }: {
     runContext: RunContext;
     decisions?: Array<Record<string, any>> | null;
+    runtimeDetection?: PackRuntimeDetection | null;
     validationEntrypoint?: ValidationEntrypoint | null;
     isFinal?: boolean;
 }): SupportBoundaryAssessment {
     const layout = buildLayoutCheck(runContext);
-    const loaderProfile = buildLoaderProfileCheck({
+    const runtimeTopology = assessRuntimeTopology({
+        runContext,
         decisions,
+        runtimeDetection,
         isFinal
     });
     const validationEntrypointCheck = buildValidationEntrypointCheck({
         runContext,
         validationEntrypoint
     });
-    const managedServer = buildManagedServerCheck();
-    const checks = [layout, loaderProfile, validationEntrypointCheck, managedServer];
+    const managedServer = buildManagedServerCheck({
+        runtimeTopology
+    });
+    const checks = [layout, runtimeTopology, validationEntrypointCheck, managedServer];
     const pendingCheckCodes = collectPendingCheckCodes(checks);
     const hasPendingChecks = pendingCheckCodes.length > 0;
     const status = deriveAssessmentStatus(checks.map((check) => check.status));
@@ -229,12 +199,13 @@ function assessSupportBoundary({
         summary: buildAssessmentSummary({
             status,
             isFinal,
-            hasPendingChecks
+            hasPendingChecks,
+            runtimeTopology
         }),
         reasons: collectReasons(checks),
         pendingCheckCodes,
         layout,
-        loaderProfile,
+        runtimeTopology,
         validationEntrypoint: validationEntrypointCheck,
         managedServer
     };

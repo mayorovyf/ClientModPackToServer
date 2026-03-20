@@ -84,6 +84,8 @@ export interface RunReport {
         supportBoundaryTier?: string;
         supportBoundaryStatus?: string;
         supportBoundaryHasPendingChecks?: boolean;
+        supportBoundaryTopologyId?: string | null;
+        supportBoundaryTopologyAssessment?: string | null;
         primaryTerminalOutcomes?: string[];
     };
     stats: {

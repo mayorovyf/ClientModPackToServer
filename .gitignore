@@ -15,6 +15,9 @@
 /.cache/
 /docs/
 /tests/
+/benchmarks/
+/src/benchmark/
+/src/cli/benchmark-command.ts
 
 # Кеши TypeScript и инструментов
 *.tsbuildinfo

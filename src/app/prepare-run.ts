@@ -60,6 +60,8 @@ function logPreparedRun({
     logger.info(`Probe timeout: ${runContext.probeTimeoutMs}ms`);
     logger.info(`Probe knowledge: ${runContext.probeKnowledgePath}`);
     logger.info(`Support boundary: ${releaseContract.supportBoundary.status}`);
+    logger.info(`Runtime topology: ${releaseContract.supportBoundary.runtimeTopology.topologyId || releaseContract.supportBoundary.runtimeTopology.assessment}`);
+    logger.info(`Runtime topology summary: ${releaseContract.supportBoundary.runtimeTopology.summary}`);
     logger.info(`Support boundary summary: ${releaseContract.supportBoundary.summary}`);
     logger.info(`Primary terminal outcomes: ${releaseContract.terminalOutcomes.primaryOutcomes.join(', ')}`);
 }

@@ -77,6 +77,8 @@ function applyPhase0ContractToReport({
     report.run.supportBoundaryTier = releaseContract.supportBoundary.tier;
     report.run.supportBoundaryStatus = releaseContract.supportBoundary.status;
     report.run.supportBoundaryHasPendingChecks = releaseContract.supportBoundary.hasPendingChecks;
+    report.run.supportBoundaryTopologyId = releaseContract.supportBoundary.runtimeTopology.topologyId;
+    report.run.supportBoundaryTopologyAssessment = releaseContract.supportBoundary.runtimeTopology.assessment;
     report.run.primaryTerminalOutcomes = [...releaseContract.terminalOutcomes.primaryOutcomes];
 
     return report;
@@ -150,6 +152,8 @@ function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFina
     runLogger.success(`Recipe: ${reportFiles.recipePath}`);
     runLogger.success(`Candidates: ${reportFiles.candidatesPath}`);
     runLogger.info(`Support boundary: ${report.releaseContract ? report.releaseContract.supportBoundary.status : 'n/a'}`);
+    runLogger.info(`Runtime topology: ${report.releaseContract ? (report.releaseContract.supportBoundary.runtimeTopology.topologyId || report.releaseContract.supportBoundary.runtimeTopology.assessment) : 'n/a'}`);
+    runLogger.info(`Runtime topology summary: ${report.releaseContract ? report.releaseContract.supportBoundary.runtimeTopology.summary : 'n/a'}`);
     runLogger.info(`Primary terminal outcomes: ${report.releaseContract ? report.releaseContract.terminalOutcomes.primaryOutcomes.join(', ') : 'n/a'}`);
     runLogger.info(`Failure family: ${report.failureAnalysis ? (report.failureAnalysis.family || report.failureAnalysis.kind) : 'n/a'}`);
     runLogger.info(`Terminal outcome: ${report.terminalOutcome ? report.terminalOutcome.id : 'n/a'}`);

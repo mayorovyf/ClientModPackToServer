@@ -34,6 +34,7 @@ function createPhase0ReportContract({
     const supportBoundary = assessSupportBoundary({
         runContext,
         decisions: report.decisions || [],
+        runtimeDetection: report.runtimeDetection || null,
         validationEntrypoint: report.validation?.entrypoint || null,
         isFinal: true
     });
