@@ -10,6 +10,8 @@ export interface ReportHistoryEntry {
     runMetadataPath: string | null;
     summaryPath: string | null;
     eventsLogPath: string | null;
+    recipePath: string | null;
+    candidatesPath: string | null;
     instancePath: string | null;
     buildDir: string | null;
     serverDirName: string | null;
@@ -30,6 +32,11 @@ export interface ReportHistoryEntry {
     review: number;
     warnings: number;
     errors: number;
+    terminalOutcomeId: string | null;
+    terminalOutcomeExplanation: string | null;
+    candidateCount: number;
+    currentCandidateId: string | null;
+    currentIteration: number | null;
 }
 
 export interface ReportHistoryState {
@@ -75,16 +82,29 @@ function getExistingFilePath(filePath: string): string | null {
     return fs.existsSync(filePath) ? filePath : null;
 }
 
+function resolveExistingFilePath(preferredPath: unknown, fallbackPath: string): string | null {
+    if (typeof preferredPath === 'string' && preferredPath.trim() && fs.existsSync(preferredPath)) {
+        return preferredPath;
+    }
+
+    return getExistingFilePath(fallbackPath);
+}
+
 function readHistoryEntry(reportDir: string): ReportHistoryEntry | null {
     const reportDirectoryName = path.basename(reportDir);
     const runMetadataPath = path.join(reportDir, 'run.json');
     const jsonReportPath = path.join(reportDir, 'report.json');
     const summaryPath = path.join(reportDir, 'summary.md');
     const eventsLogPath = path.join(reportDir, 'events.log');
+    const recipePath = path.join(reportDir, 'recipe.json');
+    const candidatesPath = path.join(reportDir, 'candidates.json');
 
     const report = readJsonFile<RunReport>(jsonReportPath);
     const runFromReport = report?.run ? (report.run as RunMetadata) : null;
     const run = readJsonFile<RunMetadata>(runMetadataPath) || runFromReport;
+    const currentCandidate = report?.candidateTrace?.candidates.find((candidate) => candidate.candidateId === report.candidateTrace?.currentCandidateId)
+        || report?.candidateTrace?.candidates.at(-1)
+        || null;
 
     if (!run && !report) {
         return null;
@@ -106,6 +126,8 @@ function readHistoryEntry(reportDir: string): ReportHistoryEntry | null {
         runMetadataPath: getExistingFilePath(runMetadataPath),
         summaryPath: getExistingFilePath(summaryPath),
         eventsLogPath: getExistingFilePath(eventsLogPath),
+        recipePath: resolveExistingFilePath(run?.recipePath, recipePath),
+        candidatesPath: resolveExistingFilePath(run?.candidatesPath, candidatesPath),
         instancePath: typeof run?.instancePath === 'string' ? run.instancePath : null,
         buildDir: typeof run?.buildDir === 'string' ? run.buildDir : null,
         serverDirName: typeof run?.serverDirName === 'string' ? run.serverDirName : null,
@@ -125,7 +147,12 @@ function readHistoryEntry(reportDir: string): ReportHistoryEntry | null {
         excluded: report?.stats.excluded ?? 0,
         review: report?.arbiter?.summary.finalDecisions.review ?? 0,
         warnings: report?.warnings.length ?? 0,
-        errors: report?.errors.length ?? 0
+        errors: report?.errors.length ?? 0,
+        terminalOutcomeId: report?.terminalOutcome?.id ?? null,
+        terminalOutcomeExplanation: report?.terminalOutcome?.explanation ?? null,
+        candidateCount: report?.candidateTrace?.candidates.length ?? 0,
+        currentCandidateId: currentCandidate?.candidateId ?? null,
+        currentIteration: typeof currentCandidate?.iteration === 'number' ? currentCandidate.iteration : null
     };
 }
 

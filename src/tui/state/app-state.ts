@@ -75,12 +75,20 @@ export interface ReportPathsState {
     jsonReportPath: string | null;
     summaryPath: string | null;
     eventsLogPath: string | null;
+    recipePath: string | null;
+    candidatesPath: string | null;
 }
 
 export interface RunSessionState {
     status: RunSessionStatus;
     runId: string | null;
     currentStage: string | null;
+    currentConvergenceStage: string | null;
+    currentCandidateId: string | null;
+    currentIteration: number | null;
+    candidateCount: number;
+    terminalOutcomeId: string | null;
+    terminalOutcomeExplanation: string | null;
     lastError: string | null;
     reportPaths: ReportPathsState;
     registrySnapshot: Record<string, unknown> | null;
@@ -156,12 +164,20 @@ export function createInitialRunSessionState(): RunSessionState {
         status: 'idle',
         runId: null,
         currentStage: null,
+        currentConvergenceStage: null,
+        currentCandidateId: null,
+        currentIteration: null,
+        candidateCount: 0,
+        terminalOutcomeId: null,
+        terminalOutcomeExplanation: null,
         lastError: null,
         reportPaths: {
             reportDir: null,
             jsonReportPath: null,
             summaryPath: null,
-            eventsLogPath: null
+            eventsLogPath: null,
+            recipePath: null,
+            candidatesPath: null
         },
         registrySnapshot: null,
         validationSnapshot: null,
@@ -203,6 +219,54 @@ export function appendBackendEvent(events: BackendEvent[], event: BackendEvent):
     return nextEvents.slice(-1000);
 }
 
+function readStringPayloadField(payload: BackendEvent['payload'], key: string): string | null {
+    const value = payload[key];
+    return typeof value === 'string' ? value : null;
+}
+
+function readNumberPayloadField(payload: BackendEvent['payload'], key: string): number | null {
+    const value = payload[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function applyConvergenceSnapshotFromPayload(session: RunSessionState, payload: BackendEvent['payload']): void {
+    const currentCandidateId = readStringPayloadField(payload, 'currentCandidateId')
+        || readStringPayloadField(payload, 'candidateId');
+    const currentIteration = readNumberPayloadField(payload, 'currentIteration');
+    const iteration = currentIteration ?? readNumberPayloadField(payload, 'iteration');
+    const candidateCount = readNumberPayloadField(payload, 'candidateCount');
+    const terminalOutcomeId = readStringPayloadField(payload, 'terminalOutcomeId');
+    const terminalOutcomeExplanation = readStringPayloadField(payload, 'terminalOutcomeExplanation');
+    const loopStage = readStringPayloadField(payload, 'loopStage');
+
+    if (currentCandidateId) {
+        session.currentCandidateId = currentCandidateId;
+    }
+
+    if (typeof iteration === 'number') {
+        session.currentIteration = iteration;
+        if (candidateCount === null) {
+            session.candidateCount = Math.max(session.candidateCount, iteration + 1);
+        }
+    }
+
+    if (typeof candidateCount === 'number') {
+        session.candidateCount = candidateCount;
+    }
+
+    if (loopStage) {
+        session.currentConvergenceStage = loopStage;
+    }
+
+    if (terminalOutcomeId) {
+        session.terminalOutcomeId = terminalOutcomeId;
+    }
+
+    if (terminalOutcomeExplanation) {
+        session.terminalOutcomeExplanation = terminalOutcomeExplanation;
+    }
+}
+
 export function applyBackendEvent(session: RunSessionState, event: BackendEvent): RunSessionState {
     const nextSession: RunSessionState = {
         ...session,
@@ -216,6 +280,12 @@ export function applyBackendEvent(session: RunSessionState, event: BackendEvent)
     switch (event.type) {
         case 'run.started':
             nextSession.status = 'running';
+            nextSession.currentConvergenceStage = null;
+            nextSession.currentCandidateId = null;
+            nextSession.currentIteration = null;
+            nextSession.candidateCount = 0;
+            nextSession.terminalOutcomeId = null;
+            nextSession.terminalOutcomeExplanation = null;
             nextSession.lastError = null;
             break;
         case 'stage.started':
@@ -237,21 +307,33 @@ export function applyBackendEvent(session: RunSessionState, event: BackendEvent)
         case 'build.action.completed':
             nextSession.buildSnapshot = event.payload;
             break;
+        case 'convergence.candidate.started':
+        case 'convergence.plan.selected':
+        case 'convergence.candidate.completed':
+        case 'convergence.terminal-outcome':
+            applyConvergenceSnapshotFromPayload(nextSession, event.payload);
+            break;
         case 'report.written':
             nextSession.reportPaths = {
                 reportDir: typeof event.payload.reportDir === 'string' ? event.payload.reportDir : null,
                 jsonReportPath: typeof event.payload.jsonReportPath === 'string' ? event.payload.jsonReportPath : null,
                 summaryPath: typeof event.payload.summaryPath === 'string' ? event.payload.summaryPath : null,
-                eventsLogPath: typeof event.payload.eventsLogPath === 'string' ? event.payload.eventsLogPath : null
+                eventsLogPath: typeof event.payload.eventsLogPath === 'string' ? event.payload.eventsLogPath : null,
+                recipePath: typeof event.payload.recipePath === 'string' ? event.payload.recipePath : null,
+                candidatesPath: typeof event.payload.candidatesPath === 'string' ? event.payload.candidatesPath : null
             };
+            applyConvergenceSnapshotFromPayload(nextSession, event.payload);
             break;
         case 'run.finished':
             nextSession.status = 'succeeded';
             nextSession.currentStage = null;
+            nextSession.currentConvergenceStage = null;
+            applyConvergenceSnapshotFromPayload(nextSession, event.payload);
             break;
         case 'run.failed':
             nextSession.status = 'failed';
             nextSession.currentStage = null;
+            nextSession.currentConvergenceStage = null;
             nextSession.lastError = typeof event.payload.message === 'string' ? event.payload.message : 'Run failed';
             break;
         default:

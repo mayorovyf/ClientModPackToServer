@@ -54,6 +54,16 @@ function getSessionStatusLabel(status: RunSessionState['status'], t: ReturnType<
     }
 }
 
+function formatTail(value: string | null, maxLength = 24): string {
+    const normalized = String(value || '').trim();
+
+    if (!normalized) {
+        return 'n/a';
+    }
+
+    return normalized.length <= maxLength ? normalized : `...${normalized.slice(-(maxLength - 3))}`;
+}
+
 export function BuildLogScreen({
     items,
     selectedItemId,
@@ -103,7 +113,11 @@ export function BuildLogScreen({
     const statusLine = t('buildLog.statusLine', {
         status: getSessionStatusLabel(session.status, t),
         runId: session.runId || t('common.placeholder.na'),
-        stage: session.currentStage || t('common.placeholder.na')
+        stage: session.currentStage || t('common.placeholder.na'),
+        candidate: formatTail(session.currentCandidateId, 22),
+        iteration: session.currentIteration ?? t('common.placeholder.na'),
+        loopStage: session.currentConvergenceStage || t('common.placeholder.na'),
+        outcome: session.terminalOutcomeId || t('common.placeholder.na')
     });
 
     return (

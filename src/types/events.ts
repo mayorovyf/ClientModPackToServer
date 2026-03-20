@@ -53,6 +53,22 @@ export interface BuildActionCompletedEvent extends BackendEvent {
     type: 'build.action.completed';
 }
 
+export interface ConvergenceCandidateStartedEvent extends BackendEvent {
+    type: 'convergence.candidate.started';
+}
+
+export interface ConvergencePlanSelectedEvent extends BackendEvent {
+    type: 'convergence.plan.selected';
+}
+
+export interface ConvergenceCandidateCompletedEvent extends BackendEvent {
+    type: 'convergence.candidate.completed';
+}
+
+export interface ConvergenceTerminalOutcomeEvent extends BackendEvent {
+    type: 'convergence.terminal-outcome';
+}
+
 export interface ReportWrittenEvent extends BackendEvent {
     type: 'report.written';
 }

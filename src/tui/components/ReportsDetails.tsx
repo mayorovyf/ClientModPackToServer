@@ -52,6 +52,19 @@ function DetailLine({
     );
 }
 
+function getOutcomeColor(outcomeId: string | null): 'green' | 'yellow' | 'red' | 'cyan' | 'white' {
+    switch (outcomeId) {
+        case 'success':
+            return 'green';
+        case 'diagnosable-but-not-fixable':
+            return 'yellow';
+        case 'not-automatable-within-boundaries':
+            return 'red';
+        default:
+            return 'white';
+    }
+}
+
 export function ReportsDetails({
     entry,
     reportRootDir,
@@ -109,6 +122,20 @@ export function ReportsDetails({
                             <DetailLine label={t('details.reports.registry')} value={entry.registryMode || t('common.placeholder.na')} />
                             <DetailLine label={t('details.reports.source')} value={entry.registrySource || t('common.placeholder.na')} />
                             <DetailLine label={t('details.reports.validation')} value={entry.validationStatus || entry.validationMode || t('common.placeholder.na')} />
+                            <DetailLine
+                                label={t('details.reports.outcome')}
+                                value={entry.terminalOutcomeId || t('common.placeholder.na')}
+                                valueColor={getOutcomeColor(entry.terminalOutcomeId)}
+                            />
+                            <DetailLine
+                                label={t('details.reports.explanation')}
+                                value={entry.terminalOutcomeExplanation || t('common.placeholder.na')}
+                                wrapMode="wrap"
+                            />
+                            <DetailLine label={t('details.reports.candidates')} value={String(entry.candidateCount)} />
+                            <DetailLine label={t('details.reports.currentCandidate')} value={entry.currentCandidateId || t('common.placeholder.na')} wrapMode="wrap" />
+                            <DetailLine label={t('details.reports.recipe')} value={entry.recipePath || t('common.placeholder.na')} wrapMode="wrap" />
+                            <DetailLine label={t('details.reports.candidateTrace')} value={entry.candidatesPath || t('common.placeholder.na')} wrapMode="wrap" />
                         </>
                     ) : null}
                 </Box>
@@ -130,6 +157,8 @@ export function ReportsDetails({
                     <DetailLine label="run.json" value={t('details.reports.files.runJson')} />
                     <DetailLine label="report.json" value={t('details.reports.files.reportJson')} />
                     <DetailLine label="summary.md" value={t('details.reports.files.summaryMd')} />
+                    <DetailLine label="recipe.json" value={t('details.reports.files.recipeJson')} />
+                    <DetailLine label="candidates.json" value={t('details.reports.files.candidatesJson')} />
                 </Box>
             )}
         </Box>

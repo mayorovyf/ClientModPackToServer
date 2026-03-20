@@ -138,6 +138,10 @@ function applyPhase3FailureAnalysisToReport({
 }
 
 function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFinalizedRunParams): void {
+    const currentCandidate = report.candidateTrace?.candidates.find((candidate) => candidate.candidateId === report.candidateTrace?.currentCandidateId)
+        || report.candidateTrace?.candidates[report.candidateTrace.candidates.length - 1]
+        || null;
+
     runLogger.report('Writing run artifacts...');
     runLogger.report(`Artifacts saved: ${reportFiles.reportDir}`);
     runLogger.raw('');
@@ -149,12 +153,16 @@ function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFina
     runLogger.info(`Primary terminal outcomes: ${report.releaseContract ? report.releaseContract.terminalOutcomes.primaryOutcomes.join(', ') : 'n/a'}`);
     runLogger.info(`Failure family: ${report.failureAnalysis ? (report.failureAnalysis.family || report.failureAnalysis.kind) : 'n/a'}`);
     runLogger.info(`Terminal outcome: ${report.terminalOutcome ? report.terminalOutcome.id : 'n/a'}`);
+    runLogger.info(`Terminal explanation: ${report.terminalOutcome ? report.terminalOutcome.explanation : 'n/a'}`);
     runLogger.info(`Candidates: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`);
+    runLogger.info(`Current candidate: ${currentCandidate ? currentCandidate.candidateId : 'n/a'}`);
+    runLogger.info(`Current iteration: ${currentCandidate ? currentCandidate.iteration : 'n/a'}`);
 
     if (runContext.dryRun) {
         runLogger.warn('Dry-run completed: build output was not created.');
     } else {
-        runLogger.success(`Build ready: ${report.run.buildModsDir}`);
+        runLogger.success(`Build ready: ${report.run.buildDir}`);
+        runLogger.info(`Build mods dir: ${report.run.buildModsDir}`);
     }
 }
 

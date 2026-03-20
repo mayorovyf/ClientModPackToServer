@@ -17,6 +17,9 @@ interface ReportFiles {
 }
 
 function createSummary(report: RunReport): string {
+    const currentCandidate = report.candidateTrace?.candidates.find((candidate) => candidate.candidateId === report.candidateTrace?.currentCandidateId)
+        || report.candidateTrace?.candidates[report.candidateTrace.candidates.length - 1]
+        || null;
     const lines = [
         '# Run Summary',
         '',
@@ -26,7 +29,12 @@ function createSummary(report: RunReport): string {
         `- Input: ${report.run.inputPath}`,
         `- Instance dir: ${report.run.instancePath}`,
         `- Build dir: ${report.run.buildDir}`,
+        `- Build mods dir: ${report.run.buildModsDir}`,
         `- Report dir: ${report.run.reportDir}`,
+        `- Report JSON path: ${report.run.jsonReportPath}`,
+        `- Summary path: ${report.run.summaryPath}`,
+        `- Recipe path: ${report.run.recipePath}`,
+        `- Candidates path: ${report.run.candidatesPath}`,
         `- Engines: ${Array.isArray(report.run.enabledEngines) ? report.run.enabledEngines.join(', ') : 'n/a'}`,
         '',
         '## Registry',
@@ -60,6 +68,7 @@ function createSummary(report: RunReport): string {
         '## Candidate Trace',
         '',
         `- Current candidate: ${report.candidateTrace ? (report.candidateTrace.currentCandidateId || 'n/a') : 'n/a'}`,
+        `- Current iteration: ${currentCandidate ? currentCandidate.iteration : 'n/a'}`,
         `- Candidate count: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`,
         `- Fingerprint digests: ${report.candidateTrace ? report.candidateTrace.fingerprintDigests.length : 0}`,
         `- Search budget max candidate states: ${report.candidateTrace ? report.candidateTrace.searchBudget.maxCandidateStates : 0}`,

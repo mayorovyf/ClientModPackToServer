@@ -74,6 +74,29 @@ function formatTail(value: string | null, maxLength = 38): string {
     return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
+function getCurrentCandidate(report: RunReport | null) {
+    if (!report?.candidateTrace?.candidates?.length) {
+        return null;
+    }
+
+    return report.candidateTrace.candidates.find((candidate) => candidate.candidateId === report.candidateTrace?.currentCandidateId)
+        || report.candidateTrace.candidates[report.candidateTrace.candidates.length - 1]
+        || null;
+}
+
+function getOutcomeColor(outcomeId: string | null): 'greenBright' | 'yellow' | 'redBright' | 'white' {
+    switch (outcomeId) {
+        case 'success':
+            return 'greenBright';
+        case 'diagnosable-but-not-fixable':
+            return 'yellow';
+        case 'not-automatable-within-boundaries':
+            return 'redBright';
+        default:
+            return 'white';
+    }
+}
+
 export function RunSummary({
     session,
     report = null,
@@ -93,21 +116,34 @@ export function RunSummary({
 }): React.JSX.Element {
     const t = useT();
     const sourceReport = report || session.lastReport;
+    const currentCandidate = getCurrentCandidate(sourceReport);
     const isHistorical = Boolean(report);
     const historicalError = sourceReport?.errors[0]?.message || t('common.value.unknown');
     const reviewCount = sourceReport?.arbiter?.summary.finalDecisions.review ?? 0;
     const keptCount = sourceReport?.stats.kept ?? 0;
     const excludedCount = sourceReport?.stats.excluded ?? 0;
     const validationStatus = sourceReport?.validation?.status ?? t('common.placeholder.na');
+    const terminalOutcomeId = sourceReport?.terminalOutcome?.id || reportEntry?.terminalOutcomeId || session.terminalOutcomeId;
+    const terminalOutcomeExplanation = sourceReport?.terminalOutcome?.explanation
+        || reportEntry?.terminalOutcomeExplanation
+        || session.terminalOutcomeExplanation;
+    const currentCandidateId = currentCandidate?.candidateId || reportEntry?.currentCandidateId || session.currentCandidateId;
+    const currentIteration = typeof currentCandidate?.iteration === 'number'
+        ? currentCandidate.iteration
+        : (reportEntry?.currentIteration ?? session.currentIteration);
+    const candidateCount = sourceReport?.candidateTrace?.candidates.length ?? reportEntry?.candidateCount ?? session.candidateCount;
+    const loopStage = isHistorical ? null : session.currentConvergenceStage;
     const summaryStatus: RunSessionState['status'] = isHistorical
-        ? ((sourceReport?.errors.length ?? 0) > 0 ? 'failed' : 'succeeded')
-        : session.status;
+        ? (terminalOutcomeId && terminalOutcomeId !== 'success'
+            ? 'failed'
+            : ((sourceReport?.errors.length ?? 0) > 0 ? 'failed' : 'succeeded'))
+        : (terminalOutcomeId && terminalOutcomeId !== 'success' ? 'failed' : session.status);
     const runId = sourceReport?.run.runId || reportEntry?.runId || session.runId;
     const events = isHistorical ? (sourceReport?.events ?? []) : session.events;
     const reportPath = sourceReport?.run.jsonReportPath || reportEntry?.jsonReportPath || session.reportPaths.jsonReportPath;
-    const summaryPath = sourceReport?.run.summaryPath || reportEntry?.summaryPath || session.reportPaths.summaryPath;
+    const recipePath = sourceReport?.run.recipePath || reportEntry?.recipePath || session.reportPaths.recipePath;
     const contentHeight = Math.max(6, height - 4);
-    const summaryHeight = summaryStatus === 'running' && !isHistorical ? 8 : 7;
+    const summaryHeight = terminalOutcomeExplanation ? 11 : 10;
     const eventsHeight = Math.max(3, contentHeight - summaryHeight);
     const visibleEventLimit = Math.max(1, Math.min(eventLimit, Math.max(eventsHeight - 2, 1)));
     const { offset, hasOverflow } = useScrollOffset({
@@ -140,11 +176,23 @@ export function RunSummary({
                 ) : null}
                 <Text wrap="truncate">{`${t('runSummary.runId')}: ${runId || t('common.placeholder.na')}`}</Text>
                 <Text wrap="truncate">
+                    {`${t('runSummary.candidate')}: ${formatTail(currentCandidateId, 30)} | ${t('runSummary.iteration')}: ${currentIteration ?? t('common.placeholder.na')}`}
+                </Text>
+                <Text wrap="truncate">
+                    {`${t('runSummary.loop')}: ${loopStage || t('common.placeholder.na')} | ${t('runSummary.candidates')}: ${candidateCount}`}
+                </Text>
+                <Text wrap="truncate">
                     {`${compact ? t('runSummary.stat.keep.short') : t('runSummary.stat.keep.full')} ${keptCount} | ${compact ? t('runSummary.stat.exclude.short') : t('runSummary.stat.exclude.full')} ${excludedCount} | ${t('runSummary.stat.review')} ${reviewCount}`}
                 </Text>
                 <Text wrap="truncate">{`${t('runSummary.validation')}: ${validationStatus}`}</Text>
+                <Text color={getOutcomeColor(terminalOutcomeId)} wrap="truncate">
+                    {`${t('runSummary.outcome')}: ${terminalOutcomeId || t('common.placeholder.na')}`}
+                </Text>
+                {terminalOutcomeExplanation ? (
+                    <Text dimColor wrap="truncate">{`${t('runSummary.explanation')}: ${terminalOutcomeExplanation}`}</Text>
+                ) : null}
                 <Text wrap="truncate">{`${t('runSummary.report')}: ${formatTail(reportPath, 34)}`}</Text>
-                <Text wrap="truncate">{`${t('runSummary.summary')}: ${formatTail(summaryPath, 34)}`}</Text>
+                <Text wrap="truncate">{`${t('runSummary.recipe')}: ${formatTail(recipePath, 34)}`}</Text>
             </Box>
             <Box flexDirection="column" height={eventsHeight} minWidth={0}>
                 <Text color="cyan" wrap="wrap">{t('runSummary.events.title')}</Text>

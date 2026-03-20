@@ -42,6 +42,10 @@ const TRACKED_EVENT_TYPES = new Set([
     'deep-check.completed',
     'validation.completed',
     'build.action.completed',
+    'convergence.candidate.started',
+    'convergence.plan.selected',
+    'convergence.candidate.completed',
+    'convergence.terminal-outcome',
     'report.written',
     'run.finished',
     'run.failed'
@@ -486,6 +490,75 @@ function createEventItem(event: BackendEvent, t: Translator<MessageKey>): BuildL
                 status,
                 timestamp,
                 sourceLabel: 'build.action.completed',
+                dataLines: createDataLinesFromObject(event.payload as Record<string, unknown>)
+            };
+        }
+        case 'convergence.candidate.started':
+            return {
+                id: `${event.timestamp}:convergence.candidate.started:${stringifyValue(event.payload.candidateId) || 'candidate'}`,
+                kind: 'event',
+                title: t('buildLog.event.convergenceCandidateStarted'),
+                subtitle: compactParts([
+                    stringifyValue(event.payload.candidateId),
+                    stringifyValue(event.payload.iteration) ? `iter ${stringifyValue(event.payload.iteration)}` : null,
+                    stringifyValue(event.payload.loopStage)
+                ]) || timestamp || t('buildLog.item.running'),
+                description: t('buildLog.description.convergenceCandidateStarted'),
+                status: 'running',
+                timestamp,
+                sourceLabel: 'convergence.candidate.started',
+                dataLines: createDataLinesFromObject(event.payload as Record<string, unknown>)
+            };
+        case 'convergence.plan.selected':
+            return {
+                id: `${event.timestamp}:convergence.plan.selected:${stringifyValue(event.payload.nextCandidateId) || 'plan'}`,
+                kind: 'event',
+                title: t('buildLog.event.convergencePlanSelected'),
+                subtitle: compactParts([
+                    stringifyValue(event.payload.candidateId),
+                    stringifyValue(event.payload.nextCandidateId),
+                    stringifyValue(event.payload.newlyAppliedFixKinds)
+                ]) || timestamp || t('buildLog.item.running'),
+                description: t('buildLog.description.convergencePlanSelected'),
+                status: 'running',
+                timestamp,
+                sourceLabel: 'convergence.plan.selected',
+                dataLines: createDataLinesFromObject(event.payload as Record<string, unknown>)
+            };
+        case 'convergence.candidate.completed': {
+            const outcomeStatus = stringifyValue(event.payload.outcomeStatus);
+
+            return {
+                id: `${event.timestamp}:convergence.candidate.completed:${stringifyValue(event.payload.candidateId) || 'candidate'}`,
+                kind: 'event',
+                title: t('buildLog.event.convergenceCandidateCompleted'),
+                subtitle: compactParts([
+                    stringifyValue(event.payload.candidateId),
+                    outcomeStatus,
+                    stringifyValue(event.payload.failureFamily)
+                ]) || timestamp || t('buildLog.item.completed'),
+                description: t('buildLog.description.convergenceCandidateCompleted'),
+                status: outcomeStatus === 'passed' ? 'completed' : 'warning',
+                timestamp,
+                sourceLabel: 'convergence.candidate.completed',
+                dataLines: createDataLinesFromObject(event.payload as Record<string, unknown>)
+            };
+        }
+        case 'convergence.terminal-outcome': {
+            const terminalOutcomeId = stringifyValue(event.payload.terminalOutcomeId);
+
+            return {
+                id: `${event.timestamp}:convergence.terminal-outcome:${terminalOutcomeId || 'terminal-outcome'}`,
+                kind: 'event',
+                title: t('buildLog.event.convergenceTerminalOutcome'),
+                subtitle: compactParts([
+                    terminalOutcomeId,
+                    formatCountPart('candidates', event.payload.candidateCount)
+                ]) || timestamp || t('buildLog.item.completed'),
+                description: t('buildLog.description.convergenceTerminalOutcome'),
+                status: terminalOutcomeId === 'success' ? 'completed' : 'failed',
+                timestamp,
+                sourceLabel: 'convergence.terminal-outcome',
                 dataLines: createDataLinesFromObject(event.payload as Record<string, unknown>)
             };
         }

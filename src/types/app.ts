@@ -57,11 +57,41 @@ export interface ProgressBuildActionEvent {
     [key: string]: unknown;
 }
 
+export interface ProgressConvergenceEvent {
+    candidateId?: string | null;
+    parentCandidateId?: string | null;
+    nextCandidateId?: string | null;
+    iteration?: number | null;
+    nextIteration?: number | null;
+    loopStage?: string | null;
+    failureFamily?: string | null;
+    outcomeStatus?: string | null;
+    stateDigest?: string | null;
+    appliedFixKinds?: string[];
+    newlyAppliedFixKinds?: string[];
+    terminalOutcomeId?: string | null;
+    terminalOutcomeExplanation?: string | null;
+    reasonCode?: string | null;
+    candidateCount?: number | null;
+    searchBudget?: {
+        consumedCandidateStates?: number;
+        consumedRetries?: number;
+        consumedGuardedFixes?: number;
+        consumedWallClockMs?: number;
+        exhausted?: boolean;
+    } | null;
+    [key: string]: unknown;
+}
+
 export interface BuildProgressReporter {
     onStageStarted: (event: ProgressStageEvent) => void;
     onStageCompleted: (event: ProgressStageEvent) => void;
     onModParsed: (event: ProgressModEvent) => void;
     onBuildActionCompleted: (event: ProgressBuildActionEvent) => void;
+    onConvergenceCandidateStarted: (event: ProgressConvergenceEvent) => void;
+    onConvergencePlanSelected: (event: ProgressConvergenceEvent) => void;
+    onConvergenceCandidateCompleted: (event: ProgressConvergenceEvent) => void;
+    onConvergenceTerminalOutcome: (event: ProgressConvergenceEvent) => void;
 }
 
 export interface ClassificationContextLike {

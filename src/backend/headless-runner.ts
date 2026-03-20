@@ -123,34 +123,46 @@ interface HeadlessRunParams {
     logger?: ReturnType<typeof createNoopLogger>;
 }
 
+function getCurrentCandidate(report: RunReport) {
+    if (!report.candidateTrace?.candidates?.length) {
+        return null;
+    }
+
+    return report.candidateTrace.candidates.find((candidate) => candidate.candidateId === report.candidateTrace?.currentCandidateId)
+        || report.candidateTrace.candidates[report.candidateTrace.candidates.length - 1]
+        || null;
+}
+
 function emitReportEvents(emitter: BackendEventEmitter, result: FinalizedApplicationRun) {
     const { report, reportFiles, runContext } = result;
+    const runId = runContext.runId;
+    const currentCandidate = getCurrentCandidate(report);
 
     emitter.emit(BACKEND_EVENT_TYPES.classificationCompleted, {
         finalDecisions: report.classification?.finalDecisions || null,
         conflicts: report.classification?.conflicts || 0,
         fallbackFinalDecisions: report.classification?.fallbackFinalDecisions || 0
-    });
+    }, runId);
 
     if (report.dependencyGraph) {
         emitter.emit(BACKEND_EVENT_TYPES.dependencyAnalysisCompleted, {
             status: report.dependencyGraph.status,
             summary: report.dependencyGraph.summary
-        });
+        }, runId);
     }
 
     if (report.arbiter) {
         emitter.emit(BACKEND_EVENT_TYPES.arbiterReviewFound, {
             reviewCount: report.arbiter.summary.finalDecisions.review,
             confidence: report.arbiter.summary.confidence
-        });
+        }, runId);
     }
 
     if (report.deepCheck) {
         emitter.emit(BACKEND_EVENT_TYPES.deepCheckCompleted, {
             status: report.deepCheck.status,
             summary: report.deepCheck.summary
-        });
+        }, runId);
     }
 
     if (report.validation) {
@@ -158,7 +170,7 @@ function emitReportEvents(emitter: BackendEventEmitter, result: FinalizedApplica
             status: report.validation.status,
             summary: report.validation.summary,
             skipReason: report.validation.skipReason || null
-        });
+        }, runId);
     }
 
     emitter.emit(BACKEND_EVENT_TYPES.reportWritten, {
@@ -167,8 +179,13 @@ function emitReportEvents(emitter: BackendEventEmitter, result: FinalizedApplica
         summaryPath: reportFiles.summaryPath,
         eventsLogPath: reportFiles.eventsLogPath,
         recipePath: reportFiles.recipePath,
-        candidatesPath: reportFiles.candidatesPath
-    });
+        candidatesPath: reportFiles.candidatesPath,
+        terminalOutcomeId: report.terminalOutcome?.id || null,
+        terminalOutcomeExplanation: report.terminalOutcome?.explanation || null,
+        currentCandidateId: currentCandidate?.candidateId || null,
+        currentIteration: typeof currentCandidate?.iteration === 'number' ? currentCandidate.iteration : null,
+        candidateCount: report.candidateTrace?.candidates.length || 0
+    }, runId);
 
     emitter.emit(BACKEND_EVENT_TYPES.runFinished, {
         mode: runContext.mode,
@@ -181,8 +198,13 @@ function emitReportEvents(emitter: BackendEventEmitter, result: FinalizedApplica
         copied: report.stats.copied,
         wouldCopy: report.stats.wouldCopy,
         wouldExclude: report.stats.wouldExclude,
-        errors: report.stats.errors
-    });
+        errors: report.stats.errors,
+        terminalOutcomeId: report.terminalOutcome?.id || null,
+        terminalOutcomeExplanation: report.terminalOutcome?.explanation || null,
+        currentCandidateId: currentCandidate?.candidateId || null,
+        currentIteration: typeof currentCandidate?.iteration === 'number' ? currentCandidate.iteration : null,
+        candidateCount: report.candidateTrace?.candidates.length || 0
+    }, runId);
 }
 
 async function runHeadlessApplication({

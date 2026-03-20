@@ -28,13 +28,16 @@ function createHistorySubtitle(entry: ReportHistoryEntry, t: ReturnType<typeof u
         ? entry.instancePath.replace(/[/\\]+$/, '').split(/[/\\]/).at(-1) || t('screen.reports.summary.instanceFallback')
         : t('screen.reports.summary.instanceFallback');
     const modeLabel = entry.dryRun ? t('screen.reports.summary.mode.dryRun') : (entry.mode || t('screen.reports.summary.mode.build'));
+    const outcomeLabel = entry.terminalOutcomeId || t('screen.reports.summary.outcomeFallback');
 
     return t('screen.reports.summary', {
         instance: instanceName,
         mode: modeLabel,
         kept: entry.kept,
         excluded: entry.excluded,
-        review: entry.review
+        review: entry.review,
+        outcome: outcomeLabel,
+        candidates: entry.candidateCount
     });
 }
 

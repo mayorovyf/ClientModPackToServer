@@ -347,7 +347,11 @@ function createNoopProgressReporter(): BuildProgressReporter {
         onStageStarted(_event) {},
         onStageCompleted(_event) {},
         onModParsed(_event) {},
-        onBuildActionCompleted(_event) {}
+        onBuildActionCompleted(_event) {},
+        onConvergenceCandidateStarted(_event) {},
+        onConvergencePlanSelected(_event) {},
+        onConvergenceCandidateCompleted(_event) {},
+        onConvergenceTerminalOutcome(_event) {}
     };
 }
 

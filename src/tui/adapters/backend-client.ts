@@ -23,6 +23,8 @@ export interface BackendRunResult {
     summaryPath: string | null;
     reportDir: string | null;
     eventsLogPath: string | null;
+    recipePath: string | null;
+    candidatesPath: string | null;
     stderrLines: string[];
 }
 
@@ -179,6 +181,8 @@ export async function runHeadlessBackend({
     let summaryPath: string | null = null;
     let reportDir: string | null = null;
     let eventsLogPath: string | null = null;
+    let recipePath: string | null = null;
+    let candidatesPath: string | null = null;
 
     function handleStdoutLine(trimmed: string): void {
         try {
@@ -189,6 +193,8 @@ export async function runHeadlessBackend({
                 summaryPath = typeof event.payload.summaryPath === 'string' ? event.payload.summaryPath : summaryPath;
                 reportDir = typeof event.payload.reportDir === 'string' ? event.payload.reportDir : reportDir;
                 eventsLogPath = typeof event.payload.eventsLogPath === 'string' ? event.payload.eventsLogPath : eventsLogPath;
+                recipePath = typeof event.payload.recipePath === 'string' ? event.payload.recipePath : recipePath;
+                candidatesPath = typeof event.payload.candidatesPath === 'string' ? event.payload.candidatesPath : candidatesPath;
             }
 
             onEvent?.(event);
@@ -260,6 +266,8 @@ export async function runHeadlessBackend({
         summaryPath,
         reportDir,
         eventsLogPath,
+        recipePath,
+        candidatesPath,
         stderrLines
     };
 }

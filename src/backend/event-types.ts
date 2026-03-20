@@ -11,6 +11,10 @@ export const BACKEND_EVENT_TYPES = Object.freeze({
     deepCheckCompleted: 'deep-check.completed',
     validationCompleted: 'validation.completed',
     buildActionCompleted: 'build.action.completed',
+    convergenceCandidateStarted: 'convergence.candidate.started',
+    convergencePlanSelected: 'convergence.plan.selected',
+    convergenceCandidateCompleted: 'convergence.candidate.completed',
+    convergenceTerminalOutcome: 'convergence.terminal-outcome',
     reportWritten: 'report.written',
     runFinished: 'run.finished'
 });

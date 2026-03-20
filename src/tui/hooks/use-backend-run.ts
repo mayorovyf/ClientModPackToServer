@@ -28,6 +28,16 @@ export function formatBackendExitMessage({
     return 'Backend exited unexpectedly';
 }
 
+function getReportCurrentCandidate(report: BackendRunResult['report']) {
+    if (!report?.candidateTrace?.candidates?.length) {
+        return null;
+    }
+
+    return report.candidateTrace.candidates.find((candidate) => candidate.candidateId === report.candidateTrace?.currentCandidateId)
+        || report.candidateTrace.candidates[report.candidateTrace.candidates.length - 1]
+        || null;
+}
+
 export function finalizeSessionAfterBackendRun(previous: RunSessionState, result: BackendRunResult): RunSessionState {
     const exitedSuccessfully = result.exitCode === 0 && result.signal === null;
     const alreadyFailed = previous.status === 'failed';
@@ -35,17 +45,26 @@ export function finalizeSessionAfterBackendRun(previous: RunSessionState, result
     const lastError = status === 'succeeded'
         ? null
         : previous.lastError || formatBackendExitMessage(result);
+    const currentCandidate = getReportCurrentCandidate(result.report);
 
     return {
         ...previous,
         status,
         currentStage: null,
+        currentConvergenceStage: null,
+        currentCandidateId: currentCandidate?.candidateId || previous.currentCandidateId,
+        currentIteration: typeof currentCandidate?.iteration === 'number' ? currentCandidate.iteration : previous.currentIteration,
+        candidateCount: result.report?.candidateTrace?.candidates.length ?? previous.candidateCount,
+        terminalOutcomeId: result.report?.terminalOutcome?.id || previous.terminalOutcomeId,
+        terminalOutcomeExplanation: result.report?.terminalOutcome?.explanation || previous.terminalOutcomeExplanation,
         lastReport: result.report,
         reportPaths: {
             reportDir: result.reportDir,
             jsonReportPath: result.reportPath,
             summaryPath: result.summaryPath,
-            eventsLogPath: result.eventsLogPath
+            eventsLogPath: result.eventsLogPath,
+            recipePath: result.recipePath,
+            candidatesPath: result.candidatesPath
         },
         lastError
     };

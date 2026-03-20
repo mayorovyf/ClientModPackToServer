@@ -116,6 +116,16 @@ function withFinalCandidateOutcome({
     ));
 }
 
+function createSearchBudgetSnapshot(searchBudget: ReturnType<typeof createDefaultSearchBudget>) {
+    return {
+        consumedCandidateStates: searchBudget.consumedCandidateStates,
+        consumedRetries: searchBudget.consumedRetries,
+        consumedGuardedFixes: searchBudget.consumedGuardedFixes,
+        consumedWallClockMs: searchBudget.consumedWallClockMs,
+        exhausted: searchBudget.exhausted
+    };
+}
+
 async function runConvergenceLoop({
     modsPath,
     blockList = [],
@@ -146,6 +156,17 @@ async function runConvergenceLoop({
     };
 
     while (true) {
+        progressReporter?.onConvergenceCandidateStarted({
+            candidateId: execution.candidateId,
+            parentCandidateId: execution.parentCandidateId,
+            iteration: execution.iteration,
+            loopStage: 'candidate',
+            appliedFixKinds: execution.appliedFixes.map((fix) => fix.kind),
+            newlyAppliedFixKinds: execution.newlyAppliedFixes.map((fix) => fix.kind),
+            candidateCount: candidates.length + 1,
+            searchBudget: createSearchBudgetSnapshot(searchBudget)
+        });
+
         if (execution.iteration > 0) {
             removeCurrentBuildOutput(execution.runContext);
         }
@@ -183,6 +204,20 @@ async function runConvergenceLoop({
             guardedFixes: execution.newlyAppliedFixes.filter((fix) => fix.scope === 'guarded').length
         });
         searchBudget = withWallClockSnapshot(searchBudget, Date.now() - startedAtMs);
+        progressReporter?.onConvergenceCandidateCompleted({
+            candidateId: candidate.candidateId,
+            parentCandidateId: candidate.parentCandidateId,
+            iteration: candidate.iteration,
+            loopStage: 'candidate-completed',
+            failureFamily: candidate.failureFamily,
+            outcomeStatus: candidate.outcomeStatus,
+            stateDigest: candidate.stateDigest,
+            appliedFixKinds: candidate.appliedFixes.map((fix: AppliedFix) => fix.kind),
+            terminalOutcomeId: candidate.terminalOutcomeId,
+            terminalOutcomeExplanation: candidate.shortExplanation,
+            candidateCount: candidates.length,
+            searchBudget: createSearchBudgetSnapshot(searchBudget)
+        });
 
         let terminalOutcome: ResolvedTerminalOutcome | null = null;
 
@@ -241,9 +276,23 @@ async function runConvergenceLoop({
             } else {
                 const nextAppliedFixes = nextPlan.appliedFixes;
                 const newlyAppliedFixes = nextAppliedFixes.slice(candidate.appliedFixes.length);
+                const nextCandidateId = `${runContext.runId}:candidate-${candidate.iteration + 1}`;
+
+                progressReporter?.onConvergencePlanSelected({
+                    candidateId: candidate.candidateId,
+                    nextCandidateId,
+                    iteration: candidate.iteration,
+                    nextIteration: candidate.iteration + 1,
+                    loopStage: 'planning',
+                    failureFamily: candidate.failureFamily,
+                    appliedFixKinds: nextAppliedFixes.map((fix: AppliedFix) => fix.kind),
+                    newlyAppliedFixKinds: newlyAppliedFixes.map((fix: AppliedFix) => fix.kind),
+                    candidateCount: candidates.length,
+                    searchBudget: createSearchBudgetSnapshot(searchBudget)
+                });
 
                 execution = {
-                    candidateId: `${runContext.runId}:candidate-${candidate.iteration + 1}`,
+                    candidateId: nextCandidateId,
                     parentCandidateId: candidate.candidateId,
                     iteration: candidate.iteration + 1,
                     runContext: nextPlan.runContext,
@@ -273,6 +322,21 @@ async function runConvergenceLoop({
                 level: 'info',
                 kind: 'convergence',
                 message: `Terminal outcome ${terminalOutcome.id}: ${terminalOutcome.explanation}`
+            });
+            progressReporter?.onConvergenceTerminalOutcome({
+                candidateId: currentCandidate.candidateId,
+                parentCandidateId: currentCandidate.parentCandidateId,
+                iteration: currentCandidate.iteration,
+                loopStage: 'terminal-outcome',
+                failureFamily: currentCandidate.failureFamily,
+                outcomeStatus: currentCandidate.outcomeStatus,
+                stateDigest: currentCandidate.stateDigest,
+                appliedFixKinds: currentCandidate.appliedFixes.map((fix: AppliedFix) => fix.kind),
+                terminalOutcomeId: terminalOutcome.id,
+                terminalOutcomeExplanation: terminalOutcome.explanation,
+                reasonCode: terminalOutcome.reasonCode,
+                candidateCount: finalizedCandidates.length,
+                searchBudget: createSearchBudgetSnapshot(searchBudget)
             });
 
             return report;

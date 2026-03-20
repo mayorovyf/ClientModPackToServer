@@ -147,35 +147,3 @@ node index.js server doctor --target-dir M:\server_instances\PackName
 
 Полный список флагов: `node index.js --help`
 
-## Файлы и артефакты
-
-- `build/<runId>/mods/` — собранный серверный модпак
-- `reports/<runId>/report.json` — полный machine-readable отчёт
-- `reports/<runId>/summary.md` — краткая сводка
-- `reports/<runId>/run.json` — параметры запуска
-- `reports/<runId>/events.log` — лента событий
-- `data/local-registry.json` — встроенный fallback registry
-- `data/local-overrides.json` — локальные registry overrides
-- `data/review-overrides.json` — ручные решения
-- `data/probe-knowledge.json` — накопленные probe результаты
-- `cache/registry/` — runtime cache для registry
-
-## Тесты
-
-```powershell
-npm.cmd run typecheck
-npm.cmd test
-```
-
-`lint` пока не настроен.
-
-## Документация
-
-Индекс документов: [docs/README.md](docs/README.md)
-
-## Текущие ограничения
-
-- Автоматизация стала существенно сильнее, но хвост `review` всё ещё существует
-- Batch probe и binary split пока не реализованы
-- CLI и доменные сообщения локализованы не полностью
-- Нет полноценного benchmark corpus с формальной метрикой точности на большом наборе реальных паков
