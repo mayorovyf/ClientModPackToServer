@@ -72,6 +72,7 @@ export interface ReportDecisionSummary {
 
 export interface RunReport {
     run: RunContext & {
+        completedAt?: string | null;
         enabledEngines?: string[];
         registrySource?: string;
         registryVersion?: string;

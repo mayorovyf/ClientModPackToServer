@@ -1,6 +1,7 @@
 import type { RoleType } from '../types/classification';
 import type { InstanceInputKind, InstanceSource } from '../types/intake';
 import type { LoaderKind } from '../types/metadata';
+import type { RunReport } from '../types/report';
 import type { ValidationEntrypointKind, ValidationStatus } from '../types/validation';
 import type { FailureFamily } from '../failure/family';
 
@@ -87,4 +88,9 @@ export interface CandidateTrace {
     candidates: CandidateState[];
     fingerprintDigests: string[];
     searchBudget: SearchBudget;
+}
+
+export interface CandidateIterationResult {
+    candidate: CandidateState;
+    report: RunReport;
 }
