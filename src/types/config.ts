@@ -1,3 +1,5 @@
+import type { JavaProfileId, RuntimeTopologyId } from './topology';
+
 export type RunMode = 'build' | 'analyze';
 export type OutputPolicy = 'unique-run-dir';
 export type DependencyValidationMode = 'conservative';
@@ -26,6 +28,8 @@ export interface CliOptions {
     validationMode?: ValidationMode | null;
     validationTimeoutMs?: number | string | null;
     validationEntrypointPath?: string | null;
+    preferredJavaProfile?: JavaProfileId | null;
+    preferredRuntimeTopologyId?: RuntimeTopologyId | null;
     validationSaveArtifacts?: boolean;
     installServerCore?: boolean | null;
     probeMode?: ProbeMode | null;
@@ -71,6 +75,8 @@ export interface RuntimeConfig {
     validationMode: ValidationMode;
     validationTimeoutMs: number;
     validationEntrypointPath: string | null;
+    javaProfile: JavaProfileId;
+    preferredRuntimeTopologyId: RuntimeTopologyId | null;
     validationSaveArtifacts: boolean;
     installServerCore: boolean;
     probeMode: ProbeMode;

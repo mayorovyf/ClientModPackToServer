@@ -43,6 +43,7 @@ function logPreparedRun({
     logger.info(`Instance source: ${runContext.instanceSource}`);
     logger.info(`Р РµР¶РёРј: ${runContext.mode}`);
     logger.info(`Build output: ${runContext.buildDir}`);
+    logger.info(`Workspace manifest: ${runContext.workspaceManifestPath}`);
     logger.info(`Report output: ${runContext.reportDir}`);
     logger.info(`Engines: ${classificationContext.enabledEngines.join(', ')}`);
     logger.info(`Registry mode: ${runContext.registryMode}`);
@@ -55,6 +56,7 @@ function logPreparedRun({
     logger.info(`Validation mode: ${runContext.validationMode}`);
     logger.info(`Validation timeout: ${runContext.validationTimeoutMs}ms`);
     logger.info(`Validation entrypoint: ${runContext.validationEntrypointPath || 'auto-detect'}`);
+    logger.info(`Java profile: ${runContext.javaProfile}`);
     logger.info(`Install server core: ${runContext.installServerCore ? 'enabled' : 'disabled'}`);
     logger.info(`Probe mode: ${runContext.probeMode}`);
     logger.info(`Probe timeout: ${runContext.probeTimeoutMs}ms`);
@@ -88,6 +90,8 @@ async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Prom
         validationMode: config.validationMode,
         validationTimeoutMs: config.validationTimeoutMs,
         validationEntrypointPath: config.validationEntrypointPath,
+        javaProfile: config.javaProfile,
+        preferredRuntimeTopologyId: config.preferredRuntimeTopologyId,
         validationSaveArtifacts: config.validationSaveArtifacts,
         installServerCore: config.installServerCore,
         probeMode: config.probeMode,

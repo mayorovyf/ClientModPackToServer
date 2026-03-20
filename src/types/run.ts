@@ -10,7 +10,7 @@ import type {
 } from './config';
 import type { InstanceInputKind, InstanceSource } from './intake';
 import type { PackRuntimeDetection } from './runtime-detection';
-import type { RuntimeTopologyId } from './topology';
+import type { JavaProfileId, RuntimeTopologyId } from './topology';
 
 export interface RunPaths {
     inputPath: string;
@@ -21,6 +21,12 @@ export interface RunPaths {
     tmpRootDir: string;
     buildDir: string;
     buildModsDir: string;
+    buildInternalDir: string;
+    workspaceManifestPath: string;
+    workspaceStashDir: string;
+    workspaceStashModsDir: string;
+    workspaceCoreCacheDir: string;
+    validationSandboxRootDir: string;
     reportDir: string;
     jsonReportPath: string;
     runMetadataPath: string;
@@ -46,6 +52,7 @@ export interface RunContext extends RunPaths {
     validationMode: ValidationMode;
     validationTimeoutMs: number;
     validationEntrypointPath: string | null;
+    javaProfile: JavaProfileId;
     preferredRuntimeTopologyId?: RuntimeTopologyId | null;
     validationSaveArtifacts: boolean;
     installServerCore: boolean;

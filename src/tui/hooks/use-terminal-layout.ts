@@ -10,85 +10,59 @@ export interface TerminalLayout {
     heightSupported: boolean;
     sizeSupported: boolean;
     compact: boolean;
-    sidebarInline: boolean;
-    detailsInline: boolean;
-    sidebarWidth: number;
+    brandWidth: number;
+    contentWidth: number;
     detailsWidth: number;
     gap: number;
-    statusBarGap: number;
     padding: number;
-    eventLimit: number;
     rootHeight: number;
-    statusBarHeight: number;
+    headerHeight: number;
+    headerGap: number;
+    footerHeight: number;
+    footerGap: number;
     mainAreaHeight: number;
-    contentAreaHeight: number;
-    sidebarHeight: number;
-    screenAreaHeight: number;
-    screenHeight: number;
-    detailsHeight: number;
 }
 
 function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
 }
 
-export function calculateTerminalLayout(columns = 120, rows = 40): TerminalLayout {
+export function calculateTerminalLayout(columns = 120, rows = 40, showHints = true): TerminalLayout {
     const safeColumns = Math.max(columns || 120, 16);
     const safeRows = Math.max(rows || 40, 8);
-    const sidebarWidth = 25;
+    const brandWidth = 25;
     const gap = 1;
     const minimumCenterWidth = 45;
     const centerRatio = 3;
     const detailsRatio = 2;
     const totalRatio = centerRatio + detailsRatio;
     const minimumDetailsWidth = Math.ceil((minimumCenterWidth * detailsRatio) / centerRatio);
+    const minimumHeaderChromeWidth = 48;
+    const minimumThreeColumnWidth = Math.max(
+        minimumCenterWidth + minimumDetailsWidth + gap,
+        brandWidth + gap + minimumHeaderChromeWidth
+    );
     const minimumRootHeight = 29;
-    const minimumCompactSidebarHeight = 7;
-    const minimumCompactScreenHeight = 8;
-    const minimumCompactDetailsHeight = 8;
-    const minimumThreeColumnWidth = sidebarWidth + minimumDetailsWidth + gap * 2 + minimumCenterWidth;
+    const headerHeight = 4;
+    const headerGap = 0;
+    const footerHeight = showHints ? 3 : 0;
+    const footerGap = 0;
     const widthSupported = safeColumns >= minimumThreeColumnWidth;
     const heightSupported = safeRows >= minimumRootHeight;
     const sizeSupported = widthSupported && heightSupported;
-    const compact = !widthSupported && heightSupported;
-    const sidebarInline = sizeSupported;
-    const detailsInline = sizeSupported;
-    const inlineMainSplitWidth = Math.max(
-        minimumDetailsWidth + minimumCenterWidth,
-        safeColumns - sidebarWidth - gap * 2
+    const compact = !sizeSupported;
+    const detailsWidth = Math.max(minimumDetailsWidth, Math.floor((safeColumns * detailsRatio) / totalRatio));
+    const contentWidth = clamp(
+        safeColumns - detailsWidth - gap,
+        minimumCenterWidth,
+        safeColumns
     );
-    const detailsWidth = detailsInline
-        ? Math.max(minimumDetailsWidth, Math.floor((inlineMainSplitWidth * detailsRatio) / totalRatio))
-        : minimumDetailsWidth;
-    const statusBarGap = 0;
     const padding = 0;
-    const statusBarHeight = 4;
     const rootHeight = safeRows;
-    const mainAreaHeight = Math.max(rootHeight - statusBarHeight - statusBarGap, 10);
-    const detailsHeight = detailsInline
-        ? mainAreaHeight
-        : clamp(
-            Math.floor(mainAreaHeight * 0.35),
-            minimumCompactDetailsHeight,
-            Math.max(
-                mainAreaHeight - minimumCompactSidebarHeight - minimumCompactScreenHeight - gap * 2,
-                minimumCompactDetailsHeight
-            )
-        );
-    const contentAreaHeight = detailsInline
-        ? mainAreaHeight
-        : Math.max(mainAreaHeight - detailsHeight - gap, minimumCompactSidebarHeight + minimumCompactScreenHeight + gap);
-    const sidebarHeight = sidebarInline
-        ? contentAreaHeight
-        : clamp(
-            Math.floor(contentAreaHeight * 0.28),
-            minimumCompactSidebarHeight,
-            Math.max(contentAreaHeight - minimumCompactScreenHeight - gap, minimumCompactSidebarHeight)
-        );
-    const screenAreaHeight = sidebarInline
-        ? contentAreaHeight
-        : Math.max(contentAreaHeight - sidebarHeight - gap, minimumCompactScreenHeight);
-    const screenHeight = Math.max(screenAreaHeight - 1, 6);
+    const mainAreaHeight = Math.max(
+        rootHeight - headerHeight - headerGap - footerHeight - footerGap,
+        10
+    );
 
     return {
         columns: safeColumns,
@@ -99,22 +73,17 @@ export function calculateTerminalLayout(columns = 120, rows = 40): TerminalLayou
         heightSupported,
         sizeSupported,
         compact,
-        sidebarInline,
-        detailsInline,
-        sidebarWidth,
+        brandWidth,
+        contentWidth,
         detailsWidth,
         gap,
-        statusBarGap,
         padding,
-        eventLimit: clamp(detailsHeight - 5, compact ? 3 : 3, compact ? 8 : 10),
         rootHeight,
-        statusBarHeight,
-        mainAreaHeight,
-        contentAreaHeight,
-        sidebarHeight,
-        screenAreaHeight,
-        screenHeight,
-        detailsHeight
+        headerHeight,
+        headerGap,
+        footerHeight,
+        footerGap,
+        mainAreaHeight
     };
 }
 
@@ -125,18 +94,18 @@ function getStdoutSize(stdout: NodeJS.WriteStream | undefined): { columns: numbe
     };
 }
 
-export function useTerminalLayout(): TerminalLayout {
+export function useTerminalLayout(showHints: boolean): TerminalLayout {
     const { stdout } = useStdout();
     const output = stdout as NodeJS.WriteStream | undefined;
     const [layout, setLayout] = useState<TerminalLayout>(() => {
         const size = getStdoutSize(output);
-        return calculateTerminalLayout(size.columns, size.rows);
+        return calculateTerminalLayout(size.columns, size.rows, showHints);
     });
 
     useEffect(() => {
         const updateLayout = () => {
             const size = getStdoutSize(output);
-            setLayout(calculateTerminalLayout(size.columns, size.rows));
+            setLayout(calculateTerminalLayout(size.columns, size.rows, showHints));
         };
 
         updateLayout();
@@ -145,7 +114,7 @@ export function useTerminalLayout(): TerminalLayout {
         return () => {
             output?.off?.('resize', updateLayout);
         };
-    }, [output]);
+    }, [output, showHints]);
 
     return layout;
 }

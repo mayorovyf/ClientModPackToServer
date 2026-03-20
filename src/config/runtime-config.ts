@@ -8,6 +8,7 @@ const { RunConfigurationError } = require('../core/errors');
 const { DEEP_CHECK_MODES, normalizeDeepCheckMode } = require('../deep-check/constants');
 const { DEFAULT_PROBE_MAX_MODS, DEFAULT_PROBE_TIMEOUT_MS, PROBE_MODES } = require('../probe/constants');
 const { resolveProbeKnowledgePath } = require('../probe/knowledge-store');
+const { findRuntimeTopologyWhitelistEntry } = require('../topology/whitelist');
 const { DEFAULT_VALIDATION_TIMEOUT_MS, normalizeValidationMode } = require('../validation/constants');
 const {
     DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
@@ -33,6 +34,7 @@ import type {
     RuntimeConfig,
     ValidationMode
 } from '../types/config';
+import type { JavaProfileId, RuntimeTopologyId } from '../types/topology';
 
 interface DefaultConfigShape {
     historyDirName: string;
@@ -60,6 +62,8 @@ interface DefaultConfigShape {
     deepCheckMode: DeepCheckMode;
     validationMode: ValidationMode;
     validationTimeoutMs: number;
+    javaProfile: JavaProfileId;
+    preferredRuntimeTopologyId: RuntimeTopologyId | null;
     installServerCore: boolean;
     probeMode: ProbeMode;
     probeTimeoutMs: number;
@@ -101,6 +105,8 @@ const DEFAULT_CONFIG: Readonly<DefaultConfigShape> = Object.freeze({
     deepCheckMode: DEEP_CHECK_MODES.auto,
     validationMode: 'auto',
     validationTimeoutMs: DEFAULT_VALIDATION_TIMEOUT_MS,
+    javaProfile: 'auto',
+    preferredRuntimeTopologyId: null,
     installServerCore: true,
     probeMode: PROBE_MODES.auto,
     probeTimeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
@@ -236,6 +242,34 @@ function normalizeValidationTimeout(value: number | string | null | undefined): 
     return normalized;
 }
 
+function normalizeJavaProfile(value: JavaProfileId | null | undefined): JavaProfileId {
+    if (value === null || value === undefined || String(value).trim() === '') {
+        return DEFAULT_CONFIG.javaProfile;
+    }
+
+    const normalized = String(value).trim() as JavaProfileId;
+
+    if (normalized !== 'auto' && normalized !== 'java-17' && normalized !== 'java-21') {
+        throw new RunConfigurationError(`Unknown Java profile: ${value}`);
+    }
+
+    return normalized;
+}
+
+function normalizePreferredRuntimeTopologyId(value: RuntimeTopologyId | null | undefined): RuntimeTopologyId | null {
+    if (value === null || value === undefined || String(value).trim() === '') {
+        return DEFAULT_CONFIG.preferredRuntimeTopologyId;
+    }
+
+    const normalized = String(value).trim() as RuntimeTopologyId;
+
+    if (!findRuntimeTopologyWhitelistEntry(normalized)) {
+        throw new RunConfigurationError(`Unknown preferred runtime topology: ${value}`);
+    }
+
+    return normalized;
+}
+
 function normalizeInstallServerCore(value: boolean | null | undefined): boolean {
     if (value === null || value === undefined) {
         return DEFAULT_CONFIG.installServerCore;
@@ -334,6 +368,10 @@ function createRuntimeConfig({
     const validationMode = normalizeValidation(cliOptions.validationMode || DEFAULT_CONFIG.validationMode);
     const validationTimeoutMs = normalizeValidationTimeout(cliOptions.validationTimeoutMs || DEFAULT_CONFIG.validationTimeoutMs);
     const validationEntrypointPath = resolveOptionalPath(cliOptions.validationEntrypointPath);
+    const javaProfile = normalizeJavaProfile(cliOptions.preferredJavaProfile ?? DEFAULT_CONFIG.javaProfile);
+    const preferredRuntimeTopologyId = normalizePreferredRuntimeTopologyId(
+        cliOptions.preferredRuntimeTopologyId ?? DEFAULT_CONFIG.preferredRuntimeTopologyId
+    );
     const validationSaveArtifacts = Boolean(cliOptions.validationSaveArtifacts);
     const installServerCore = normalizeInstallServerCore(cliOptions.installServerCore);
     const probeMode = normalizeProbeMode(cliOptions.probeMode || DEFAULT_CONFIG.probeMode);
@@ -389,6 +427,8 @@ function createRuntimeConfig({
         validationMode,
         validationTimeoutMs,
         validationEntrypointPath,
+        javaProfile,
+        preferredRuntimeTopologyId,
         validationSaveArtifacts,
         installServerCore,
         probeMode,

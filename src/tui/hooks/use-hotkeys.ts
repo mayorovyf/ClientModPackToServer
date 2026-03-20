@@ -4,7 +4,7 @@ import { normalizeHotkeyInput } from '../lib/normalize-hotkey-input.js';
 import type { FocusedColumn, ScreenId, TuiMode } from '../state/app-state.js';
 
 const SCREEN_ORDER: ScreenId[] = ['build', 'results', 'server', 'settings'];
-const DEFAULT_COLUMN_ORDER: FocusedColumn[] = ['sidebar', 'content', 'details'];
+const DEFAULT_COLUMN_ORDER: FocusedColumn[] = ['content', 'details'];
 
 export function getAdjacentScreen(currentScreen: ScreenId, direction: 'prev' | 'next'): ScreenId {
     const currentIndex = SCREEN_ORDER.indexOf(currentScreen);
@@ -22,7 +22,7 @@ export function getAdjacentScreen(currentScreen: ScreenId, direction: 'prev' | '
 }
 
 export function getColumnOrder(showDetails: boolean): FocusedColumn[] {
-    return showDetails ? DEFAULT_COLUMN_ORDER : ['sidebar', 'content'];
+    return showDetails ? DEFAULT_COLUMN_ORDER : ['content'];
 }
 
 export function getAdjacentColumn(

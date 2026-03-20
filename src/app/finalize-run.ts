@@ -163,6 +163,9 @@ function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFina
     runLogger.info(`Detected loader version: ${report.runtimeDetection ? (report.runtimeDetection.loaderVersion || 'n/a') : 'n/a'}`);
     runLogger.info(`Managed core status: ${report.serverCoreInstall ? report.serverCoreInstall.status : 'n/a'}`);
     runLogger.info(`Managed core entrypoint: ${report.serverCoreInstall ? (report.serverCoreInstall.entrypointPath || 'n/a') : 'n/a'}`);
+    runLogger.info(`Workspace materialization: ${report.workspace ? report.workspace.materializationMode : 'n/a'}`);
+    runLogger.info(`Workspace manifest: ${report.workspace ? (report.workspace.manifestPath || 'n/a') : 'n/a'}`);
+    runLogger.info(`Validation sandbox linked files: ${report.workspace?.validationSandbox ? report.workspace.validationSandbox.linkedFiles : 0}`);
     runLogger.info(`Candidates: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`);
     runLogger.info(`Current candidate: ${currentCandidate ? currentCandidate.candidateId : 'n/a'}`);
     runLogger.info(`Current iteration: ${currentCandidate ? currentCandidate.iteration : 'n/a'}`);

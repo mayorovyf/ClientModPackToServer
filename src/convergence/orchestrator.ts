@@ -1,5 +1,3 @@
-const fs = require('node:fs');
-
 const { applyPhase0ContractToReport, applyPhase3FailureAnalysisToReport } = require('../app/finalize-run');
 const { attachTerminalOutcomeToCandidate, createCandidateState } = require('./candidate-state');
 const { runInitialCandidateIteration } = require('./iteration-engine');
@@ -50,20 +48,17 @@ function createTerminalOutcome({
 }
 
 function meetsSuccessContract(report: RunReport): boolean {
+    const allowedJavaProfiles = report.releaseContract?.supportBoundary.runtimeTopology.matchedWhitelistEntry?.allowedJavaProfiles || [];
+
     return Boolean(
         report.validation
         && report.validation.runAttempted
         && report.validation.status === 'passed'
         && report.validation.successMarkers.length > 0
-        && report.validation.joinability?.status !== 'failed'
+        && report.validation.joinability?.status === 'passed'
         && report.validation.errors.length === 0
+        && (allowedJavaProfiles.length === 0 || allowedJavaProfiles.includes(report.run.javaProfile))
     );
-}
-
-function removeCurrentBuildOutput(runContext: RunContext): void {
-    if (!runContext.dryRun && fs.existsSync(runContext.buildDir)) {
-        fs.rmSync(runContext.buildDir, { recursive: true, force: true });
-    }
 }
 
 function enrichIterationReport({
@@ -142,6 +137,9 @@ async function runConvergenceLoop({
     });
     const candidates: CandidateState[] = [];
     const seenFailingStateDigests = new Set<string>();
+    let staticSnapshot: Awaited<ReturnType<typeof runInitialCandidateIteration>>['staticSnapshot'] = null;
+    let realizedSnapshot: Awaited<ReturnType<typeof runInitialCandidateIteration>>['realizedSnapshot'] = null;
+    let workspaceSession: Awaited<ReturnType<typeof runInitialCandidateIteration>>['workspaceSession'] = null;
     let execution: CandidateExecutionState = {
         candidateId: `${runContext.runId}:candidate-0`,
         parentCandidateId: null,
@@ -168,10 +166,6 @@ async function runConvergenceLoop({
             searchBudget: createSearchBudgetSnapshot(searchBudget)
         });
 
-        if (execution.iteration > 0) {
-            removeCurrentBuildOutput(execution.runContext);
-        }
-
         const iterationResult = await runInitialCandidateIteration({
             modsPath,
             blockList,
@@ -183,8 +177,15 @@ async function runConvergenceLoop({
             parentCandidateId: execution.parentCandidateId,
             iteration: execution.iteration,
             appliedFixes: execution.appliedFixes,
+            newlyAppliedFixes: execution.newlyAppliedFixes,
+            staticSnapshot,
+            realizedSnapshot,
+            workspaceSession,
             mutations: execution.mutations
         });
+        staticSnapshot = iterationResult.staticSnapshot || staticSnapshot;
+        realizedSnapshot = iterationResult.realizedSnapshot || realizedSnapshot;
+        workspaceSession = iterationResult.workspaceSession || workspaceSession;
         const report = enrichIterationReport({
             report: iterationResult.report,
             runContext: execution.runContext
@@ -226,7 +227,7 @@ async function runConvergenceLoop({
             terminalOutcome = createTerminalOutcome({
                 id: 'success',
                 reasonCode: 'success-contract-met',
-                explanation: 'The candidate reached the dedicated server success contract with a reliable ready marker.'
+                explanation: 'The candidate reached the success contract with a reliable ready marker and deterministic joinability confirmation.'
             });
         } else if (report.releaseContract?.supportBoundary.status === 'unsupported') {
             terminalOutcome = createTerminalOutcome({

@@ -14,7 +14,11 @@ function createDefaultSearchBudget({
     guardedFixes?: number;
     wallClockMs?: number;
 }): SearchBudget {
-    const maxWallClockMs = Math.max(runContext.validationTimeoutMs * 3, runContext.probeTimeoutMs * 2, 60000);
+    const maxWallClockMs = Math.max(
+        runContext.validationTimeoutMs * 24,
+        runContext.probeTimeoutMs * Math.max(runContext.probeMaxMods, 4),
+        900000
+    );
     const consumedCandidateStates = Math.max(candidateStates, 0);
     const consumedRetries = Math.max(retries, 0);
     const consumedGuardedFixes = Math.max(guardedFixes, 0);

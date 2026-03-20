@@ -45,7 +45,8 @@ function createEmptyValidationReport(
             status: 'not-checked',
             successMarkers: [],
             failureMarkers: [],
-            evidence: []
+            evidence: [],
+            checkedBy: []
         },
         logArtifacts: {},
         warnings,

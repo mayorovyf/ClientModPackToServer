@@ -3,6 +3,20 @@ const path = require('node:path');
 
 import type { ValidationEntrypoint, ValidationEntrypointKind } from '../types/validation';
 
+const IGNORED_AUTO_SCAN_DIRECTORIES = new Set([
+    'mods',
+    '.cmpts',
+    'logs',
+    'world',
+    'world_nether',
+    'world_the_end',
+    'crash-reports'
+]);
+
+function shouldScanDirectory(entryName: string): boolean {
+    return !IGNORED_AUTO_SCAN_DIRECTORIES.has(entryName.trim().toLowerCase());
+}
+
 function walkFiles(rootDirectory: string): string[] {
     if (!fs.existsSync(rootDirectory)) {
         return [];
@@ -24,7 +38,9 @@ function walkFiles(rootDirectory: string): string[] {
             const fullPath = path.join(currentDirectory, entry.name);
 
             if (entry.isDirectory()) {
-                queue.push(fullPath);
+                if (shouldScanDirectory(entry.name)) {
+                    queue.push(fullPath);
+                }
                 continue;
             }
 

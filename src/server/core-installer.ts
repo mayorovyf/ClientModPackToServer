@@ -22,6 +22,9 @@ interface FabricLoaderVersionEntry {
     };
 }
 
+const DEFAULT_INSTALLER_CONNECT_TIMEOUT_MS = 45000;
+const DEFAULT_INSTALLER_READ_TIMEOUT_MS = 45000;
+
 function ensureDirectory(directoryPath: string): void {
     if (!fs.existsSync(directoryPath)) {
         fs.mkdirSync(directoryPath, { recursive: true });
@@ -189,9 +192,17 @@ async function runJavaInstaller({
     targetDir: string;
 }): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
     const javaExecutable = javaPath && String(javaPath).trim() ? String(javaPath).trim() : 'java';
+    const javaArgs = [
+        `-Dsun.net.client.defaultConnectTimeout=${DEFAULT_INSTALLER_CONNECT_TIMEOUT_MS}`,
+        `-Dsun.net.client.defaultReadTimeout=${DEFAULT_INSTALLER_READ_TIMEOUT_MS}`,
+        '-jar',
+        installerJarPath,
+        '--installServer',
+        '.'
+    ];
 
     return new Promise((resolve, reject) => {
-        const child = spawn(javaExecutable, ['-jar', installerJarPath, '--installServer', '.'], {
+        const child = spawn(javaExecutable, javaArgs, {
             cwd: targetDir,
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: true

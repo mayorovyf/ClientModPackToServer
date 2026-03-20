@@ -1,6 +1,52 @@
+const path = require('node:path');
+
+const { resolveJavaRuntimeForProfile } = require('../runtime/java-profile');
+const { loadWorkspaceManifest, saveWorkspaceManifest } = require('../build/workspace-manifest');
+const { removePathIfExists } = require('../build/file-transfer');
+const { canReuseWorkspaceServerCore, createServerCoreCacheKey } = require('./core-cache');
+
 import type { BuildServerCoreInstallReport, PackRuntimeDetection } from '../types/runtime-detection';
 import type { RunContext } from '../types/run';
 import type { ServerCoreType } from './types';
+
+function isPathInsideBuildDir(runContext: RunContext, targetPath: string | null | undefined): boolean {
+    if (!targetPath) {
+        return false;
+    }
+
+    const normalizedBuildDir = `${path.resolve(runContext.buildDir)}${path.sep}`;
+    const resolvedTargetPath = path.resolve(targetPath);
+    return resolvedTargetPath.startsWith(normalizedBuildDir);
+}
+
+function cleanupTrackedManagedCore({
+    runContext,
+    record = () => {}
+}: {
+    runContext: RunContext;
+    record?: (level: string, kind: string, message: string) => void;
+}): void {
+    const workspaceManifest = loadWorkspaceManifest(runContext);
+    const trackedCore = workspaceManifest.coreInstall;
+
+    if (!trackedCore) {
+        return;
+    }
+
+    for (const trackedPath of [trackedCore.entrypointPath, trackedCore.downloadedArtifactPath]) {
+        if (!isPathInsideBuildDir(runContext, trackedPath)) {
+            continue;
+        }
+
+        removePathIfExists(trackedPath);
+        record('info', 'server-core', `Removed stale managed core artifact: ${trackedPath}`);
+    }
+
+    saveWorkspaceManifest(runContext, {
+        ...workspaceManifest,
+        coreInstall: null
+    });
+}
 
 function normalizeString(value: unknown): string | null {
     if (value === null || value === undefined) {
@@ -18,6 +64,19 @@ function extractFirstVersion(value: string | null): string | null {
 
     const match = value.match(/\d+\.\d+(?:\.\d+)?(?:[-+A-Za-z0-9.]*)?/);
     return match?.[0] || null;
+}
+
+const SERVER_CORE_INSTALL_MAX_ATTEMPTS = 3;
+const SERVER_CORE_INSTALL_RETRY_DELAY_MS = 1500;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+function isRetryableServerCoreInstallFailure(message: string): boolean {
+    return /(SocketTimeoutException|Connect timed out|Read timed out|Failed to establish connection|These libraries failed to download|ECONNRESET|ETIMEDOUT|fetch failed|network error|temporar(?:y|ily)|timeout)/i.test(message);
 }
 
 export function normalizeMinecraftVersionForInstall(value: string | null): string | null {
@@ -70,6 +129,7 @@ function createServerCoreInstallReport({
     runContext,
     requested,
     status,
+    cacheHit = null,
     coreType = null,
     minecraftVersion = null,
     loaderVersion = null,
@@ -82,6 +142,7 @@ function createServerCoreInstallReport({
     runContext: RunContext;
     requested: boolean;
     status: BuildServerCoreInstallReport['status'];
+    cacheHit?: boolean | null;
     coreType?: ServerCoreType | null;
     minecraftVersion?: string | null;
     loaderVersion?: string | null;
@@ -95,6 +156,7 @@ function createServerCoreInstallReport({
         enabledByConfig: runContext.installServerCore,
         requested,
         status,
+        cacheHit,
         coreType,
         minecraftVersion,
         loaderVersion,
@@ -116,6 +178,10 @@ export async function installDetectedServerCore({
     record?: (level: string, kind: string, message: string) => void;
 }): Promise<BuildServerCoreInstallReport> {
     if (!runContext.installServerCore) {
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
         return createServerCoreInstallReport({
             runContext,
             requested: false,
@@ -125,6 +191,10 @@ export async function installDetectedServerCore({
     }
 
     if (runContext.dryRun) {
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
         return createServerCoreInstallReport({
             runContext,
             requested: false,
@@ -134,6 +204,10 @@ export async function installDetectedServerCore({
     }
 
     if (!runtimeDetection?.loader) {
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
         return createServerCoreInstallReport({
             runContext,
             requested: true,
@@ -143,6 +217,10 @@ export async function installDetectedServerCore({
     }
 
     if (!runtimeDetection.supportedServerCore) {
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
         return createServerCoreInstallReport({
             runContext,
             requested: true,
@@ -154,6 +232,10 @@ export async function installDetectedServerCore({
     const minecraftVersion = normalizeMinecraftVersionForInstall(runtimeDetection.minecraftVersion);
 
     if (!minecraftVersion) {
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
         return createServerCoreInstallReport({
             runContext,
             requested: true,
@@ -168,41 +250,146 @@ export async function installDetectedServerCore({
         coreType,
         loaderVersion: runtimeDetection.loaderVersion
     });
+    const resolvedJavaRuntime = resolveJavaRuntimeForProfile(runContext.javaProfile);
+    const workspaceManifest = loadWorkspaceManifest(runContext);
+    const cacheKey = createServerCoreCacheKey({
+        coreType,
+        minecraftVersion,
+        loaderVersion
+    });
 
-    record('info', 'server-core', `Installing managed ${coreType} core into ${runContext.buildDir}`);
-
-    try {
-        const { installServerCore } = require('./core-installer');
-        const result = await installServerCore({
-            targetDir: runContext.buildDir,
-            coreType,
-            minecraftVersion,
-            loaderVersion,
-            acceptEula: false
-        });
-
-        record('success', 'server-core', `Managed ${coreType} core installed: ${result.entrypointPath || runContext.buildDir}`);
+    if (canReuseWorkspaceServerCore({
+        manifest: workspaceManifest,
+        coreType,
+        minecraftVersion,
+        loaderVersion
+    })) {
+        record('info', 'server-core', `Reusing managed ${coreType} core already present in workspace ${runContext.buildDir}`);
 
         return createServerCoreInstallReport({
             runContext,
             requested: true,
             status: 'installed',
+            cacheHit: true,
+            coreType,
+            minecraftVersion,
+            loaderVersion,
+            entrypointPath: workspaceManifest.coreInstall?.entrypointPath || null,
+            installedAt: workspaceManifest.coreInstall?.installedAt || null,
+            notes: [
+                `Reused managed ${coreType} core from the existing workspace session`
+            ]
+        });
+    }
+
+    if (workspaceManifest.coreInstall) {
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
+    }
+
+    record('info', 'server-core', `Installing managed ${coreType} core into ${runContext.buildDir}`);
+
+    if (!resolvedJavaRuntime.available || !resolvedJavaRuntime.command) {
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
+        return createServerCoreInstallReport({
+            runContext,
+            requested: true,
+            status: 'failed',
+            coreType,
+            minecraftVersion,
+            loaderVersion,
+            reason: `Requested Java profile ${runContext.javaProfile} is not available in the trusted environment`
+        });
+    }
+
+    try {
+        const { installServerCore } = require('./core-installer');
+        let result: Awaited<ReturnType<typeof installServerCore>> | null = null;
+        let attempt = 0;
+        let lastErrorMessage = '';
+
+        while (attempt < SERVER_CORE_INSTALL_MAX_ATTEMPTS) {
+            attempt += 1;
+
+            try {
+                result = await installServerCore({
+                    targetDir: runContext.buildDir,
+                    coreType,
+                    minecraftVersion,
+                    loaderVersion,
+                    javaPath: resolvedJavaRuntime.command,
+                    acceptEula: false
+                });
+                break;
+            } catch (error) {
+                lastErrorMessage = error instanceof Error ? error.message : String(error);
+                const retryable = attempt < SERVER_CORE_INSTALL_MAX_ATTEMPTS && isRetryableServerCoreInstallFailure(lastErrorMessage);
+
+                if (!retryable) {
+                    throw error;
+                }
+
+                record(
+                    'warning',
+                    'server-core',
+                    `Managed ${coreType} core installation hit a transient failure on attempt ${attempt}/${SERVER_CORE_INSTALL_MAX_ATTEMPTS}; retrying`
+                );
+                await sleep(SERVER_CORE_INSTALL_RETRY_DELAY_MS * attempt);
+            }
+        }
+
+        if (!result) {
+            throw new Error(lastErrorMessage || `Failed to install ${coreType} server core`);
+        }
+
+        record('success', 'server-core', `Managed ${coreType} core installed: ${result.entrypointPath || runContext.buildDir}`);
+        saveWorkspaceManifest(runContext, {
+            ...workspaceManifest,
+            coreInstall: {
+                cacheKey,
+                coreType,
+                minecraftVersion: result.minecraftVersion,
+                loaderVersion: result.loaderVersion || loaderVersion,
+                entrypointPath: result.entrypointPath,
+                downloadedArtifactPath: result.downloadedArtifactPath,
+                installedAt: result.installedAt
+            }
+        });
+
+        return createServerCoreInstallReport({
+            runContext,
+            requested: true,
+            status: 'installed',
+            cacheHit: false,
             coreType,
             minecraftVersion: result.minecraftVersion,
             loaderVersion: result.loaderVersion || loaderVersion,
             entrypointPath: result.entrypointPath,
             downloadedArtifactPath: result.downloadedArtifactPath,
             installedAt: result.installedAt,
-            notes: result.notes
+            notes: [
+                ...result.notes,
+                ...(attempt > 1 ? [`Installer succeeded after ${attempt} attempts`] : [])
+            ]
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        cleanupTrackedManagedCore({
+            runContext,
+            record
+        });
         record('error', 'server-core', `Managed server core installation failed: ${message}`);
 
         return createServerCoreInstallReport({
             runContext,
             requested: true,
             status: 'failed',
+            cacheHit: false,
             coreType,
             minecraftVersion,
             loaderVersion,

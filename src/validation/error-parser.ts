@@ -10,6 +10,50 @@ function extractJarHints(text: unknown): string[] {
     return toUniqueList(Array.from(String(text || '').matchAll(/\b([a-z0-9_.-]+\.jar)\b/gi), (match) => match[1]));
 }
 
+function normalizeClassName(className: unknown): string {
+    return String(className || '').trim().replace(/\//g, '.');
+}
+
+function normalizeModIdToken(value: unknown): string {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\.jar$/i, '')
+        .replace(/[^a-z0-9_.-]+/g, '');
+}
+
+function classNameLooksClientOnly(className: unknown): boolean {
+    const normalized = normalizeClassName(className).toLowerCase();
+
+    return /net\.minecraft\.client|com\.mojang\.blaze3d|mezz\.jei|journeymap|xaero|keyboardinput|mousehandler|iteminhandrenderer|humanoidarmorlayer|inventoryeffectrendererguihandler|craftingscreen|screen|renderer|camera|posestack|inputconstants/.test(normalized);
+}
+
+function deriveMixinOwnerHints(configName: unknown): string[] {
+    const suffixTokens = new Set(['common', 'client', 'server', 'forge', 'fabric', 'neoforge', 'quilt', 'compat', 'integration']);
+    const normalized = String(configName || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\.mixins?\.json$/i, '');
+
+    if (!normalized) {
+        return [];
+    }
+
+    const segments = normalized.split('.').filter(Boolean);
+    const strippedSegments = [...segments];
+
+    while (strippedSegments.length > 1 && suffixTokens.has(strippedSegments[strippedSegments.length - 1] || '')) {
+        strippedSegments.pop();
+    }
+
+    return toUniqueList([
+        normalizeModIdToken(normalized),
+        normalizeModIdToken(segments[0]),
+        normalizeModIdToken(strippedSegments.join('.')),
+        normalizeModIdToken(strippedSegments[0])
+    ]);
+}
+
 function parseMissingDependencyIssues(text: string): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
     const patterns = [
@@ -51,26 +95,32 @@ function parseSideMismatchIssues(text: string): ValidationIssue[] {
     const patterns = [
         /mod ['"]?([a-z0-9_.-]+)['"]?.{0,160}(cannot load|can't load).{0,160}environment type server/ig,
         /([a-z0-9_.-]+).{0,120}client-only/ig,
-        /Cannot load class .* in environment type SERVER/ig
+        /Cannot load class .* in environment type SERVER/ig,
+        /Attempted to load class\s+([a-z0-9_.$/]+)\s+for invalid dist DEDICATED_SERVER/ig
     ];
 
     for (const pattern of patterns) {
         let match = pattern.exec(text);
 
         while (match) {
-            const modId = match[1] || null;
+            const rawToken = match[1] || null;
+            const modId = rawToken && !/[/.]/.test(rawToken) ? rawToken : null;
             const evidence = match[0].replace(/\s+/g, ' ').trim();
+            const clientClass = rawToken && /[/.]/.test(rawToken) ? normalizeClassName(rawToken) : null;
+            const suspectedModIds = toUniqueList([modId]);
 
             issues.push({
                 kind: 'side-mismatch',
                 message: modId
                     ? `Validation detected a side mismatch for ${modId}`
+                    : clientClass
+                        ? `Validation detected a dedicated-server load of client class ${clientClass}`
                     : 'Validation detected a client/server side mismatch',
                 evidence,
                 modIds: toUniqueList([modId]),
-                suspectedModIds: toUniqueList([modId]),
+                suspectedModIds,
                 jarHints: extractJarHints(evidence),
-                confidence: modId ? 'high' : 'medium'
+                confidence: modId || clientClass ? 'high' : 'medium'
             });
 
             match = pattern.exec(text);
@@ -91,7 +141,7 @@ function parseClassLoadingIssues(text: string): ValidationIssue[] {
         let match = pattern.exec(text);
 
         while (match) {
-            const className = match[1] || null;
+            const className = normalizeClassName(match[1] || null);
             const evidence = match[0].replace(/\s+/g, ' ').trim();
 
             issues.push({
@@ -113,6 +163,45 @@ function parseClassLoadingIssues(text: string): ValidationIssue[] {
     return issues;
 }
 
+function parseMixinTargetIssues(text: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const lines = String(text || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    for (const line of lines) {
+        const match = line.match(/@Mixin target\s+([a-z0-9_.$/]+)\s+was not found\s+([a-z0-9_.-]+\.mixins?\.json):([a-z0-9_.$/]+)/i);
+
+        if (!match) {
+            continue;
+        }
+
+        const targetClass = normalizeClassName(match[1] || null);
+        const mixinConfig = match[2] || '';
+        const ownerHints = deriveMixinOwnerHints(mixinConfig);
+        const clientOnly = classNameLooksClientOnly(targetClass);
+        const evidence = line.replace(/\s+/g, ' ').trim();
+
+        issues.push({
+            kind: clientOnly ? 'side-mismatch' : 'class-loading',
+            message: clientOnly
+                ? `Validation linked a client-only mixin target to ${mixinConfig}`
+                : `Validation linked a class loading failure to ${mixinConfig}`,
+            evidence,
+            modIds: ownerHints,
+            suspectedModIds: ownerHints,
+            jarHints: toUniqueList([
+                ...extractJarHints(evidence),
+                ...ownerHints
+            ]),
+            confidence: clientOnly ? 'high' : 'medium'
+        });
+    }
+
+    return issues;
+}
+
 function parseJavaRuntimeIssues(text: string): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
     const patterns = [
@@ -124,7 +213,8 @@ function parseJavaRuntimeIssues(text: string): ValidationIssue[] {
         /A JNI error has occurred[^\r\n]*/ig,
         /Invalid maximum heap size[^\r\n]*/ig,
         /Could not reserve enough space[^\r\n]*/ig,
-        /Error: LinkageError occurred while loading main class[^\r\n]*/ig
+        /Error: LinkageError occurred while loading main class[^\r\n]*/ig,
+        /Requested Java profile .* is not available[^\r\n]*/ig
     ];
 
     for (const pattern of patterns) {
@@ -437,6 +527,7 @@ function parseValidationIssues(text: string | null | undefined): ValidationParse
     const issues = deduplicateIssues([
         ...parseMissingDependencyIssues(normalizedText),
         ...parseSideMismatchIssues(normalizedText),
+        ...parseMixinTargetIssues(normalizedText),
         ...parseClassLoadingIssues(normalizedText),
         ...parseJavaRuntimeIssues(normalizedText),
         ...parseLaunchProfileIssues(normalizedText),

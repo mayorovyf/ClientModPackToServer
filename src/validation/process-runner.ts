@@ -1,17 +1,26 @@
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
+const { resolveJavaRuntimeForProfile } = require('../runtime/java-profile');
 const { detectSuccessMarkers } = require('./markers');
 
 import type { ValidationEntrypoint, ValidationProcessCommand, ValidationProcessRuntime } from '../types/validation';
+import type { JavaProfileId } from '../types/topology';
 
-function buildCommand(entrypoint: ValidationEntrypoint): ValidationProcessCommand {
+function buildCommand(entrypoint: ValidationEntrypoint, javaProfile: JavaProfileId = 'auto'): ValidationProcessCommand {
     switch (entrypoint.kind) {
-        case 'jar':
+        case 'jar': {
+            const resolvedJavaRuntime = resolveJavaRuntimeForProfile(javaProfile);
+
+            if (!resolvedJavaRuntime.available || !resolvedJavaRuntime.command) {
+                throw new Error(`Requested Java profile ${javaProfile} is not available in the trusted environment`);
+            }
+
             return {
-                command: 'java',
+                command: resolvedJavaRuntime.command,
                 args: ['-jar', path.basename(entrypoint.path), 'nogui']
             };
+        }
         case 'node-script':
             return {
                 command: process.execPath,
@@ -41,14 +50,16 @@ function runValidationProcess({
     entrypoint,
     workingDirectory,
     timeoutMs,
+    javaProfile = 'auto',
     record = () => {}
 }: {
     entrypoint: ValidationEntrypoint;
     workingDirectory: string;
     timeoutMs: number;
+    javaProfile?: JavaProfileId;
     record?: (level: string, kind: string, message: string) => void;
 }): Promise<ValidationProcessRuntime> {
-    const command = buildCommand(entrypoint);
+    const command = buildCommand(entrypoint, javaProfile);
     const startedAt = new Date().toISOString();
     const startedAtMs = Date.now();
 

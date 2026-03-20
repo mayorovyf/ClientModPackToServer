@@ -1,4 +1,5 @@
 const { assessRuntimeTopology } = require('./assessment');
+const { isKnownConnectorArtifact, listArtifactCompatibleLoaders } = require('./topology-helpers');
 
 import type { PackRuntimeDetection } from '../types/runtime-detection';
 import type { LoaderKind } from '../types/metadata';
@@ -12,6 +13,7 @@ interface DecisionLike {
         modIds?: string[] | null;
         displayName?: string | null;
         manifestHints?: Record<string, string> | null;
+        metadataFilesFound?: string[] | null;
     } | null;
     topologyPartition?: TopologyArtifactPartitionKind | null;
     topologyReason?: string | null;
@@ -32,55 +34,6 @@ interface PartitionResult {
     decisions: DecisionLike[];
     topologyAssessment: RuntimeTopologyAssessment;
     summary: PartitionSummary;
-}
-
-function normalizeString(value: unknown): string | null {
-    if (value === null || value === undefined) {
-        return null;
-    }
-
-    const normalized = String(value).trim();
-    return normalized ? normalized : null;
-}
-
-function collectDecisionTokens(decision: DecisionLike): string[] {
-    const tokens: string[] = [];
-    const fileName = normalizeString(decision.fileName);
-    const displayName = normalizeString(decision.descriptor?.displayName);
-
-    if (fileName) {
-        tokens.push(fileName.toLowerCase());
-    }
-
-    if (displayName) {
-        tokens.push(displayName.toLowerCase());
-    }
-
-    for (const modId of decision.descriptor?.modIds || []) {
-        const normalizedModId = normalizeString(modId);
-
-        if (normalizedModId) {
-            tokens.push(normalizedModId.toLowerCase());
-        }
-    }
-
-    for (const value of Object.values(decision.descriptor?.manifestHints || {})) {
-        const normalizedValue = normalizeString(value);
-
-        if (normalizedValue) {
-            tokens.push(normalizedValue.toLowerCase());
-        }
-    }
-
-    return [...new Set(tokens)];
-}
-
-function hasConnectorArtifactHints(decision: DecisionLike): boolean {
-    const tokens = collectDecisionTokens(decision);
-
-    return tokens.some((token) => token.includes('sinytra-connector') || token.includes('sinytra_connector'))
-        || (tokens.some((token) => token.includes('sinytra')) && tokens.some((token) => token.includes('connector')))
-        || tokens.some((token) => token.includes('connector') || token.includes('bridge'));
 }
 
 function createEmptySummary(): PartitionSummary {
@@ -139,7 +92,8 @@ function partitionDecision({
     const loader = decision.descriptor?.loader || 'unknown';
     const baseLoader = topologyAssessment.baseLoader;
     const bridgedEcosystem = topologyAssessment.bridgedEcosystem;
-    const connectorArtifact = hasConnectorArtifactHints(decision);
+    const connectorArtifact = isKnownConnectorArtifact(decision);
+    const compatibleLoaders = listArtifactCompatibleLoaders(decision);
 
     if (topologyAssessment.assessment !== 'supported' || !topologyId) {
         return createPartitionedDecision({
@@ -177,7 +131,7 @@ function partitionDecision({
         });
     }
 
-    if (loader === baseLoader) {
+    if (baseLoader && compatibleLoaders.includes(baseLoader)) {
         return createPartitionedDecision({
             decision,
             topologyAssessment,
@@ -186,7 +140,7 @@ function partitionDecision({
         });
     }
 
-    if (bridgedEcosystem && loader === bridgedEcosystem) {
+    if (bridgedEcosystem && compatibleLoaders.includes(bridgedEcosystem)) {
         return createPartitionedDecision({
             decision,
             topologyAssessment,

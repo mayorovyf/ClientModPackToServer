@@ -17,6 +17,7 @@ export interface BuildServerCoreInstallReport {
     enabledByConfig: boolean;
     requested: boolean;
     status: 'not-requested' | 'skipped' | 'installed' | 'failed';
+    cacheHit?: boolean | null;
     coreType: ServerCoreType | null;
     minecraftVersion: string | null;
     loaderVersion: string | null;

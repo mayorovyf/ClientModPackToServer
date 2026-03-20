@@ -4,74 +4,22 @@ import { Box } from 'ink';
 import type { TerminalLayout } from '../hooks/use-terminal-layout.js';
 
 export function Layout({
-    sidebar,
+    header,
     content,
     details,
     showDetails = true,
-    statusBar,
+    footer,
+    showFooter = false,
     layout
 }: {
-    sidebar: React.ReactNode;
+    header: React.ReactNode;
     content: React.ReactNode;
     details?: React.ReactNode;
     showDetails?: boolean;
-    statusBar: React.ReactNode;
+    footer?: React.ReactNode;
+    showFooter?: boolean;
     layout: TerminalLayout;
 }): React.JSX.Element {
-    const contentWithSidebar = layout.sidebarInline ? (
-        <Box
-            flexDirection="row"
-            alignItems="stretch"
-            height={layout.contentAreaHeight}
-            minWidth={0}
-            flexGrow={1}
-        >
-            <Box width={layout.sidebarWidth} height={layout.sidebarHeight} flexShrink={0}>
-                {sidebar}
-            </Box>
-            <Box width={layout.gap} flexShrink={0} />
-            <Box flexGrow={1} height={layout.screenAreaHeight} minWidth={0}>
-                {content}
-            </Box>
-        </Box>
-    ) : (
-        <Box flexDirection="column" width={layout.columns} height={layout.contentAreaHeight} minWidth={0}>
-            <Box height={layout.sidebarHeight} marginBottom={layout.gap}>
-                {sidebar}
-            </Box>
-            <Box flexGrow={1} height={layout.screenAreaHeight} minWidth={0}>
-                {content}
-            </Box>
-        </Box>
-    );
-
-    const mainArea = !showDetails ? (
-        <Box width={layout.columns} height={layout.mainAreaHeight} minWidth={0}>
-            {contentWithSidebar}
-        </Box>
-    ) : layout.detailsInline ? (
-        <Box
-            flexDirection="row"
-            alignItems="stretch"
-            width={layout.columns}
-            height={layout.mainAreaHeight}
-            minWidth={0}
-        >
-            {contentWithSidebar}
-            <Box marginLeft={layout.gap} width={layout.detailsWidth} height={layout.mainAreaHeight} flexShrink={0}>
-                {details}
-            </Box>
-        </Box>
-    ) : (
-        <Box flexDirection="column" width={layout.columns} height={layout.mainAreaHeight} minWidth={0}>
-            {contentWithSidebar}
-            <Box height={layout.gap} flexShrink={0} />
-            <Box height={layout.detailsHeight} minWidth={0}>
-                {details}
-            </Box>
-        </Box>
-    );
-
     return (
         <Box
             flexDirection="column"
@@ -81,11 +29,43 @@ export function Layout({
             paddingY={layout.padding}
             minWidth={0}
         >
-            {mainArea}
-            <Box height={layout.statusBarGap} flexShrink={0} />
-            <Box width={layout.columns} height={layout.statusBarHeight} minWidth={0}>
-                {statusBar}
+            <Box width={layout.columns} height={layout.headerHeight} minWidth={0}>
+                {header}
             </Box>
+
+            <Box height={layout.headerGap} flexShrink={0} />
+
+            <Box
+                flexDirection="row"
+                width={layout.columns}
+                height={layout.mainAreaHeight}
+                minWidth={0}
+            >
+                <Box
+                    width={showDetails ? layout.contentWidth : layout.columns}
+                    height={layout.mainAreaHeight}
+                    minWidth={0}
+                    flexGrow={showDetails ? 0 : 1}
+                >
+                    {content}
+                </Box>
+
+                {showDetails ? <Box width={layout.gap} flexShrink={0} /> : null}
+
+                {showDetails ? (
+                    <Box width={layout.detailsWidth} height={layout.mainAreaHeight} minWidth={0} flexShrink={0}>
+                        {details}
+                    </Box>
+                ) : null}
+            </Box>
+
+            {showFooter ? <Box height={layout.footerGap} flexShrink={0} /> : null}
+
+            {showFooter ? (
+                <Box width={layout.columns} height={layout.footerHeight} minWidth={0}>
+                    {footer}
+                </Box>
+            ) : null}
         </Box>
     );
 }

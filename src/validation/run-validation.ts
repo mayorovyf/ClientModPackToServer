@@ -2,6 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { ensureDirectory } = require('../io/history');
+const { cleanupValidationSandbox, createValidationSandbox } = require('./sandbox');
+const { projectDeterministicJoinability } = require('./joinability-projection');
 const { detectJoinabilityFailureMarkers, detectJoinabilitySuccessMarkers } = require('./markers');
 const {
     DEFAULT_VALIDATION_LOG_FILE_NAME,
@@ -29,26 +31,6 @@ import type {
     ValidationStageResult,
     ValidationStatus
 } from '../types/validation';
-
-function prepareValidationWorkspace(runContext: RunContext): { workspaceRoot: string; workspaceDir: string } {
-    ensureDirectory(runContext.tmpRootDir);
-    const workspaceRoot = fs.mkdtempSync(path.join(runContext.tmpRootDir, `${runContext.runId}-validation-`));
-    const workspaceDir = path.join(workspaceRoot, 'server');
-    fs.cpSync(runContext.buildDir, workspaceDir, { recursive: true });
-
-    return {
-        workspaceRoot,
-        workspaceDir
-    };
-}
-
-function cleanupValidationWorkspace(workspaceRoot: string | null): void {
-    if (!workspaceRoot || !fs.existsSync(workspaceRoot)) {
-        return;
-    }
-
-    fs.rmSync(workspaceRoot, { recursive: true, force: true });
-}
 
 function writeValidationArtifacts({
     runContext,
@@ -203,43 +185,66 @@ function determineValidationStatus(
 
 function deriveJoinabilityResult({
     output,
-    issues
+    issues,
+    decisions
 }: {
     output: string;
     issues: ValidationIssue[];
+    decisions: ValidationDecisionLike[];
 }): ValidationJoinabilityResult {
     const successMarkers = detectJoinabilitySuccessMarkers(output);
     const failureMarkers = detectJoinabilityFailureMarkers(output);
     const joinabilityIssues = issues.filter((issue) => issue.kind === 'joinability-failure');
+    const projection = projectDeterministicJoinability({
+        decisions
+    });
     const evidence = [
         ...failureMarkers.map((marker: ValidationJoinabilityResult['failureMarkers'][number]) => marker.evidence),
         ...joinabilityIssues.map((issue) => issue.evidence),
-        ...successMarkers.map((marker: ValidationJoinabilityResult['successMarkers'][number]) => marker.evidence)
+        ...successMarkers.map((marker: ValidationJoinabilityResult['successMarkers'][number]) => marker.evidence),
+        ...projection.evidence
     ].filter(Boolean).slice(0, 5);
+    const checkedBy = [
+        ...(successMarkers.length > 0 || failureMarkers.length > 0 || joinabilityIssues.length > 0 ? ['runtime-markers' as const] : []),
+        ...projection.checkedBy
+    ];
 
     if (failureMarkers.length > 0 || joinabilityIssues.length > 0) {
         return {
             status: 'failed',
             successMarkers,
             failureMarkers,
-            evidence
+            evidence,
+            checkedBy
         };
     }
 
-    if (successMarkers.length > 0) {
+    if (projection.status === 'failed') {
+        return {
+            status: 'failed',
+            successMarkers,
+            failureMarkers,
+            evidence,
+            checkedBy
+        };
+    }
+
+    if (successMarkers.length > 0 || projection.status === 'passed') {
         return {
             status: 'passed',
             successMarkers,
             failureMarkers,
-            evidence
+            evidence,
+            checkedBy
         };
     }
 
     return {
-        status: 'not-checked',
+        status: projection.status,
         successMarkers: [],
         failureMarkers: [],
-        evidence: []
+        evidence: projection.evidence,
+        checkedBy
     };
 }
 
@@ -302,7 +307,7 @@ async function runValidationStage({
 
     try {
         record('info', 'validation', `Preparing validation workspace for run ${runContext.runId}`);
-        const workspace = prepareValidationWorkspace(runContext);
+        const workspace = createValidationSandbox(runContext);
         workspaceRoot = workspace.workspaceRoot;
 
         const explicitEntrypoint = materializeExplicitEntrypoint({
@@ -342,6 +347,7 @@ async function runValidationStage({
             entrypoint,
             workingDirectory: workspace.workspaceDir,
             timeoutMs: runContext.validationTimeoutMs,
+            javaProfile: runContext.javaProfile,
             record
         });
         const parsed = parseValidationIssues(processRuntime.combinedOutput);
@@ -352,7 +358,8 @@ async function runValidationStage({
         });
         const joinability = deriveJoinabilityResult({
             output: processRuntime.combinedOutput,
-            issues: linked.issues
+            issues: linked.issues,
+            decisions
         });
         const status = determineValidationStatus(processRuntime, linked.issues, processRuntime.successMarkers);
         const logArtifacts = writeValidationArtifacts({
@@ -417,7 +424,8 @@ async function runValidationStage({
         }
 
         return {
-            validation: report
+            validation: report,
+            sandboxStats: workspace.stats
         };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -427,7 +435,7 @@ async function runValidationStage({
             validation: createErrorValidation(runContext.validationMode, message)
         };
     } finally {
-        cleanupValidationWorkspace(workspaceRoot);
+        cleanupValidationSandbox(workspaceRoot);
     }
 }
 

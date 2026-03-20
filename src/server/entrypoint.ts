@@ -18,7 +18,8 @@ const IGNORED_AUTO_SCAN_DIRECTORIES = new Set([
     'resourcepacks',
     'datapacks',
     'cache',
-    'backups'
+    'backups',
+    '.cmpts'
 ]);
 
 export function getManagedServerEntrypointKind(filePath: string): ManagedServerEntrypointKind | null {

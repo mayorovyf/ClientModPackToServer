@@ -6,10 +6,10 @@ import i18nApi from '../i18n/create-translator.js';
 import entrypointApi from '../server/entrypoint.js';
 import manualReviewOverridesApi from '../review/manual-overrides.js';
 import type { ManualReviewAction } from '../review/manual-overrides.js';
+import { HeaderChrome } from './components/HeaderChrome.js';
+import { HintBar } from './components/HintBar.js';
 import { Layout } from './components/Layout.js';
 import { SectionShell } from './components/SectionShell.js';
-import { Sidebar } from './components/Sidebar.js';
-import { StatusBar } from './components/StatusBar.js';
 import { useBackendRun } from './hooks/use-backend-run.js';
 import { getColumnOrder, useHotkeys } from './hooks/use-hotkeys.js';
 import { useServerManager } from './hooks/use-server-manager.js';
@@ -89,7 +89,6 @@ function resolveTuiReviewOverridesPath(
 
 export function App(): React.JSX.Element {
     const { exit } = useApp();
-    const layout = useTerminalLayout();
     const [persistedState] = useState(loadPersistedTuiState);
     const [activeScreen, setActiveScreen] = useState<ScreenId>(persistedState.activeScreen);
     const [activePageByScreen, setActivePageByScreen] = useState<ActivePageByScreen>(persistedState.activePageByScreen);
@@ -120,6 +119,7 @@ export function App(): React.JSX.Element {
     const [appNotice, setAppNotice] = useState<NoticeState | null>(null);
     const [persistenceError, setPersistenceError] = useState<string | null>(null);
     const { session, startRun, cancelRun } = useBackendRun();
+    const layout = useTerminalLayout(showHints);
     const serverManager = useServerManager();
     const serverEntrypointCacheRef = useRef<Map<string, string | null>>(new Map());
     const lastBuildLogItemIdRef = useRef('');
@@ -928,6 +928,15 @@ export function App(): React.JSX.Element {
         || persistenceError
         || pageStatusMessage
         || fallbackStatusMessage;
+    const noticeTone: NoticeState['level'] | null = persistenceError
+        ? 'error'
+        : appNotice?.level
+            || reviewNotice?.level
+            || (serverManager.state.lastError || session.lastError ? 'error' : null);
+    const sectionTabs = NAVIGATION_ITEMS.map((item) => t(item.labelKey));
+    const activeSectionIndex = Math.max(0, NAVIGATION_ITEMS.findIndex((item) => item.id === activeScreen));
+    const pageTabs = activeSection.pages.map((page) => page.label);
+    const activePageIndex = Math.max(0, activeSection.pages.findIndex((page) => page.id === activePage.id));
 
     if (!layout.sizeSupported) {
         const warnings: string[] = [];
@@ -968,18 +977,14 @@ export function App(): React.JSX.Element {
         );
     }
 
-    const sidebarHeight = layout.sidebarInline ? layout.mainAreaHeight : layout.sidebarHeight;
-    const screenHeight = layout.sidebarInline ? layout.mainAreaHeight : layout.screenAreaHeight;
-    const detailsHeight = layout.detailsInline ? layout.mainAreaHeight : layout.detailsHeight;
-    const screenWidth = layout.sidebarInline
-        ? (showDetails && layout.detailsInline
-            ? layout.columns - layout.sidebarWidth - layout.detailsWidth - layout.gap * 2
-            : layout.columns - layout.sidebarWidth - layout.gap)
-        : layout.columns;
+    const screenHeight = layout.mainAreaHeight;
+    const detailsHeight = layout.mainAreaHeight;
+    const screenWidth = showDetails ? layout.contentWidth : layout.columns;
     const content = (
         <SectionShell
             section={activeSection}
             activePageId={activePage.id}
+            showTabs={false}
             frameLabel={contentFrameLabel}
             height={screenHeight}
             width={screenWidth}
@@ -1007,20 +1012,26 @@ export function App(): React.JSX.Element {
             <I18nContext.Provider value={t}>
                 <Layout
                     layout={layout}
-                    sidebar={
-                        <Sidebar
-                            items={NAVIGATION_ITEMS}
-                            activeScreen={activeScreen}
-                            activePageId={String(activePage.id)}
-                            activePageLabel={activePageLabel}
-                            hasMultiplePages={activeSection.pages.length > 1}
-                            isFocused={focusedColumn === 'sidebar'}
-                            uiMode={uiMode}
+                    header={
+                        <HeaderChrome
+                            width={layout.columns}
+                            brandWidth={layout.brandWidth}
+                            gap={layout.gap}
+                            title="ClientModPackToServer"
+                            modeLabel={uiMode === 'simple' ? t('sidebar.mode.simple') : t('sidebar.mode.expert')}
+                            sectionTabs={sectionTabs}
+                            activeSectionIndex={activeSectionIndex}
+                            pageTabs={pageTabs}
+                            activePageIndex={activePageIndex}
                             runStatus={session.status}
-                            showHints={showHints}
-                            compact={layout.compact}
-                            height={sidebarHeight}
-                            {...(layout.sidebarInline ? { width: layout.sidebarWidth } : {})}
+                            currentStage={session.currentStage}
+                            currentConvergenceStage={session.currentConvergenceStage}
+                            currentCandidateId={session.currentCandidateId}
+                            currentIteration={session.currentIteration}
+                            candidateCount={session.candidateCount}
+                            terminalOutcomeId={session.terminalOutcomeId}
+                            statusMessage={statusMessage}
+                            noticeTone={noticeTone}
                         />
                     }
                     content={
@@ -1030,17 +1041,18 @@ export function App(): React.JSX.Element {
                     }
                     showDetails={showDetails}
                     details={details}
-                    statusBar={
-                        <StatusBar
-                            activeScreenLabel={activeScreenLabel}
-                            activePageLabel={activePageLabel}
-                            focusedColumn={focusedColumn}
-                            uiMode={uiMode}
-                            runStatus={session.status}
-                            currentStage={session.currentStage}
-                            statusMessage={statusMessage}
+                    showFooter={showHints}
+                    footer={showHints ? (
+                        <HintBar
+                            width={layout.columns}
+                            activeScreen={activeScreen}
+                            activePageId={String(activePage.id)}
+                            hasMultiplePages={activeSection.pages.length > 1}
+                            showDetails={showDetails}
+                            isRunning={session.status === 'running'}
+                            compact={layout.compact}
                         />
-                    }
+                    ) : null}
                 />
             </I18nContext.Provider>
         </LocaleContext.Provider>

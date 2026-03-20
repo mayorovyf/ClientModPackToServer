@@ -132,6 +132,7 @@ function renderBorderLine(segments: BorderSegment[], width: number): React.JSX.E
 export function SectionShell<S extends ScreenId>({
     section,
     activePageId,
+    showTabs = true,
     frameLabel = null,
     height,
     width,
@@ -140,18 +141,19 @@ export function SectionShell<S extends ScreenId>({
 }: {
     section: SectionDefinition<S>;
     activePageId: SectionPageMap[S];
+    showTabs?: boolean;
     frameLabel?: string | null;
     height: number;
     width: number;
     isFocused: boolean;
     content: (contentHeight: number) => React.JSX.Element;
 }): React.JSX.Element {
-    const showTabs = section.pages.length > 1;
+    const shouldShowTabs = showTabs && section.pages.length > 1;
     const contentHeight = Math.max(1, height);
     const innerWidth = Math.max(1, width - 2);
     const borderColor = getBorderColor(section, activePageId, isFocused);
     const activeIndex = Math.max(0, section.pages.findIndex((page) => page.id === activePageId));
-    const topSegments = showTabs
+    const topSegments = shouldShowTabs
         ? buildBorderSegments(section.pages.map((page) => page.label), activeIndex, innerWidth, borderColor)
         : [];
     const bottomSegments = frameLabel
@@ -163,7 +165,7 @@ export function SectionShell<S extends ScreenId>({
             <Box flexGrow={1} height={contentHeight} minWidth={0}>
                 {content(contentHeight)}
             </Box>
-            {showTabs ? (
+            {shouldShowTabs ? (
                 <Box position="absolute" width={width} height={1} minWidth={0}>
                     {renderBorderLine(topSegments, width)}
                 </Box>

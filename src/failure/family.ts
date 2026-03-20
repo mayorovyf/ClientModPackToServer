@@ -5,17 +5,13 @@ import type { SupportBoundaryAssessment, TrustPolicyAction, TrustPolicyActionDec
 import type { ValidationIssue, ValidationResult } from '../types/validation';
 
 export type FailureFamily =
-    | 'wrong-runtime-topology'
-    | 'connector-layer-incompatibility'
-    | 'missing-trusted-connector-dependency'
-    | 'topology-incompatible-artifact-kept'
-    | 'client-server-joinability-failure'
     | 'wrong-java-or-launch-profile'
     | 'missing-trusted-dependency'
     | 'client-only-or-side-mismatch'
-    | 'wrong-core-or-entrypoint'
+    | 'wrong-runtime-topology-or-core-or-entrypoint'
+    | 'client-server-joinability-failure'
     | 'timeout-before-ready'
-    | 'unknown-startup-failure';
+    | 'unknown-startup-or-join-failure';
 
 export type FailureAnalysisKind = 'unsupported-by-boundary' | 'policy-blocked' | 'validation-family';
 
@@ -38,31 +34,34 @@ export interface NormalizedFailureAnalysis {
 }
 
 const FAMILY_ACTIONS: Record<FailureFamily, TrustPolicyAction[]> = {
-    'wrong-runtime-topology': ['switch-whitelisted-runtime-topology'],
-    'connector-layer-incompatibility': ['switch-whitelisted-runtime-topology', 'add-trusted-connector-dependency'],
-    'missing-trusted-connector-dependency': ['add-trusted-connector-dependency', 'restore-server-required-artifact'],
-    'topology-incompatible-artifact-kept': ['remove-confirmed-topology-incompatible-artifact'],
-    'client-server-joinability-failure': ['switch-whitelisted-runtime-topology', 'restore-server-required-artifact'],
     'wrong-java-or-launch-profile': ['select-java-profile', 'switch-whitelisted-entrypoint'],
-    'missing-trusted-dependency': ['add-trusted-dependency'],
+    'missing-trusted-dependency': ['add-trusted-dependency', 'add-trusted-connector-dependency'],
     'client-only-or-side-mismatch': ['remove-explicit-client-only-mod', 'remove-confirmed-client-only-support-library'],
-    'wrong-core-or-entrypoint': ['switch-whitelisted-server-core', 'switch-whitelisted-entrypoint'],
+    'wrong-runtime-topology-or-core-or-entrypoint': [
+        'switch-whitelisted-runtime-topology',
+        'switch-whitelisted-server-core',
+        'switch-whitelisted-entrypoint',
+        'add-trusted-connector-dependency',
+        'remove-confirmed-topology-incompatible-artifact'
+    ],
+    'client-server-joinability-failure': [
+        'restore-server-required-artifact',
+        'add-trusted-dependency',
+        'add-trusted-connector-dependency',
+        'switch-whitelisted-runtime-topology'
+    ],
     'timeout-before-ready': ['retry-timeout'],
-    'unknown-startup-failure': []
+    'unknown-startup-or-join-failure': []
 };
 
 const FAMILY_EXPLANATIONS: Record<FailureFamily, string> = {
-    'wrong-runtime-topology': 'Validation evidence points to the wrong runtime topology being selected for this candidate.',
-    'connector-layer-incompatibility': 'Validation evidence points to an incompatible connector layer or connector bootstrap failure.',
-    'missing-trusted-connector-dependency': 'Validation evidence points to a missing connector-side dependency that should come from the trusted source instance.',
-    'topology-incompatible-artifact-kept': 'Validation evidence points to a topology-incompatible artifact that was still kept in the candidate.',
-    'client-server-joinability-failure': 'Validation evidence points to a joinability mismatch between the built server and the original client pack.',
     'wrong-java-or-launch-profile': 'Validation evidence points to a Java/runtime launch profile mismatch.',
     'missing-trusted-dependency': 'Validation evidence points to a missing required dependency that should come from a trusted source.',
     'client-only-or-side-mismatch': 'Validation evidence points to a client-only mod or a client/server side mismatch.',
-    'wrong-core-or-entrypoint': 'Validation evidence points to an incorrect server core or launch entrypoint.',
+    'wrong-runtime-topology-or-core-or-entrypoint': 'Validation evidence points to an incorrect runtime topology, server core, connector layer or launch entrypoint.',
+    'client-server-joinability-failure': 'Validation evidence points to a joinability mismatch between the built server and the original client pack.',
     'timeout-before-ready': 'Validation timed out before a reliable ready marker appeared.',
-    'unknown-startup-failure': 'Validation detected a startup failure, but it does not fit a more specific release family yet.'
+    'unknown-startup-or-join-failure': 'Validation detected a startup or joinability failure, but it does not fit a more specific release family yet.'
 };
 
 function uniqueSorted(values: Array<string | null | undefined>): string[] {
@@ -147,7 +146,7 @@ function hasClientClassLoadingHints(text: string): boolean {
 }
 
 function isLikelyJavaRuntimeFailure(text: string): boolean {
-    return /unsupportedclassversionerror|unsupported major\.minor|compiled by a more recent version of the java runtime|unsupported class file major version|could not create the java virtual machine|a jni error has occurred|invalid maximum heap size|could not reserve enough space|spawn .*enoent|not recognized as an internal or external command/i.test(text);
+    return /unsupportedclassversionerror|unsupported major\.minor|compiled by a more recent version of the java runtime|unsupported class file major version|could not create the java virtual machine|a jni error has occurred|invalid maximum heap size|could not reserve enough space|spawn .*enoent|not recognized as an internal or external command|requested java profile .* is not available/i.test(text);
 }
 
 function isLikelyEntrypointFailure(text: string): boolean {
@@ -232,24 +231,12 @@ function resolveValidationFailureFamily(validation: ValidationResult | null | un
         return 'client-server-joinability-failure';
     }
 
-    if (hasTopologyIncompatibleArtifactIssue(validation)) {
-        return 'topology-incompatible-artifact-kept';
-    }
-
-    if (hasIssueKind(issues, 'missing-dependency') && hasConnectorDependencyCandidateEvidence(validation)) {
-        return 'missing-trusted-connector-dependency';
-    }
-
-    if (hasConnectorLayerIssue(validation)) {
-        return 'connector-layer-incompatibility';
-    }
-
-    if (hasRuntimeTopologyIssue(validation)) {
-        return 'wrong-runtime-topology';
+    if (hasTopologyIncompatibleArtifactIssue(validation) || hasConnectorLayerIssue(validation) || hasRuntimeTopologyIssue(validation)) {
+        return 'wrong-runtime-topology-or-core-or-entrypoint';
     }
 
     if (isLikelyEntrypointFailure(evidenceText)) {
-        return 'wrong-core-or-entrypoint';
+        return 'wrong-runtime-topology-or-core-or-entrypoint';
     }
 
     if (isLikelyJavaRuntimeFailure(evidenceText)) {
@@ -262,7 +249,7 @@ function resolveValidationFailureFamily(validation: ValidationResult | null | un
 
     if (hasIssueKind(issues, 'launch-profile')) {
         return isLikelyEntrypointSelectionFailure(evidenceText)
-            ? 'wrong-core-or-entrypoint'
+            ? 'wrong-runtime-topology-or-core-or-entrypoint'
             : 'wrong-java-or-launch-profile';
     }
 
@@ -275,7 +262,7 @@ function resolveValidationFailureFamily(validation: ValidationResult | null | un
     }
 
     if (hasIssueKind(issues, 'entrypoint-crash')) {
-        return 'wrong-core-or-entrypoint';
+        return 'wrong-runtime-topology-or-core-or-entrypoint';
     }
 
     if (hasIssueKind(issues, 'class-loading') && hasClientClassLoadingHints(evidenceText)) {
@@ -287,19 +274,19 @@ function resolveValidationFailureFamily(validation: ValidationResult | null | un
     }
 
     if (validation.status === 'error' && !validation.entrypoint) {
-        return 'wrong-core-or-entrypoint';
+        return 'wrong-runtime-topology-or-core-or-entrypoint';
     }
 
     if (hasIssueKind(issues, 'class-loading')) {
-        return 'unknown-startup-failure';
+        return 'unknown-startup-or-join-failure';
     }
 
     if (hasIssueKind(issues, 'unknown-critical') || hasIssueKind(issues, 'validation-no-success-marker')) {
-        return 'unknown-startup-failure';
+        return 'unknown-startup-or-join-failure';
     }
 
     if (validation.status === 'failed' || validation.status === 'error') {
-        return 'unknown-startup-failure';
+        return 'unknown-startup-or-join-failure';
     }
 
     return null;
@@ -313,19 +300,11 @@ function resolveFailureConfidence({
     family: FailureFamily;
 }): ConfidenceLevel {
     if (!validation) {
-        return family === 'unknown-startup-failure' ? 'low' : 'none';
+        return family === 'unknown-startup-or-join-failure' ? 'low' : 'none';
     }
 
     if (family === 'timeout-before-ready') {
         return 'medium';
-    }
-
-    if (family === 'wrong-runtime-topology' || family === 'connector-layer-incompatibility' || family === 'topology-incompatible-artifact-kept') {
-        return 'high';
-    }
-
-    if (family === 'missing-trusted-connector-dependency') {
-        return hasConnectorDependencyCandidateEvidence(validation) ? 'high' : 'medium';
     }
 
     if (family === 'client-server-joinability-failure') {
@@ -340,8 +319,14 @@ function resolveFailureConfidence({
         return hasTrustedDependencyCandidateEvidence(validation) ? 'high' : 'medium';
     }
 
-    if (family === 'wrong-core-or-entrypoint') {
-        if (!validation?.entrypoint || hasIssueKind(validation.issues || [], 'entrypoint-crash') || hasIssueKind(validation.issues || [], 'launch-profile')) {
+    if (family === 'wrong-runtime-topology-or-core-or-entrypoint') {
+        if (
+            !validation?.entrypoint
+            || hasIssueKind(validation.issues || [], 'entrypoint-crash')
+            || hasIssueKind(validation.issues || [], 'launch-profile')
+            || hasConnectorLayerIssue(validation)
+            || hasRuntimeTopologyIssue(validation)
+        ) {
             return 'high';
         }
 
@@ -363,7 +348,7 @@ function resolveFailureConfidence({
     const issueConfidence = maxConfidence((validation.issues || []).map((issue) => issue.confidence));
 
     if (issueConfidence !== 'none') {
-        if (family === 'unknown-startup-failure' && issueConfidence === 'high') {
+        if (family === 'unknown-startup-or-join-failure' && issueConfidence === 'high') {
             return 'medium';
         }
 
@@ -371,10 +356,10 @@ function resolveFailureConfidence({
     }
 
     if (validation.errors.length > 0) {
-        return family === 'unknown-startup-failure' ? 'low' : 'medium';
+        return family === 'unknown-startup-or-join-failure' ? 'low' : 'medium';
     }
 
-    return family === 'unknown-startup-failure' ? 'low' : 'medium';
+    return family === 'unknown-startup-or-join-failure' ? 'low' : 'medium';
 }
 
 function resolveRecommendedActions(
@@ -386,7 +371,7 @@ function resolveRecommendedActions(
 
     const actions = [...FAMILY_ACTIONS[family]];
 
-    if (family === 'unknown-startup-failure' && hasEulaEvidence(validation)) {
+    if (family === 'unknown-startup-or-join-failure' && hasEulaEvidence(validation)) {
         actions.push('accept-eula');
     }
 

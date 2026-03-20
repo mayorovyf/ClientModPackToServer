@@ -4,7 +4,7 @@ const { createRunId } = require('./run-id');
 
 import type { ArbiterProfile, DeepCheckMode, DependencyValidationMode, OutputPolicy, ProbeMode, RegistryMode, RunMode, ValidationMode } from '../types/config';
 import type { InstanceInputKind, InstanceSource } from '../types/intake';
-import type { RuntimeTopologyId } from '../types/topology';
+import type { JavaProfileId, RuntimeTopologyId } from '../types/topology';
 import type { RunContext } from '../types/run';
 
 interface CreateRunContextOptions {
@@ -27,6 +27,7 @@ interface CreateRunContextOptions {
     validationMode?: ValidationMode;
     validationTimeoutMs?: number;
     validationEntrypointPath?: string | null;
+    javaProfile?: JavaProfileId;
     preferredRuntimeTopologyId?: RuntimeTopologyId | null;
     validationSaveArtifacts?: boolean;
     installServerCore?: boolean;
@@ -71,6 +72,7 @@ function createRunContext({
     validationMode = 'auto',
     validationTimeoutMs = 15000,
     validationEntrypointPath = null,
+    javaProfile = 'auto',
     preferredRuntimeTopologyId = null,
     validationSaveArtifacts = false,
     installServerCore = false,
@@ -90,8 +92,13 @@ function createRunContext({
     const resolvedServerDirName = serverDirName || deriveDefaultServerDirName(inputPath);
     const buildDir = path.join(outputRootDir, resolvedServerDirName);
     const buildModsDir = path.join(buildDir, 'mods');
+    const buildInternalDir = path.join(buildDir, '.cmpts');
     const reportDir = path.join(reportRootDir, runId);
     const resolvedTmpRootDir = tmpRootDir || path.join(process.cwd(), 'tmp');
+    const validationSandboxRootDir = path.join(resolvedTmpRootDir, 'validation');
+    const workspaceStashDir = path.join(buildInternalDir, 'stash');
+    const workspaceStashModsDir = path.join(workspaceStashDir, 'mods');
+    const workspaceCoreCacheDir = path.join(buildInternalDir, 'core-cache');
 
     return {
         runId,
@@ -109,6 +116,12 @@ function createRunContext({
         outputPolicy,
         buildDir,
         buildModsDir,
+        buildInternalDir,
+        workspaceManifestPath: path.join(buildInternalDir, 'workspace-manifest.json'),
+        workspaceStashDir,
+        workspaceStashModsDir,
+        workspaceCoreCacheDir,
+        validationSandboxRootDir,
         reportDir,
         jsonReportPath: path.join(reportDir, 'report.json'),
         runMetadataPath: path.join(reportDir, 'run.json'),
@@ -124,6 +137,7 @@ function createRunContext({
         validationMode,
         validationTimeoutMs,
         validationEntrypointPath,
+        javaProfile,
         preferredRuntimeTopologyId,
         validationSaveArtifacts,
         installServerCore,

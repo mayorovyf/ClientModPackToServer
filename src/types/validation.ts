@@ -1,4 +1,5 @@
 import type { ConfidenceLevel, SemanticDecision } from './classification';
+import type { ValidationSandboxStats } from './workspace';
 
 export type ValidationMode = 'off' | 'auto' | 'require' | 'force';
 export type ValidationStatus = 'not-run' | 'passed' | 'failed' | 'timed-out' | 'error' | 'skipped';
@@ -85,12 +86,14 @@ export interface ValidationSuspectedFalseRemoval {
 }
 
 export type ValidationJoinabilityStatus = 'not-checked' | 'passed' | 'failed';
+export type ValidationJoinabilityCheckKind = 'runtime-markers' | 'deterministic-projection';
 
 export interface ValidationJoinabilityResult {
     status: ValidationJoinabilityStatus;
     successMarkers: ValidationMarker[];
     failureMarkers: ValidationMarker[];
     evidence: string[];
+    checkedBy: ValidationJoinabilityCheckKind[];
 }
 
 export interface ValidationSummary {
@@ -173,4 +176,5 @@ export interface ValidationDecisionLike {
 
 export interface ValidationStageResult {
     validation: ValidationResult;
+    sandboxStats?: ValidationSandboxStats | null;
 }

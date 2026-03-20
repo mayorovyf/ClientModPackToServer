@@ -4,6 +4,7 @@ const {
     listPendingRuntimeTopologyIds,
     listSupportedRuntimeTopologyIds
 } = require('./whitelist');
+const { detectRuntimeConnectorLayer } = require('./topology-helpers');
 
 import type { PackRuntimeDetection } from '../types/runtime-detection';
 import type { LoaderKind } from '../types/metadata';
@@ -17,6 +18,7 @@ interface DecisionLike {
         modIds?: string[] | null;
         displayName?: string | null;
         manifestHints?: Record<string, string> | null;
+        metadataFilesFound?: string[] | null;
     } | null;
 }
 
@@ -102,32 +104,6 @@ function collectTrustedArtifactProvenance(runContext: RunContext): TrustedArtifa
     return [...provenance].sort((left, right) => left.localeCompare(right));
 }
 
-function detectConnectorLayer(tokens: string[]) {
-    const connectorHints: string[] = [];
-    let connectorLayer: RuntimeTopologyAssessment['connectorLayer'] = null;
-
-    for (const token of tokens) {
-        if (/sinytra/.test(token) && /connector/.test(token)) {
-            connectorLayer = 'sinytra-connector';
-            connectorHints.push('sinytra-connector');
-            continue;
-        }
-
-        if (/connector/.test(token) || /bridge/.test(token)) {
-            if (!connectorLayer) {
-                connectorLayer = 'unknown-connector-layer';
-            }
-
-            connectorHints.push(token);
-        }
-    }
-
-    return {
-        connectorLayer,
-        connectorHints: toSortedUniqueList(connectorHints)
-    };
-}
-
 function detectBridgedEcosystem({
     detectedLoaders,
     tokens
@@ -164,11 +140,17 @@ function detectBridgedEcosystem({
 
 function inferBaseLoader({
     detectedLoaders,
-    connectorLayer
+    connectorLayer,
+    runtimeDetection
 }: {
     detectedLoaders: LoaderKind[];
     connectorLayer: RuntimeTopologyAssessment['connectorLayer'];
+    runtimeDetection: PackRuntimeDetection | null;
 }): LoaderKind | null {
+    if (runtimeDetection?.loader && runtimeDetection.loader !== 'unknown' && runtimeDetection.confidence !== 'low') {
+        return runtimeDetection.loader;
+    }
+
     if (detectedLoaders.length === 1) {
         return detectedLoaders[0] || null;
     }
@@ -207,17 +189,25 @@ function listCandidateRuntimeTopologyIds({
     detectedLoaders,
     baseLoader,
     connectorLayer,
-    bridgedEcosystem
+    bridgedEcosystem,
+    runtimeDetection
 }: {
     detectedLoaders: LoaderKind[];
     baseLoader: LoaderKind | null;
     connectorLayer: RuntimeTopologyAssessment['connectorLayer'];
     bridgedEcosystem: RuntimeTopologyAssessment['bridgedEcosystem'];
+    runtimeDetection: PackRuntimeDetection | null;
 }): RuntimeTopologyId[] {
     const candidateTopologyIds: RuntimeTopologyId[] = [];
+    const runtimeDetectionLoader = runtimeDetection?.loader && runtimeDetection.loader !== 'unknown' && runtimeDetection.confidence !== 'low'
+        ? runtimeDetection.loader
+        : null;
 
-    if (!connectorLayer && detectedLoaders.length === 1 && baseLoader) {
-        const topologyId = resolveSingleLoaderTopologyId(baseLoader);
+    if (!connectorLayer) {
+        const singleLoaderCandidate = detectedLoaders.length === 1
+            ? baseLoader
+            : runtimeDetectionLoader;
+        const topologyId = resolveSingleLoaderTopologyId(singleLoaderCandidate);
 
         if (topologyId) {
             candidateTopologyIds.push(topologyId);
@@ -361,20 +351,22 @@ export function assessRuntimeTopology({
 
     const detectedLoaders = collectDetectedLoaders(decisions, runtimeDetection);
     const tokens = collectHintTokens(decisions);
-    const { connectorLayer, connectorHints } = detectConnectorLayer(tokens);
+    const { connectorLayer, connectorHints } = detectRuntimeConnectorLayer(decisions);
     const bridgedEcosystem = detectBridgedEcosystem({
         detectedLoaders,
         tokens
     });
     const baseLoader = inferBaseLoader({
         detectedLoaders,
-        connectorLayer
+        connectorLayer,
+        runtimeDetection
     });
     const candidateTopologyIds = listCandidateRuntimeTopologyIds({
         detectedLoaders,
         baseLoader,
         connectorLayer,
-        bridgedEcosystem
+        bridgedEcosystem,
+        runtimeDetection
     });
     const topologyId = resolveTopologyId({
         candidateTopologyIds,

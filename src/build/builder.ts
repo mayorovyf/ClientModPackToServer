@@ -665,7 +665,12 @@ function buildStats(decisions: PipelineDecision[]): RunReport['stats'] {
         totalJarFiles: decisions.length,
         kept: decisions.filter((item) => item.decision === 'keep').length,
         excluded: decisions.filter((item) => item.decision === 'exclude').length,
-        copied: decisions.filter((item) => item.actionStatus === 'copied').length,
+        copied: decisions.filter((item) => (
+            item.actionStatus === 'copied'
+            || item.actionStatus === 'linked'
+            || item.actionStatus === 'restored'
+            || item.actionStatus === 'reused'
+        )).length,
         wouldCopy: decisions.filter((item) => item.actionStatus === 'would-copy').length,
         wouldExclude: decisions.filter((item) => item.actionStatus === 'would-exclude').length,
         errors: decisions.filter((item) => item.actionStatus === 'error').length

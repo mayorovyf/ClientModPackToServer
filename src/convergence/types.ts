@@ -7,6 +7,8 @@ import type { BridgedEcosystemId, ConnectorLayerId, RuntimeTopologyId } from '..
 import type { TopologyArtifactPartitionKind } from '../types/topology';
 import type { ValidationEntrypointKind, ValidationStatus } from '../types/validation';
 import type { FailureFamily, NormalizedFailureAnalysis } from '../failure/family';
+import type { BaseStaticSnapshot, RealizedStaticSnapshot } from './static-snapshot';
+import type { WorkspaceSessionHandle } from '../build/workspace-session';
 
 export interface CandidateFingerprintFile {
     fileName: string;
@@ -107,4 +109,7 @@ export interface CandidateTrace {
 export interface CandidateIterationResult {
     candidate: CandidateState;
     report: RunReport;
+    staticSnapshot?: BaseStaticSnapshot;
+    realizedSnapshot?: RealizedStaticSnapshot;
+    workspaceSession?: WorkspaceSessionHandle;
 }

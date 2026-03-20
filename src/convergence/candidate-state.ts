@@ -68,7 +68,8 @@ function createStateDigest({
     javaProfile,
     validationTimeoutMs,
     launchProfile,
-    currentModDecisions
+    currentModDecisions,
+    appliedFixes
 }: {
     fingerprintDigest: string;
     runtimeTopologyId: CandidateState['runtimeTopologyId'];
@@ -77,6 +78,7 @@ function createStateDigest({
     validationTimeoutMs: number | null;
     launchProfile: CandidateState['launchProfile'];
     currentModDecisions: CandidateState['currentModDecisions'];
+    appliedFixes: CandidateState['appliedFixes'];
 }): string {
     const payload = {
         fingerprintDigest,
@@ -86,6 +88,13 @@ function createStateDigest({
         validationTimeoutMs,
         validationEntrypointKind: launchProfile.validationEntrypointKind || null,
         validationEntrypointPath: launchProfile.validationEntrypointPath || null,
+        appliedFixes: appliedFixes
+            .map((fix) => ({
+                fixId: fix.fixId,
+                kind: fix.kind,
+                scope: fix.scope
+            }))
+            .sort((left, right) => left.fixId.localeCompare(right.fixId)),
         decisions: currentModDecisions
             .map((decision) => ({
                 fileName: decision.fileName,
@@ -127,7 +136,7 @@ function createCandidateState({
     appliedFixes?: CandidateState['appliedFixes'];
     terminalOutcome?: ResolvedTerminalOutcome | null;
 }): CandidateState {
-    const failureAnalysis = report.failureAnalysis || (report.releaseContract
+    const failureAnalysis = report.failureAnalysis || (report.releaseContract?.supportBoundary && report.releaseContract?.trustPolicy
         ? normalizeFailureAnalysis({
             supportBoundary: report.releaseContract.supportBoundary,
             trustPolicy: report.releaseContract.trustPolicy,
@@ -157,10 +166,11 @@ function createCandidateState({
         fingerprintDigest: fingerprint.digest,
         runtimeTopologyId: report.releaseContract?.supportBoundary.runtimeTopology.topologyId || null,
         core: report.serverCoreInstall?.coreType || report.runtimeDetection?.supportedServerCore || null,
-        javaProfile: null,
+        javaProfile: runContext.javaProfile,
         validationTimeoutMs: runContext.validationTimeoutMs,
         launchProfile,
-        currentModDecisions
+        currentModDecisions,
+        appliedFixes
     });
 
     return {
@@ -174,7 +184,7 @@ function createCandidateState({
         connectorLayer: report.releaseContract?.supportBoundary.runtimeTopology.connectorLayer || null,
         bridgedEcosystem: report.releaseContract?.supportBoundary.runtimeTopology.bridgedEcosystem || null,
         core: report.serverCoreInstall?.coreType || report.runtimeDetection?.supportedServerCore || null,
-        javaProfile: null,
+        javaProfile: runContext.javaProfile,
         validationTimeoutMs: runContext.validationTimeoutMs,
         launchProfile,
         currentModDecisions,

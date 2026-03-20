@@ -14,6 +14,7 @@ import type { NormalizedFailureAnalysis } from '../failure/family';
 import type { MinimalRecipe } from '../recipe/types';
 import type { BuildServerCoreInstallReport, PackRuntimeDetection } from './runtime-detection';
 import type { RuntimeTopologyId, TopologyArtifactPartitionKind } from './topology';
+import type { CandidateDelta, ValidationSandboxStats, WorkspaceMaterializationStats } from './workspace';
 
 export interface ReportIssue {
     fileName: string | null;
@@ -52,6 +53,11 @@ export interface ReportDecisionSummary {
     deepCheckDecision?: string | null;
     actionStatus?: string | null;
     dependencyAdjusted?: boolean;
+    dependencyDependencies?: {
+        required?: unknown[];
+        optional?: unknown[];
+        incompatibilities?: unknown[];
+    };
     finalReasons?: string[];
     manualReviewKey?: string | null;
     manualOverrideAction?: 'keep' | 'exclude' | null;
@@ -148,6 +154,15 @@ export interface RunReport {
     failureAnalysis?: NormalizedFailureAnalysis | null;
     runtimeDetection?: PackRuntimeDetection | null;
     serverCoreInstall?: BuildServerCoreInstallReport | null;
+    workspace?: {
+        materializationMode: 'full-build' | 'delta-materialization' | 'validation-only' | 'dry-run';
+        manifestPath: string | null;
+        stashModsDir: string | null;
+        currentActiveMods: number;
+        delta: CandidateDelta | null;
+        materialization: WorkspaceMaterializationStats | null;
+        validationSandbox: ValidationSandboxStats | null;
+    } | null;
     candidateTrace?: CandidateTrace;
     recipe?: MinimalRecipe;
     decisions?: ReportDecisionSummary[];

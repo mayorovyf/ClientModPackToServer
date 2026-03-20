@@ -29,6 +29,10 @@ const FAILURE_MARKERS = Object.freeze([
         pattern: /missing or unsupported mandatory dependencies|requires mod |depends on|required mod/i
     },
     {
+        label: 'eula-required',
+        pattern: /need to agree to the eula|accept the eula|go to eula\.txt|eula\.txt/i
+    },
+    {
         label: 'side-mismatch',
         pattern: /environment type server|client-only|dedicated server/i
     },
@@ -38,7 +42,7 @@ const FAILURE_MARKERS = Object.freeze([
     },
     {
         label: 'java-runtime',
-        pattern: /UnsupportedClassVersionError|unsupported class file major version|compiled by a more recent version of the Java Runtime|Could not create the Java Virtual Machine|A JNI error has occurred|Invalid maximum heap size|Unsupported major\.minor version/i
+        pattern: /UnsupportedClassVersionError|unsupported class file major version|compiled by a more recent version of the Java Runtime|Could not create the Java Virtual Machine|A JNI error has occurred|Invalid maximum heap size|Unsupported major\.minor version|Requested Java profile .* is not available/i
     },
     {
         label: 'launch-profile',

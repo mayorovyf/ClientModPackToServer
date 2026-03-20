@@ -1,36 +1,29 @@
-const { createClassificationContext } = require('../classification/context');
 const { buildClassificationStats } = require('../classification/temporary-merge-policy');
-const { listJarFiles } = require('../io/mods-folder');
 const { buildParsingStats } = require('../metadata/parse-mod-file');
-const { createEmptyProbeSummary, runProbeStage } = require('../probe/run-probe-stage');
-const { applyManualReviewOverrides, resolveReviewOverridesPath } = require('../review/manual-overrides');
 const { detectPackRuntime } = require('../runtime/pack-runtime');
 const { ensureServerEulaAccepted } = require('../server/runtime');
 const { installDetectedServerCore } = require('../server/build-core');
-const { applyTopologyArtifactPartitioning } = require('../topology/artifact-partitioning');
 const { createEmptyValidationReport } = require('../validation/report-model');
 const { runValidationStage } = require('../validation/run-validation');
 const {
     createEventCollector,
     createNoopProgressReporter,
-    collectDecisions,
-    reclassifyDecisions,
-    applyBuildActions,
-    buildStats,
     collectReportIssues,
-    runDependencyStage,
-    runArbiterStage,
-    runDeepCheckStage
+    buildStats
 } = require('../build/builder');
 const { createCandidateState } = require('./candidate-state');
+const { determineCandidateExecutionImpact } = require('./execution-impact');
+const { buildStaticSnapshot, realizeStaticSnapshot } = require('./static-snapshot');
+const { createWorkspaceSession, initializeBaseWorkspace, updateWorkspaceManifest } = require('../build/workspace-session');
+const { applyWorkspaceDelta, createCandidateDelta } = require('../build/workspace-materializer');
 
 import type { ApplicationLogger, BuildProgressReporter, ClassificationContextLike } from '../types/app';
-import type { ClassificationContext } from '../types/classification';
-import type { ProbeSummary } from '../types/probe';
 import type { RunReport } from '../types/report';
 import type { RunContext } from '../types/run';
 import type { ValidationError, ValidationResult, ValidationStageResult } from '../types/validation';
 import type { AppliedFix, CandidateIterationResult } from './types';
+import type { BaseStaticSnapshot, RealizedStaticSnapshot } from './static-snapshot';
+import type { WorkspaceSessionHandle } from '../build/workspace-session';
 
 interface CandidateIterationMutations {
     forcedExcludes?: string[];
@@ -49,7 +42,11 @@ interface RunInitialCandidateIterationParams {
     parentCandidateId?: string | null;
     iteration?: number;
     appliedFixes?: AppliedFix[];
+    newlyAppliedFixes?: AppliedFix[];
     mutations?: CandidateIterationMutations;
+    staticSnapshot?: BaseStaticSnapshot | null;
+    realizedSnapshot?: RealizedStaticSnapshot | null;
+    workspaceSession?: WorkspaceSessionHandle | null;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -152,16 +149,23 @@ async function runInitialCandidateIteration({
     parentCandidateId = null,
     iteration = 0,
     appliedFixes = [],
-    mutations = {}
+    newlyAppliedFixes = [],
+    mutations = {},
+    staticSnapshot = null,
+    realizedSnapshot = null,
+    workspaceSession = null
 }: RunInitialCandidateIterationParams): Promise<CandidateIterationResult> {
     const effectiveProgressReporter = progressReporter || createNoopProgressReporter();
-    const effectiveClassificationContext = (classificationContext || createClassificationContext({ blockList })) as ClassificationContextLike;
     const collector = createEventCollector(logger);
     const effectiveMutations = {
         forcedExcludes: Array.isArray(mutations?.forcedExcludes) ? mutations.forcedExcludes : [],
         forcedKeeps: Array.isArray(mutations?.forcedKeeps) ? mutations.forcedKeeps : [],
         acceptEula: Boolean(mutations?.acceptEula)
     };
+    const executionImpact = determineCandidateExecutionImpact({
+        iteration,
+        newlyAppliedFixes
+    });
 
     collector.record('info', 'analysis', `Run mode: ${runContext.mode}`);
     collector.record('info', 'analysis', `Input directory: ${runContext.inputPath}`);
@@ -169,212 +173,72 @@ async function runInitialCandidateIteration({
     collector.record('info', 'analysis', `Mods directory: ${modsPath}`);
     collector.record('info', 'analysis', `Build root: ${runContext.outputRootDir}`);
     collector.record('info', 'analysis', `Server directory: ${runContext.buildDir}`);
+    collector.record('info', 'analysis', `Workspace manifest: ${runContext.workspaceManifestPath}`);
     collector.record('info', 'analysis', `Report root: ${runContext.reportRootDir}`);
-    collector.record('info', 'analysis', `Classification engines: ${effectiveClassificationContext.enabledEngines.join(', ')}`);
     collector.record('info', 'analysis', `Dependency validation mode: ${runContext.dependencyValidationMode}`);
     collector.record('info', 'analysis', `Arbiter profile: ${runContext.arbiterProfile}`);
     collector.record('info', 'analysis', `Deep-check mode: ${runContext.deepCheckMode}`);
+    collector.record('info', 'analysis', `Iteration execution impact: ${executionImpact.kind}`);
 
-    const reviewOverridesPath = resolveReviewOverridesPath(process.cwd());
-    collector.record('info', 'analysis', `Manual review overrides: ${reviewOverridesPath}`);
-
-    const discoveredJarFiles = listJarFiles(modsPath);
-    effectiveProgressReporter.onStageStarted({
-        stage: 'classification',
-        total: discoveredJarFiles.length
-    });
-    const { decisions: classifiedDecisions } = collectDecisions(
-        modsPath,
-        effectiveClassificationContext,
-        runContext,
-        collector.record,
-        effectiveProgressReporter,
-        discoveredJarFiles
-    );
-    effectiveProgressReporter.onStageCompleted({
-        stage: 'classification',
-        total: classifiedDecisions.length,
-        summary: {
-            parsed: classifiedDecisions.length
-        }
-    });
-    collector.record('info', 'analysis', `Discovered .jar files: ${classifiedDecisions.length}`);
-
-    let currentClassificationContext = effectiveClassificationContext;
-    let currentRuntimeDetection = detectPackRuntime({
-        runContext,
-        decisions: classifiedDecisions
-    });
-    let currentClassifiedDecisions = applyTopologyArtifactPartitioning({
-        decisions: classifiedDecisions,
-        runContext,
-        runtimeDetection: currentRuntimeDetection,
-        record: collector.record
-    }).decisions;
-
-    effectiveProgressReporter.onStageStarted({
-        stage: 'dependency',
-        total: currentClassifiedDecisions.length
-    });
-    let dependencyStage = runDependencyStage({
-        decisions: currentClassifiedDecisions,
-        runContext,
-        record: collector.record
-    });
-    effectiveProgressReporter.onStageCompleted({
-        stage: 'dependency',
-        total: dependencyStage.decisions.length,
-        status: dependencyStage.dependencyGraph.status,
-        summary: dependencyStage.dependencyGraph.summary
-    });
-
-    effectiveProgressReporter.onStageStarted({
-        stage: 'arbiter',
-        total: dependencyStage.decisions.length,
-        profile: runContext.arbiterProfile
-    });
-    let arbiterStage = runArbiterStage({
-        decisions: dependencyStage.decisions,
-        runContext,
-        record: collector.record
-    });
-    effectiveProgressReporter.onStageCompleted({
-        stage: 'arbiter',
-        total: arbiterStage.decisions.length,
-        status: arbiterStage.arbiter.status,
-        summary: arbiterStage.arbiter.summary
-    });
-
-    effectiveProgressReporter.onStageStarted({
-        stage: 'deep-check',
-        total: arbiterStage.decisions.length,
-        mode: runContext.deepCheckMode
-    });
-    let deepCheckStage = runDeepCheckStage({
-        decisions: arbiterStage.decisions,
-        runContext,
-        record: collector.record
-    });
-    effectiveProgressReporter.onStageCompleted({
-        stage: 'deep-check',
-        total: deepCheckStage.decisions.length,
-        status: deepCheckStage.deepCheck.status,
-        summary: deepCheckStage.deepCheck.summary
-    });
-
-    let probeStage: ProbeSummary = createEmptyProbeSummary(
-        runContext.probeMode,
-        runContext.probeKnowledgePath,
-        'Probe stage was not run'
-    );
-
-    effectiveProgressReporter.onStageStarted({
-        stage: 'probe',
-        total: deepCheckStage.decisions.length,
-        mode: runContext.probeMode
-    });
-    const probeRun = await runProbeStage({
-        decisions: deepCheckStage.decisions,
-        runContext,
-        knowledgePath: runContext.probeKnowledgePath,
-        record: collector.record
-    });
-    probeStage = probeRun.summary;
-
-    if (probeRun.knowledgeChanged && (probeStage.resolvedToKeep > 0 || probeStage.resolvedToRemove > 0 || runContext.probeMode === 'force')) {
-        collector.record('info', 'probe', 'Re-running classification stages with updated probe knowledge');
-        currentClassificationContext = createClassificationContext({
+    let effectiveStaticSnapshot = staticSnapshot;
+    if (!effectiveStaticSnapshot || executionImpact.requiresBaseSnapshotBuild) {
+        effectiveStaticSnapshot = await buildStaticSnapshot({
+            modsPath,
             blockList,
-            localRegistry: effectiveClassificationContext.localRegistry || null,
-            probeKnowledge: probeRun.updatedKnowledge,
-            enabledEngines: effectiveClassificationContext.enabledEngines
-        }) as ClassificationContextLike;
-        const reclassifiedDecisions = reclassifyDecisions({
-            decisions: classifiedDecisions,
-            classificationContext: currentClassificationContext as ClassificationContext,
+            classificationContext,
             runContext,
-            record: collector.record
+            record: collector.record,
+            progressReporter: effectiveProgressReporter
         });
-        currentRuntimeDetection = detectPackRuntime({
-            runContext,
-            decisions: reclassifiedDecisions
-        });
-        currentClassifiedDecisions = applyTopologyArtifactPartitioning({
-            decisions: reclassifiedDecisions,
-            runContext,
-            runtimeDetection: currentRuntimeDetection,
-            record: collector.record
-        }).decisions;
-        dependencyStage = runDependencyStage({
-            decisions: currentClassifiedDecisions,
-            runContext,
-            record: collector.record
-        });
-        arbiterStage = runArbiterStage({
-            decisions: dependencyStage.decisions,
-            runContext,
-            record: collector.record
-        });
-        deepCheckStage = runDeepCheckStage({
-            decisions: arbiterStage.decisions,
-            runContext,
-            record: collector.record
-        });
+    } else {
+        collector.record('info', 'analysis', 'Reusing static snapshot from the current convergence session');
     }
-    effectiveProgressReporter.onStageCompleted({
-        stage: 'probe',
-        total: probeStage.attempted,
-        status: probeStage.status,
-        summary: {
-            planned: probeStage.planned,
-            attempted: probeStage.attempted,
-            reusedKnowledge: probeStage.reusedKnowledge,
-            storedKnowledge: probeStage.storedKnowledge,
-            resolvedToKeep: probeStage.resolvedToKeep,
-            resolvedToRemove: probeStage.resolvedToRemove,
-            inconclusive: probeStage.inconclusive
-        },
-        skipReason: probeStage.skipReason || null
-    });
+    const resolvedStaticSnapshot = effectiveStaticSnapshot;
 
-    const probeOutcomeByFile = new Map(probeStage.outcomes.map((outcome) => [outcome.fileName, outcome]));
-    const manualReviewStage = applyManualReviewOverrides({
-        decisions: deepCheckStage.decisions,
-        overridesPath: reviewOverridesPath,
-        record: collector.record
-    });
-    const decisionsWithProbe = manualReviewStage.decisions.map((decision: Record<string, any>) => {
-        const probeOutcome = probeOutcomeByFile.get(decision.fileName);
+    if (!resolvedStaticSnapshot) {
+        throw new Error('Static snapshot was not created');
+    }
 
-        if (!probeOutcome) {
-            return decision;
-        }
+    let effectiveRealizedSnapshot = realizedSnapshot;
+    if (
+        !effectiveRealizedSnapshot
+        || executionImpact.requiresSnapshotRealization
+        || effectiveRealizedSnapshot.topologyPreference !== (runContext.preferredRuntimeTopologyId || null)
+    ) {
+        effectiveRealizedSnapshot = executionImpact.requiresBaseSnapshotBuild && resolvedStaticSnapshot.initialRealization.topologyPreference === (runContext.preferredRuntimeTopologyId || null)
+            ? resolvedStaticSnapshot.initialRealization
+            : realizeStaticSnapshot({
+                snapshot: resolvedStaticSnapshot,
+                runContext,
+                record: collector.record,
+                progressReporter: effectiveProgressReporter,
+                emitProgressEvents: true
+            });
+    } else {
+        collector.record('info', 'analysis', 'Reusing realized topology-aware snapshot for this candidate');
+    }
+    const resolvedRealizedSnapshot = effectiveRealizedSnapshot;
 
-        return {
-            ...decision,
-            probeOutcome: probeOutcome.outcome,
-            probeReason: probeOutcome.reason,
-            probeConfidence: probeOutcome.confidence,
-            probeLogPath: probeOutcome.logPath || null
-        };
-    });
+    if (!resolvedRealizedSnapshot) {
+        throw new Error('Realized static snapshot was not created');
+    }
+
     const decisions = applyCandidateDecisionFixes({
-        decisions: decisionsWithProbe,
+        decisions: resolvedRealizedSnapshot.decisions,
         forcedExcludes: effectiveMutations.forcedExcludes,
         forcedKeeps: effectiveMutations.forcedKeeps,
         record: collector.record
     });
 
-    for (const decision of decisions) {
-        const engine = decision.classification ? decision.classification.winningEngine || 'conservative-default' : 'unknown';
-        const semantic = decision.finalSemanticDecision || decision.arbiterDecision || 'unknown';
-        const confidence = decision.finalConfidence || decision.arbiterConfidence || 'none';
-        const roleType = decision.finalRoleType || 'unknown';
-        collector.record(
-            'info',
-            'decision',
-            `Decision ${decision.decision}: ${decision.fileName} | semantic: ${semantic} | role: ${roleType} | confidence: ${confidence} | engine: ${engine} | origin: ${decision.decisionOrigin} | ${decision.reason}`
-        );
+    let effectiveWorkspaceSession = workspaceSession || createWorkspaceSession(runContext);
+    let skeletonEntriesCopied = 0;
+
+    if (!runContext.dryRun && !effectiveWorkspaceSession.baseWorkspaceReady) {
+        const initializedWorkspace = initializeBaseWorkspace({
+            session: effectiveWorkspaceSession,
+            record: collector.record
+        });
+        skeletonEntriesCopied = initializedWorkspace.skeletonEntriesCopied;
     }
 
     effectiveProgressReporter.onStageStarted({
@@ -382,16 +246,28 @@ async function runInitialCandidateIteration({
         total: decisions.length,
         dryRun: runContext.dryRun
     });
-    const finalizedDecisions = applyBuildActions({
+    const candidateDelta = createCandidateDelta({
+        decisions,
+        session: effectiveWorkspaceSession,
+        acceptEula: effectiveMutations.acceptEula
+    });
+    const materializedBuild = applyWorkspaceDelta({
         decisions,
         runContext,
+        session: effectiveWorkspaceSession,
+        delta: candidateDelta,
+        skeletonEntriesCopied,
         record: collector.record,
         progressReporter: effectiveProgressReporter
     });
+    const finalizedDecisions = materializedBuild.decisions;
     const stats = buildStats(finalizedDecisions);
 
-    if (!runContext.dryRun && effectiveMutations.acceptEula) {
+    if (!runContext.dryRun && effectiveMutations.acceptEula && !effectiveWorkspaceSession.manifest.eulaAccepted) {
         const eulaPath = ensureServerEulaAccepted(runContext.buildDir);
+        updateWorkspaceManifest(effectiveWorkspaceSession, {
+            eulaAccepted: true
+        });
         collector.record('info', 'build', `Convergence fix accepted EULA: ${eulaPath}`);
     }
 
@@ -399,7 +275,14 @@ async function runInitialCandidateIteration({
         stage: 'build',
         total: finalizedDecisions.length,
         dryRun: runContext.dryRun,
-        summary: stats
+        summary: {
+            ...stats,
+            materializationMode: executionImpact.kind,
+            linked: materializedBuild.stats.linked,
+            reused: materializedBuild.stats.reused,
+            restoredFromStash: materializedBuild.stats.restoredFromStash,
+            movedToStash: materializedBuild.stats.movedToStash
+        }
     });
 
     const runtimeDetection = detectPackRuntime({
@@ -429,7 +312,8 @@ async function runInitialCandidateIteration({
             minecraftVersion: serverCoreInstall.minecraftVersion,
             loaderVersion: serverCoreInstall.loaderVersion,
             entrypointPath: serverCoreInstall.entrypointPath,
-            reason: serverCoreInstall.reason
+            reason: serverCoreInstall.reason,
+            cacheHit: serverCoreInstall.cacheHit
         },
         skipReason: serverCoreInstall.status === 'skipped' || serverCoreInstall.status === 'not-requested'
             ? serverCoreInstall.reason
@@ -481,14 +365,19 @@ async function runInitialCandidateIteration({
         stage: 'validation',
         total: finalizedDecisions.length,
         status: validationStage.validation.status,
-        summary: validationStage.validation.summary,
+        summary: {
+            ...validationStage.validation.summary,
+            sandboxLinkedFiles: validationStage.sandboxStats?.linkedFiles || 0,
+            sandboxCopiedFiles: validationStage.sandboxStats?.copiedFiles || 0,
+            sandboxCopiedDirectories: validationStage.sandboxStats?.copiedDirectories || 0
+        },
         skipReason: validationStage.validation.skipReason || null
     });
 
     const completedAt = new Date().toISOString();
     const issues = collectReportIssues(finalizedDecisions);
 
-    for (const error of dependencyStage.dependencyGraph.errors) {
+    for (const error of resolvedRealizedSnapshot.dependencyGraph.errors) {
         issues.errors.push({
             fileName: null,
             source: 'dependency-graph',
@@ -498,7 +387,7 @@ async function runInitialCandidateIteration({
         });
     }
 
-    for (const error of arbiterStage.arbiter.errors) {
+    for (const error of resolvedRealizedSnapshot.arbiter.errors) {
         issues.errors.push({
             fileName: null,
             source: 'arbiter',
@@ -508,7 +397,7 @@ async function runInitialCandidateIteration({
         });
     }
 
-    for (const error of deepCheckStage.deepCheck.errors) {
+    for (const error of resolvedRealizedSnapshot.deepCheck.errors) {
         issues.errors.push({
             fileName: null,
             source: 'deep-check',
@@ -568,21 +457,36 @@ async function runInitialCandidateIteration({
             ...validationRunContext,
             detectedRuntime: runtimeDetection,
             completedAt,
-            enabledEngines: currentClassificationContext.enabledEngines,
-            registryFilePath: currentClassificationContext.localRegistry?.filePath ?? null,
-            reviewOverridesPath
+            enabledEngines: resolvedStaticSnapshot.classificationContext.enabledEngines,
+            registryFilePath: resolvedStaticSnapshot.classificationContext.localRegistry?.filePath ?? null,
+            reviewOverridesPath: resolvedStaticSnapshot.reviewOverridesPath
         },
         stats,
         parsing: buildParsingStats(finalizedDecisions),
-        classification: buildClassificationStats(finalizedDecisions, currentClassificationContext.enabledEngines),
-        dependencyGraph: dependencyStage.dependencyGraph,
-        arbiter: arbiterStage.arbiter,
-        deepCheck: deepCheckStage.deepCheck,
+        classification: buildClassificationStats(finalizedDecisions, resolvedStaticSnapshot.classificationContext.enabledEngines),
+        dependencyGraph: resolvedRealizedSnapshot.dependencyGraph,
+        arbiter: resolvedRealizedSnapshot.arbiter,
+        deepCheck: resolvedRealizedSnapshot.deepCheck,
         validation: validationStage.validation,
-        probe: probeStage,
-        manualReview: manualReviewStage.summary,
+        probe: resolvedStaticSnapshot.probe,
+        manualReview: resolvedRealizedSnapshot.manualReview,
         runtimeDetection,
         serverCoreInstall,
+        workspace: {
+            materializationMode: runContext.dryRun
+                ? 'dry-run'
+                : materializedBuild.stats.validationOnly
+                    ? 'validation-only'
+                    : iteration === 0
+                        ? 'full-build'
+                        : 'delta-materialization',
+            manifestPath: runContext.workspaceManifestPath,
+            stashModsDir: runContext.workspaceStashModsDir,
+            currentActiveMods: effectiveWorkspaceSession.manifest.activeMods.length,
+            delta: materializedBuild.delta,
+            materialization: materializedBuild.stats,
+            validationSandbox: validationStage.sandboxStats || null
+        },
         decisions: finalizedDecisions,
         events: collector.events,
         warnings: issues.warnings,
@@ -599,7 +503,10 @@ async function runInitialCandidateIteration({
 
     return {
         candidate,
-        report
+        report,
+        staticSnapshot: resolvedStaticSnapshot,
+        realizedSnapshot: resolvedRealizedSnapshot,
+        workspaceSession: effectiveWorkspaceSession
     };
 }
 
