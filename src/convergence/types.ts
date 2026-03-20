@@ -3,7 +3,7 @@ import type { InstanceInputKind, InstanceSource } from '../types/intake';
 import type { LoaderKind } from '../types/metadata';
 import type { RunReport } from '../types/report';
 import type { ValidationEntrypointKind, ValidationStatus } from '../types/validation';
-import type { FailureFamily } from '../failure/family';
+import type { FailureFamily, NormalizedFailureAnalysis } from '../failure/family';
 
 export interface CandidateFingerprintFile {
     fileName: string;
@@ -79,6 +79,7 @@ export interface CandidateState {
     appliedFixes: AppliedFix[];
     validation: CandidateValidationSnapshot | null;
     failureFamily: FailureFamily | null;
+    failureAnalysis: NormalizedFailureAnalysis | null;
     evidenceSummary: string[];
     outcomeStatus: 'not-run' | 'passed' | 'failed' | 'skipped';
 }

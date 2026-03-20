@@ -1,6 +1,6 @@
 const { createCandidateFingerprint } = require('./candidate-fingerprint');
 const { createDefaultSearchBudget } = require('./search-budget');
-const { inferPreliminaryFailureFamily } = require('../failure/family');
+const { inferPreliminaryFailureFamily, normalizeFailureAnalysis } = require('../failure/family');
 
 import type { CandidateState, CandidateTrace } from './types';
 import type { RunReport } from '../types/report';
@@ -37,6 +37,10 @@ function createValidationSnapshot(report: RunReport): CandidateState['validation
 }
 
 function createEvidenceSummary(report: RunReport): string[] {
+    if (report.failureAnalysis?.evidence?.length) {
+        return report.failureAnalysis.evidence.slice(0, 5);
+    }
+
     const summary: string[] = [];
 
     if (report.validation?.skipReason) {
@@ -67,6 +71,13 @@ function createInitialCandidateState({
     runContext: RunContext;
     report: RunReport;
 }): CandidateState {
+    const failureAnalysis = report.failureAnalysis || (report.releaseContract
+        ? normalizeFailureAnalysis({
+            supportBoundary: report.releaseContract.supportBoundary,
+            trustPolicy: report.releaseContract.trustPolicy,
+            validation: report.validation || null
+        })
+        : null);
     const fingerprint = createCandidateFingerprint({
         runContext,
         decisions: (report.decisions || []) as Array<Record<string, any>>
@@ -94,7 +105,8 @@ function createInitialCandidateState({
         })),
         appliedFixes: [],
         validation: createValidationSnapshot(report),
-        failureFamily: inferPreliminaryFailureFamily(report.validation || null),
+        failureFamily: failureAnalysis ? failureAnalysis.family : inferPreliminaryFailureFamily(report.validation || null),
+        failureAnalysis,
         evidenceSummary: createEvidenceSummary(report),
         outcomeStatus: createOutcomeStatus(report)
     };

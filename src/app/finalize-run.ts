@@ -1,4 +1,6 @@
 const { createSyntheticCandidateTrace } = require('../convergence/candidate-state');
+const { normalizeFailureAnalysis } = require('../failure/family');
+const { resolveTerminalOutcomeContract } = require('../outcome/terminal-outcomes');
 const { createPhase0ReportContract } = require('../policy/release-contract');
 const { createMinimalRecipe } = require('../recipe/create-minimal-recipe');
 const { writeRunReports } = require('../report/writer');
@@ -103,6 +105,38 @@ function applyPhase1ArtifactsToReport({
     return report;
 }
 
+function applyPhase3FailureAnalysisToReport({
+    report
+}: {
+    report: RunReport;
+}): RunReport {
+    if (!report.releaseContract) {
+        report.failureAnalysis = null;
+        return report;
+    }
+
+    const failureAnalysis = normalizeFailureAnalysis({
+        supportBoundary: report.releaseContract.supportBoundary,
+        trustPolicy: report.releaseContract.trustPolicy,
+        validation: report.validation || null
+    });
+
+    report.failureAnalysis = failureAnalysis;
+
+    if (failureAnalysis?.kind === 'policy-blocked') {
+        report.releaseContract = {
+            ...report.releaseContract,
+            terminalOutcomes: resolveTerminalOutcomeContract({
+                supportBoundary: report.releaseContract.supportBoundary,
+                policyBlocked: true
+            })
+        };
+        report.run.primaryTerminalOutcomes = [...report.releaseContract.terminalOutcomes.primaryOutcomes];
+    }
+
+    return report;
+}
+
 function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFinalizedRunParams): void {
     runLogger.report('Writing run artifacts...');
     runLogger.report(`Artifacts saved: ${reportFiles.reportDir}`);
@@ -113,6 +147,7 @@ function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFina
     runLogger.success(`Candidates: ${reportFiles.candidatesPath}`);
     runLogger.info(`Support boundary: ${report.releaseContract ? report.releaseContract.supportBoundary.status : 'n/a'}`);
     runLogger.info(`Primary terminal outcomes: ${report.releaseContract ? report.releaseContract.terminalOutcomes.primaryOutcomes.join(', ') : 'n/a'}`);
+    runLogger.info(`Failure family: ${report.failureAnalysis ? (report.failureAnalysis.family || report.failureAnalysis.kind) : 'n/a'}`);
     runLogger.info(`Synthetic candidates: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`);
 
     if (runContext.dryRun) {
@@ -124,13 +159,15 @@ function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFina
 
 function finalizeRun({ report, runContext, runLogger, registryRuntime }: FinalizeRunParams): FinalizedApplicationRun {
     const enrichedReport = applyPhase1ArtifactsToReport({
-        report: applyPhase0ContractToReport({
-            report: applyRegistryRuntimeToReport({
-                report,
-                runContext,
-                registryRuntime
-            }),
-            runContext
+        report: applyPhase3FailureAnalysisToReport({
+            report: applyPhase0ContractToReport({
+                report: applyRegistryRuntimeToReport({
+                    report,
+                    runContext,
+                    registryRuntime
+                }),
+                runContext
+            })
         }),
         runContext
     });
@@ -153,6 +190,7 @@ function finalizeRun({ report, runContext, runLogger, registryRuntime }: Finaliz
 module.exports = {
     applyPhase0ContractToReport,
     applyPhase1ArtifactsToReport,
+    applyPhase3FailureAnalysisToReport,
     applyRegistryRuntimeToReport,
     finalizeRun,
     logFinalizedRun

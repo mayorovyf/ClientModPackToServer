@@ -10,6 +10,7 @@ import type { ValidationResult } from './validation';
 import type { TerminalOutcomeContract } from './outcome';
 import type { SupportBoundaryAssessment, TrustPolicyContract } from './policy';
 import type { CandidateTrace } from '../convergence/types';
+import type { NormalizedFailureAnalysis } from '../failure/family';
 import type { MinimalRecipe } from '../recipe/types';
 
 export interface ReportIssue {
@@ -136,6 +137,7 @@ export interface RunReport {
         trustPolicy: TrustPolicyContract;
         terminalOutcomes: TerminalOutcomeContract;
     };
+    failureAnalysis?: NormalizedFailureAnalysis | null;
     candidateTrace?: CandidateTrace;
     recipe?: MinimalRecipe;
     decisions?: ReportDecisionSummary[];
