@@ -1,5 +1,6 @@
 const { createRunContext } = require('../build/run-context');
 const { resolveInstanceLayout } = require('../io/instance-folder');
+const { createPhase0PreflightContract } = require('../policy/release-contract');
 const { loadRuntimeState } = require('./load-runtime-state');
 
 import type { PreparedRun, ApplicationLogger, ClassificationContextLike, RegistryRuntimeBundle } from '../types/app';
@@ -31,10 +32,16 @@ function logPreparedRun({
     registryRuntime,
     logger
 }: LogPreparedRunParams): void {
-    logger.info(`Вход: ${inputPath}`);
-    logger.info(`Инстанс: ${instancePath}`);
-    logger.info(`Папка mods: ${modsPath}`);
-    logger.info(`Режим: ${runContext.mode}`);
+    const releaseContract = createPhase0PreflightContract({
+        runContext
+    });
+
+    logger.info(`Р’С…РѕРґ: ${inputPath}`);
+    logger.info(`РРЅСЃС‚Р°РЅСЃ: ${instancePath}`);
+    logger.info(`РџР°РїРєР° mods: ${modsPath}`);
+    logger.info(`Input kind: ${runContext.inputKind}`);
+    logger.info(`Instance source: ${runContext.instanceSource}`);
+    logger.info(`Р РµР¶РёРј: ${runContext.mode}`);
     logger.info(`Build output: ${runContext.buildDir}`);
     logger.info(`Report output: ${runContext.reportDir}`);
     logger.info(`Engines: ${classificationContext.enabledEngines.join(', ')}`);
@@ -51,6 +58,9 @@ function logPreparedRun({
     logger.info(`Probe mode: ${runContext.probeMode}`);
     logger.info(`Probe timeout: ${runContext.probeTimeoutMs}ms`);
     logger.info(`Probe knowledge: ${runContext.probeKnowledgePath}`);
+    logger.info(`Support boundary: ${releaseContract.supportBoundary.status}`);
+    logger.info(`Support boundary summary: ${releaseContract.supportBoundary.summary}`);
+    logger.info(`Primary terminal outcomes: ${releaseContract.terminalOutcomes.primaryOutcomes.join(', ')}`);
 }
 
 async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Promise<PreparedRun> {
@@ -59,6 +69,8 @@ async function prepareRun({ config, inputPath, logger }: PrepareRunParams): Prom
         inputPath,
         instancePath: instanceLayout.instancePath,
         modsPath: instanceLayout.modsPath,
+        inputKind: instanceLayout.inputKind,
+        instanceSource: instanceLayout.instanceSource,
         outputRootDir: config.outputRootDir,
         serverDirName: config.serverDirName,
         reportRootDir: config.reportRootDir,

@@ -7,6 +7,10 @@ import type { RegistryRuntimeState } from './registry';
 import type { RunContext } from './run';
 import type { ProbeSummary } from './probe';
 import type { ValidationResult } from './validation';
+import type { TerminalOutcomeContract } from './outcome';
+import type { SupportBoundaryAssessment, TrustPolicyContract } from './policy';
+import type { CandidateTrace } from '../convergence/types';
+import type { MinimalRecipe } from '../recipe/types';
 
 export interface ReportIssue {
     fileName: string | null;
@@ -74,6 +78,10 @@ export interface RunReport {
         registryFilePath?: string | null;
         probeKnowledgePath?: string | null;
         reviewOverridesPath?: string | null;
+        supportBoundaryTier?: string;
+        supportBoundaryStatus?: string;
+        supportBoundaryHasPendingChecks?: boolean;
+        primaryTerminalOutcomes?: string[];
     };
     stats: {
         totalJarFiles: number;
@@ -122,6 +130,13 @@ export interface RunReport {
         kept: number;
         excluded: number;
     };
+    releaseContract?: {
+        supportBoundary: SupportBoundaryAssessment;
+        trustPolicy: TrustPolicyContract;
+        terminalOutcomes: TerminalOutcomeContract;
+    };
+    candidateTrace?: CandidateTrace;
+    recipe?: MinimalRecipe;
     decisions?: ReportDecisionSummary[];
     warnings: ReportIssue[];
     errors: ReportIssue[];

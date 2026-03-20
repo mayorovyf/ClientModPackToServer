@@ -106,6 +106,8 @@ interface ReportFiles {
     runMetadataPath: string;
     summaryPath: string;
     eventsLogPath: string;
+    recipePath: string;
+    candidatesPath: string;
 }
 
 interface FinalizedApplicationRun {
@@ -163,7 +165,9 @@ function emitReportEvents(emitter: BackendEventEmitter, result: FinalizedApplica
         reportDir: reportFiles.reportDir,
         jsonReportPath: reportFiles.jsonReportPath,
         summaryPath: reportFiles.summaryPath,
-        eventsLogPath: reportFiles.eventsLogPath
+        eventsLogPath: reportFiles.eventsLogPath,
+        recipePath: reportFiles.recipePath,
+        candidatesPath: reportFiles.candidatesPath
     });
 
     emitter.emit(BACKEND_EVENT_TYPES.runFinished, {

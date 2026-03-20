@@ -8,6 +8,7 @@ import type {
     ValidationMode,
     ProbeMode
 } from './config';
+import type { InstanceInputKind, InstanceSource } from './intake';
 
 export interface RunPaths {
     inputPath: string;
@@ -23,6 +24,8 @@ export interface RunPaths {
     runMetadataPath: string;
     summaryPath: string;
     eventsLogPath: string;
+    recipePath: string;
+    candidatesPath: string;
 }
 
 export interface RunContext extends RunPaths {
@@ -30,6 +33,8 @@ export interface RunContext extends RunPaths {
     runIdPrefix: string;
     serverDirName: string | null;
     startedAt: string;
+    inputKind: InstanceInputKind;
+    instanceSource: InstanceSource;
     dryRun: boolean;
     mode: RunMode;
     outputPolicy: OutputPolicy;

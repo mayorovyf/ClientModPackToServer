@@ -1,3 +1,6 @@
+const { createSyntheticCandidateTrace } = require('../convergence/candidate-state');
+const { createPhase0ReportContract } = require('../policy/release-contract');
+const { createMinimalRecipe } = require('../recipe/create-minimal-recipe');
 const { writeRunReports } = require('../report/writer');
 
 import type { FinalizedApplicationRun, PreparedRun, RegistryRuntimeBundle } from '../types/app';
@@ -12,6 +15,7 @@ interface ApplyRegistryRuntimeParams {
 
 interface LogFinalizedRunParams {
     runContext: RunContext;
+    report: RunReport;
     reportFiles: FinalizedApplicationRun['reportFiles'];
     runLogger: PreparedRun['runLogger'];
 }
@@ -55,30 +59,86 @@ function applyRegistryRuntimeToReport({ report, runContext, registryRuntime }: A
     return report;
 }
 
-function logFinalizedRun({ runContext, reportFiles, runLogger }: LogFinalizedRunParams): void {
-    runLogger.report('Запись артефактов запуска...');
-    runLogger.report(`Артефакты сохранены: ${reportFiles.reportDir}`);
+function applyPhase0ContractToReport({
+    report,
+    runContext
+}: {
+    report: RunReport;
+    runContext: RunContext;
+}): RunReport {
+    const releaseContract = createPhase0ReportContract({
+        runContext,
+        report
+    });
+
+    report.releaseContract = releaseContract;
+    report.run.supportBoundaryTier = releaseContract.supportBoundary.tier;
+    report.run.supportBoundaryStatus = releaseContract.supportBoundary.status;
+    report.run.supportBoundaryHasPendingChecks = releaseContract.supportBoundary.hasPendingChecks;
+    report.run.primaryTerminalOutcomes = [...releaseContract.terminalOutcomes.primaryOutcomes];
+
+    return report;
+}
+
+function applyPhase1ArtifactsToReport({
+    report,
+    runContext
+}: {
+    report: RunReport;
+    runContext: RunContext;
+}): RunReport {
+    const candidateTrace = createSyntheticCandidateTrace({
+        runContext,
+        report
+    });
+    const recipe = createMinimalRecipe({
+        runContext,
+        report,
+        candidateTrace
+    });
+
+    report.candidateTrace = candidateTrace;
+    report.recipe = recipe;
+
+    return report;
+}
+
+function logFinalizedRun({ runContext, report, reportFiles, runLogger }: LogFinalizedRunParams): void {
+    runLogger.report('Writing run artifacts...');
+    runLogger.report(`Artifacts saved: ${reportFiles.reportDir}`);
     runLogger.raw('');
-    runLogger.success(`Отчёт JSON: ${reportFiles.jsonReportPath}`);
+    runLogger.success(`Report JSON: ${reportFiles.jsonReportPath}`);
     runLogger.success(`Summary: ${reportFiles.summaryPath}`);
+    runLogger.success(`Recipe: ${reportFiles.recipePath}`);
+    runLogger.success(`Candidates: ${reportFiles.candidatesPath}`);
+    runLogger.info(`Support boundary: ${report.releaseContract ? report.releaseContract.supportBoundary.status : 'n/a'}`);
+    runLogger.info(`Primary terminal outcomes: ${report.releaseContract ? report.releaseContract.terminalOutcomes.primaryOutcomes.join(', ') : 'n/a'}`);
+    runLogger.info(`Synthetic candidates: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`);
 
     if (runContext.dryRun) {
-        runLogger.warn('Dry-run завершён: build-папка не создавалась');
+        runLogger.warn('Dry-run completed: build output was not created.');
     } else {
-        runLogger.success(`Сборка готова: ${runContext.buildModsDir}`);
+        runLogger.success(`Build ready: ${runContext.buildModsDir}`);
     }
 }
 
 function finalizeRun({ report, runContext, runLogger, registryRuntime }: FinalizeRunParams): FinalizedApplicationRun {
-    const enrichedReport = applyRegistryRuntimeToReport({
-        report,
-        runContext,
-        registryRuntime
+    const enrichedReport = applyPhase1ArtifactsToReport({
+        report: applyPhase0ContractToReport({
+            report: applyRegistryRuntimeToReport({
+                report,
+                runContext,
+                registryRuntime
+            }),
+            runContext
+        }),
+        runContext
     });
     const reportFiles = writeRunReports(runContext, enrichedReport);
 
     logFinalizedRun({
         runContext,
+        report: enrichedReport,
         reportFiles,
         runLogger
     });
@@ -91,6 +151,8 @@ function finalizeRun({ report, runContext, runLogger, registryRuntime }: Finaliz
 }
 
 module.exports = {
+    applyPhase0ContractToReport,
+    applyPhase1ArtifactsToReport,
     applyRegistryRuntimeToReport,
     finalizeRun,
     logFinalizedRun

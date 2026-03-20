@@ -110,6 +110,8 @@ export interface ReportFiles {
     runMetadataPath: string;
     summaryPath: string;
     eventsLogPath: string;
+    recipePath: string;
+    candidatesPath: string;
 }
 
 export interface FinalizedApplicationRun {

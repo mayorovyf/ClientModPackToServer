@@ -3,12 +3,15 @@ const path = require('node:path');
 const { createRunId } = require('./run-id');
 
 import type { ArbiterProfile, DeepCheckMode, DependencyValidationMode, OutputPolicy, ProbeMode, RegistryMode, RunMode, ValidationMode } from '../types/config';
+import type { InstanceInputKind, InstanceSource } from '../types/intake';
 import type { RunContext } from '../types/run';
 
 interface CreateRunContextOptions {
     inputPath: string;
     instancePath?: string;
     modsPath?: string;
+    inputKind?: InstanceInputKind;
+    instanceSource?: InstanceSource;
     outputRootDir: string;
     serverDirName?: string | null;
     reportRootDir: string;
@@ -49,6 +52,8 @@ function createRunContext({
     inputPath,
     instancePath = inputPath,
     modsPath = inputPath,
+    inputKind = 'instance',
+    instanceSource = 'direct',
     outputRootDir,
     serverDirName = null,
     reportRootDir,
@@ -91,6 +96,8 @@ function createRunContext({
         inputPath,
         instancePath,
         modsPath,
+        inputKind,
+        instanceSource,
         outputRootDir,
         reportRootDir,
         tmpRootDir: resolvedTmpRootDir,
@@ -102,6 +109,8 @@ function createRunContext({
         runMetadataPath: path.join(reportDir, 'run.json'),
         summaryPath: path.join(reportDir, 'summary.md'),
         eventsLogPath: path.join(reportDir, 'events.log'),
+        recipePath: path.join(reportDir, 'recipe.json'),
+        candidatesPath: path.join(reportDir, 'candidates.json'),
         dryRun,
         mode: resolvedMode,
         dependencyValidationMode,

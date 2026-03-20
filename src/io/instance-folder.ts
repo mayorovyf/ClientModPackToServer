@@ -3,12 +3,7 @@ const path = require('node:path');
 
 const { PathValidationError } = require('../core/errors');
 
-interface InstanceLayout {
-    instancePath: string;
-    modsPath: string;
-    inputKind: 'instance' | 'mods-directory';
-    instanceSource: 'direct' | 'mods-directory' | 'minecraft-subdir' | 'dot-minecraft-subdir';
-}
+import type { InstanceLayout } from '../types/intake';
 
 function validateDirectory(directoryPath: string, label: string): void {
     if (!fs.existsSync(directoryPath)) {

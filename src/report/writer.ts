@@ -12,6 +12,8 @@ interface ReportFiles {
     runMetadataPath: string;
     summaryPath: string;
     eventsLogPath: string;
+    recipePath: string;
+    candidatesPath: string;
 }
 
 function createSummary(report: RunReport): string {
@@ -39,6 +41,43 @@ function createSummary(report: RunReport): string {
         `- Used embedded fallback: ${report.registry ? (report.registry.usedEmbeddedFallback ? 'yes' : 'no') : 'n/a'}`,
         `- Used local overrides: ${report.registry ? (report.registry.usedLocalOverrides ? 'yes' : 'no') : 'n/a'}`,
         `- Effective rules: ${report.registry ? report.registry.effectiveRuleCount : 0}`,
+        '',
+        '## Release Contract',
+        '',
+        `- Support boundary tier: ${report.releaseContract ? report.releaseContract.supportBoundary.tier : 'n/a'}`,
+        `- Support boundary status: ${report.releaseContract ? report.releaseContract.supportBoundary.status : 'n/a'}`,
+        `- Pending checks: ${report.releaseContract ? (report.releaseContract.supportBoundary.hasPendingChecks ? 'yes' : 'no') : 'n/a'}`,
+        `- Support boundary summary: ${report.releaseContract ? report.releaseContract.supportBoundary.summary : 'n/a'}`,
+        `- Primary terminal outcomes: ${report.releaseContract ? report.releaseContract.terminalOutcomes.primaryOutcomes.join(', ') : 'n/a'}`,
+        `- Reserved terminal outcomes: ${report.releaseContract ? report.releaseContract.terminalOutcomes.reservedOutcomes.join(', ') : 'n/a'}`,
+        `- Safe actions: ${report.releaseContract ? report.releaseContract.trustPolicy.safeByDefaultActions.length : 0}`,
+        `- Guarded actions: ${report.releaseContract ? report.releaseContract.trustPolicy.guardedActions.length : 0}`,
+        `- Manual-only actions: ${report.releaseContract ? report.releaseContract.trustPolicy.manualOnlyActions.length : 0}`,
+        `- Forbidden actions: ${report.releaseContract ? report.releaseContract.trustPolicy.forbiddenActions.length : 0}`,
+        '',
+        '## Candidate Trace',
+        '',
+        `- Current candidate: ${report.candidateTrace ? (report.candidateTrace.currentCandidateId || 'n/a') : 'n/a'}`,
+        `- Candidate count: ${report.candidateTrace ? report.candidateTrace.candidates.length : 0}`,
+        `- Fingerprint digests: ${report.candidateTrace ? report.candidateTrace.fingerprintDigests.length : 0}`,
+        `- Search budget max candidate states: ${report.candidateTrace ? report.candidateTrace.searchBudget.maxCandidateStates : 0}`,
+        `- Search budget max retries: ${report.candidateTrace ? report.candidateTrace.searchBudget.maxRetries : 0}`,
+        `- Search budget max guarded fixes: ${report.candidateTrace ? report.candidateTrace.searchBudget.maxGuardedFixes : 0}`,
+        `- Search budget exhausted: ${report.candidateTrace ? (report.candidateTrace.searchBudget.exhausted ? 'yes' : 'no') : 'n/a'}`,
+        '',
+        '## Recipe',
+        '',
+        `- Schema version: ${report.recipe ? report.recipe.schemaVersion : 'n/a'}`,
+        `- Selected loader: ${report.recipe ? (report.recipe.selectedLoader || 'n/a') : 'n/a'}`,
+        `- Selected core: ${report.recipe ? (report.recipe.selectedCore || 'n/a') : 'n/a'}`,
+        `- Selected Java profile: ${report.recipe ? (report.recipe.selectedJavaProfile || 'n/a') : 'n/a'}`,
+        `- Launch entrypoint kind: ${report.recipe ? (report.recipe.launchProfile.validationEntrypointKind || 'n/a') : 'n/a'}`,
+        `- Keep decisions: ${report.recipe ? report.recipe.decisions.keep.length : 0}`,
+        `- Remove decisions: ${report.recipe ? report.recipe.decisions.remove.length : 0}`,
+        `- Add decisions: ${report.recipe ? report.recipe.decisions.add.length : 0}`,
+        `- Applied fixes: ${report.recipe ? report.recipe.appliedFixes.length : 0}`,
+        `- Recipe outcome status: ${report.recipe ? report.recipe.finalOutcome.status : 'n/a'}`,
+        `- Recipe terminal outcome: ${report.recipe ? (report.recipe.finalOutcome.terminalOutcomeId || 'n/a') : 'n/a'}`,
         '',
         '## Stats',
         '',
@@ -199,6 +238,8 @@ function writeRunReports(runContext: RunContext, report: RunReport): ReportFiles
 
         writeJson(runContext.runMetadataPath, report.run);
         writeJson(runContext.jsonReportPath, report);
+        writeJson(runContext.recipePath, report.recipe || null);
+        writeJson(runContext.candidatesPath, report.candidateTrace || null);
         writeText(runContext.summaryPath, createSummary(report));
         writeText(runContext.eventsLogPath, createEventsLog(report.events));
 
@@ -207,7 +248,9 @@ function writeRunReports(runContext: RunContext, report: RunReport): ReportFiles
             jsonReportPath: runContext.jsonReportPath,
             runMetadataPath: runContext.runMetadataPath,
             summaryPath: runContext.summaryPath,
-            eventsLogPath: runContext.eventsLogPath
+            eventsLogPath: runContext.eventsLogPath,
+            recipePath: runContext.recipePath,
+            candidatesPath: runContext.candidatesPath
         };
     } catch (error) {
         throw new ReportWriteError(`Не удалось записать отчёт запуска: ${runContext.reportDir}`, { cause: error });
