@@ -2,7 +2,7 @@ const path = require('node:path');
 
 const { createRunId } = require('./run-id');
 
-import type { ArbiterProfile, DeepCheckMode, DependencyValidationMode, OutputPolicy, RegistryMode, RunMode, ValidationMode } from '../types/config';
+import type { ArbiterProfile, DeepCheckMode, DependencyValidationMode, OutputPolicy, ProbeMode, RegistryMode, RunMode, ValidationMode } from '../types/config';
 import type { RunContext } from '../types/run';
 
 interface CreateRunContextOptions {
@@ -24,6 +24,10 @@ interface CreateRunContextOptions {
     validationTimeoutMs?: number;
     validationEntrypointPath?: string | null;
     validationSaveArtifacts?: boolean;
+    probeMode?: ProbeMode;
+    probeTimeoutMs?: number;
+    probeKnowledgePath?: string;
+    probeMaxMods?: number;
     registryMode?: RegistryMode;
     registryManifestUrl?: string | null;
     registryBundleUrl?: string | null;
@@ -60,6 +64,10 @@ function createRunContext({
     validationTimeoutMs = 15000,
     validationEntrypointPath = null,
     validationSaveArtifacts = false,
+    probeMode = 'auto',
+    probeTimeoutMs = 12000,
+    probeKnowledgePath = path.join(process.cwd(), 'data', 'probe-knowledge.json'),
+    probeMaxMods = 8,
     registryMode = 'auto',
     registryManifestUrl = null,
     registryBundleUrl = null,
@@ -103,6 +111,10 @@ function createRunContext({
         validationTimeoutMs,
         validationEntrypointPath,
         validationSaveArtifacts,
+        probeMode,
+        probeTimeoutMs,
+        probeKnowledgePath,
+        probeMaxMods,
         registryMode,
         registryManifestUrl,
         registryBundleUrl,

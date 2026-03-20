@@ -5,7 +5,8 @@ import type {
     OutputPolicy,
     RegistryMode,
     RunMode,
-    ValidationMode
+    ValidationMode,
+    ProbeMode
 } from './config';
 
 export interface RunPaths {
@@ -39,6 +40,10 @@ export interface RunContext extends RunPaths {
     validationTimeoutMs: number;
     validationEntrypointPath: string | null;
     validationSaveArtifacts: boolean;
+    probeMode: ProbeMode;
+    probeTimeoutMs: number;
+    probeKnowledgePath: string;
+    probeMaxMods: number;
     registryMode: RegistryMode;
     registryManifestUrl: string | null;
     registryBundleUrl: string | null;

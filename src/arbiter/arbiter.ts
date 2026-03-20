@@ -5,7 +5,7 @@ const { resolveDefaultBuildAction } = require('./profiles');
 import type { ArbiterInput, ArbiterResult, ArbiterSummary } from '../types/arbiter';
 import type { EngineEvidence, EngineResult } from '../types/classification';
 
-const ENGINE_PRIORITY = ['metadata-engine', 'forge-bytecode-engine', 'forge-semantic-engine', 'registry-engine', 'filename-engine'];
+const ENGINE_PRIORITY = ['probe-knowledge-engine', 'metadata-engine', 'forge-bytecode-engine', 'client-signature-engine', 'forge-semantic-engine', 'dependency-role-engine', 'registry-engine', 'filename-engine'];
 const BLOCKING_FINDING_TYPES = new Set(['missing-required', 'provider-ambiguous', 'incompatibility']);
 
 function chooseBestResult(results: EngineResult[] = [], decision: string): EngineResult | null {
@@ -170,6 +170,11 @@ function arbitrateDecision(input: ArbiterInput): ArbiterResult {
     const hasStrongConflict = signalState.strongKeepSignals.length > 0 && signalState.strongRemoveSignals.length > 0;
     const hasActionableSignals = signalState.keepSignals.length > 0 || signalState.removeSignals.length > 0;
     const strongKeepConsensus = hasStrongKeepConsensus(signalState);
+    const probeKnowledgeSignal = signalState.results.find((result) => (
+        result.engine === 'probe-knowledge-engine'
+        && (result.decision === 'keep' || result.decision === 'remove')
+        && STRONG_ENGINE_CONFIDENCE.has(result.confidence)
+    )) || null;
 
     if (dependencyState.preservedByDependency) {
         return createArbiterResult({
@@ -196,6 +201,20 @@ function arbitrateDecision(input: ArbiterInput): ArbiterResult {
             requiresReview: true,
             requiresDeepCheck: true,
             winningEvidence: createFindingEvidence(dependencyState.blockingFindings)
+        });
+    }
+
+    if (probeKnowledgeSignal) {
+        return createArbiterResult({
+            finalDecision: probeKnowledgeSignal.decision as ArbiterResult['finalDecision'],
+            finalConfidence: probeKnowledgeSignal.confidence as ArbiterResult['finalConfidence'],
+            reason: probeKnowledgeSignal.reason,
+            reasons: [probeKnowledgeSignal.reason],
+            decisionOrigin: `engine:${probeKnowledgeSignal.engine}`,
+            recommendedBuildAction: probeKnowledgeSignal.decision === 'remove'
+                ? ARBITER_BUILD_ACTIONS.exclude
+                : ARBITER_BUILD_ACTIONS.keep,
+            winningEvidence: createWinningEvidence(probeKnowledgeSignal)
         });
     }
 

@@ -1,11 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { finalizeDecision } = require('./decision-model');
+const { createFileDecision, finalizeDecision } = require('./decision-model');
 const { buildArbiterStats } = require('../arbiter/arbiter');
 const { runArbiter } = require('../arbiter/run-arbiter');
 const { createClassificationContext } = require('../classification/context');
-const { classifyModFile } = require('../classification/classify-mod-file');
+const { classifyDescriptor, classifyModFile } = require('../classification/classify-mod-file');
 const { buildClassificationStats } = require('../classification/temporary-merge-policy');
 const { createEmptyDeepCheckSummary } = require('../deep-check/constants');
 const { runDeepCheck } = require('../deep-check/run-deep-check');
@@ -14,13 +14,15 @@ const { FileCopyError, OutputDirectoryError, ResultCollisionError } = require('.
 const { ensureDirectory } = require('../io/history');
 const { listJarFiles } = require('../io/mods-folder');
 const { buildParsingStats } = require('../metadata/parse-mod-file');
+const { createEmptyProbeSummary, runProbeStage } = require('../probe/run-probe-stage');
 const { createEmptyValidationReport } = require('../validation/report-model');
 const { runValidationStage } = require('../validation/run-validation');
 const { applyManualReviewOverrides, resolveReviewOverridesPath } = require('../review/manual-overrides');
 
 import type { ApplicationLogger, BuildProgressReporter, ClassificationContextLike } from '../types/app';
-import type { ConfidenceLevel, FinalClassification, RoleType, SemanticDecision } from '../types/classification';
+import type { ClassificationContext, ConfidenceLevel, FinalClassification, RoleType, SemanticDecision } from '../types/classification';
 import type { ModDescriptor } from '../types/descriptor';
+import type { ProbeSummary } from '../types/probe';
 import type { ReportEvent, ReportIssue, RunReport } from '../types/report';
 import type { RunContext } from '../types/run';
 import type { ValidationDecisionLike, ValidationError, ValidationResult, ValidationStageResult } from '../types/validation';
@@ -116,6 +118,10 @@ interface PipelineDecision extends ValidationDecisionLike {
     manualOverrideAction: 'keep' | 'exclude' | null;
     manualOverrideReason: string | null;
     manualOverrideUpdatedAt: string | null;
+    probeOutcome?: string | null;
+    probeReason?: string | null;
+    probeConfidence?: string | null;
+    probeLogPath?: string | null;
 }
 
 interface BuildPipelineReport extends RunReport {
@@ -507,6 +513,43 @@ function collectDecisions(
     };
 }
 
+function reclassifyDecisions({
+    decisions,
+    classificationContext,
+    runContext,
+    record = () => {}
+}: {
+    decisions: PipelineDecision[];
+    classificationContext: ClassificationContextLike;
+    runContext: RunContext;
+    record?: RecordEvent;
+}): PipelineDecision[] {
+    return decisions.map((decision) => {
+        if (!decision.descriptor) {
+            return createFileDecision({
+                fileName: decision.fileName,
+                sourcePath: decision.sourcePath,
+                descriptor: null,
+                classification: null
+            }) as PipelineDecision;
+        }
+
+        const classification = classifyDescriptor({
+            descriptor: decision.descriptor,
+            classificationContext: classificationContext as ClassificationContext,
+            runContext,
+            record
+        });
+
+        return createFileDecision({
+            fileName: decision.fileName,
+            sourcePath: decision.sourcePath,
+            descriptor: decision.descriptor,
+            classification
+        }) as PipelineDecision;
+    });
+}
+
 function applyBuildActions({
     decisions,
     runContext,
@@ -717,6 +760,9 @@ function createEmptyDependencyGraph(mode: RunContext['dependencyValidationMode']
             incompatibilities: 0,
             preservedByDependency: 0,
             orphanLibraries: 0,
+            rolePropagations: 0,
+            roleKeepConstraints: 0,
+            roleRemoveSignals: 0,
             graphErrors: error ? 1 : 0
         },
         providerIndex: {
@@ -949,12 +995,15 @@ async function runBuildPipeline({
     });
     collector.record('info', 'analysis', `Discovered .jar files: ${classifiedDecisions.length}`);
 
+    let currentClassificationContext = effectiveClassificationContext;
+    let currentClassifiedDecisions = classifiedDecisions;
+
     effectiveProgressReporter.onStageStarted({
         stage: 'dependency',
-        total: classifiedDecisions.length
+        total: currentClassifiedDecisions.length
     });
-    const dependencyStage = runDependencyStage({
-        decisions: classifiedDecisions,
+    let dependencyStage = runDependencyStage({
+        decisions: currentClassifiedDecisions,
         runContext,
         record: collector.record
     });
@@ -970,7 +1019,7 @@ async function runBuildPipeline({
         total: dependencyStage.decisions.length,
         profile: runContext.arbiterProfile
     });
-    const arbiterStage = runArbiterStage({
+    let arbiterStage = runArbiterStage({
         decisions: dependencyStage.decisions,
         runContext,
         record: collector.record
@@ -987,7 +1036,7 @@ async function runBuildPipeline({
         total: arbiterStage.decisions.length,
         mode: runContext.deepCheckMode
     });
-    const deepCheckStage = runDeepCheckStage({
+    let deepCheckStage = runDeepCheckStage({
         decisions: arbiterStage.decisions,
         runContext,
         record: collector.record
@@ -998,12 +1047,92 @@ async function runBuildPipeline({
         status: deepCheckStage.deepCheck.status,
         summary: deepCheckStage.deepCheck.summary
     });
+    let probeStage: ProbeSummary = createEmptyProbeSummary(
+        runContext.probeMode,
+        runContext.probeKnowledgePath,
+        'Probe stage was not run'
+    );
+
+    effectiveProgressReporter.onStageStarted({
+        stage: 'probe',
+        total: deepCheckStage.decisions.length,
+        mode: runContext.probeMode
+    });
+    const probeRun = await runProbeStage({
+        decisions: deepCheckStage.decisions,
+        runContext,
+        knowledgePath: runContext.probeKnowledgePath,
+        record: collector.record
+    });
+    probeStage = probeRun.summary;
+
+    if (probeRun.knowledgeChanged && (probeStage.resolvedToKeep > 0 || probeStage.resolvedToRemove > 0 || runContext.probeMode === 'force')) {
+        collector.record('info', 'probe', 'Re-running classification stages with updated probe knowledge');
+        currentClassificationContext = createClassificationContext({
+            blockList,
+            localRegistry: effectiveClassificationContext.localRegistry || null,
+            probeKnowledge: probeRun.updatedKnowledge,
+            enabledEngines: effectiveClassificationContext.enabledEngines
+        }) as ClassificationContextLike;
+        currentClassifiedDecisions = reclassifyDecisions({
+            decisions: classifiedDecisions,
+            classificationContext: currentClassificationContext,
+            runContext,
+            record: collector.record
+        });
+        dependencyStage = runDependencyStage({
+            decisions: currentClassifiedDecisions,
+            runContext,
+            record: collector.record
+        });
+        arbiterStage = runArbiterStage({
+            decisions: dependencyStage.decisions,
+            runContext,
+            record: collector.record
+        });
+        deepCheckStage = runDeepCheckStage({
+            decisions: arbiterStage.decisions,
+            runContext,
+            record: collector.record
+        });
+    }
+    effectiveProgressReporter.onStageCompleted({
+        stage: 'probe',
+        total: probeStage.attempted,
+        status: probeStage.status,
+        summary: {
+            planned: probeStage.planned,
+            attempted: probeStage.attempted,
+            reusedKnowledge: probeStage.reusedKnowledge,
+            storedKnowledge: probeStage.storedKnowledge,
+            resolvedToKeep: probeStage.resolvedToKeep,
+            resolvedToRemove: probeStage.resolvedToRemove,
+            inconclusive: probeStage.inconclusive
+        },
+        skipReason: probeStage.skipReason || null
+    });
+    const probeOutcomeByFile = new Map(probeStage.outcomes.map((outcome) => [outcome.fileName, outcome]));
+
     const manualReviewStage = applyManualReviewOverrides({
         decisions: deepCheckStage.decisions,
         overridesPath: reviewOverridesPath,
         record: collector.record
     });
-    const decisions = manualReviewStage.decisions;
+    const decisions = manualReviewStage.decisions.map((decision: PipelineDecision) => {
+        const probeOutcome = probeOutcomeByFile.get(decision.fileName);
+
+        if (!probeOutcome) {
+            return decision;
+        }
+
+        return {
+            ...decision,
+            probeOutcome: probeOutcome.outcome,
+            probeReason: probeOutcome.reason,
+            probeConfidence: probeOutcome.confidence,
+            probeLogPath: probeOutcome.logPath || null
+        };
+    });
 
     for (const decision of decisions) {
         const engine = decision.classification ? decision.classification.winningEngine || 'conservative-default' : 'unknown';
@@ -1146,22 +1275,27 @@ async function runBuildPipeline({
             validationTimeoutMs: runContext.validationTimeoutMs,
             validationEntrypointPath: runContext.validationEntrypointPath,
             validationSaveArtifacts: runContext.validationSaveArtifacts,
+            probeMode: runContext.probeMode,
+            probeTimeoutMs: runContext.probeTimeoutMs,
+            probeKnowledgePath: runContext.probeKnowledgePath,
+            probeMaxMods: runContext.probeMaxMods,
             registryMode: runContext.registryMode,
             registryManifestUrl: runContext.registryManifestUrl,
             registryBundleUrl: runContext.registryBundleUrl,
             registryCacheDir: runContext.registryCacheDir,
             localOverridesPath: runContext.localOverridesPath,
-            enabledEngines: effectiveClassificationContext.enabledEngines,
-            registryFilePath: effectiveClassificationContext.localRegistry ? effectiveClassificationContext.localRegistry.filePath : null,
+            enabledEngines: currentClassificationContext.enabledEngines,
+            registryFilePath: currentClassificationContext.localRegistry ? currentClassificationContext.localRegistry.filePath : null,
             reviewOverridesPath
         },
         stats,
         parsing: buildParsingStats(finalizedDecisions),
-        classification: buildClassificationStats(finalizedDecisions, effectiveClassificationContext.enabledEngines),
+        classification: buildClassificationStats(finalizedDecisions, currentClassificationContext.enabledEngines),
         dependencyGraph: dependencyStage.dependencyGraph,
         arbiter: arbiterStage.arbiter,
         deepCheck: deepCheckStage.deepCheck,
         validation: validationStage.validation,
+        probe: probeStage,
         manualReview: manualReviewStage.summary,
         decisions: finalizedDecisions,
         events: collector.events,

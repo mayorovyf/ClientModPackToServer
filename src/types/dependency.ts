@@ -7,6 +7,7 @@ export type DependencyFindingKind =
     | 'incompatibility'
     | 'preserved-by-dependency'
     | 'orphan-library'
+    | 'role-propagation'
     | 'graph-error';
 
 export type DependencyFindingSeverity = 'info' | 'warn' | 'error';
@@ -126,6 +127,9 @@ export interface DependencyGraphSummary {
     incompatibilities: number;
     preservedByDependency: number;
     orphanLibraries: number;
+    rolePropagations: number;
+    roleKeepConstraints: number;
+    roleRemoveSignals: number;
     graphErrors: number;
 }
 

@@ -13,8 +13,10 @@ const CONFIDENCE_LEVELS = Object.freeze({
 });
 
 const DEFAULT_ENABLED_ENGINES = Object.freeze([
+    'probe-knowledge-engine',
     'metadata-engine',
     'forge-bytecode-engine',
+    'client-signature-engine',
     'forge-semantic-engine',
     'registry-engine',
     'filename-engine'

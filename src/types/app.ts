@@ -1,4 +1,5 @@
 import type { RegistryRuntimeState } from './registry';
+import type { ProbeKnowledgeFile } from './probe';
 import type { RunReport } from './report';
 import type { RunContext } from './run';
 
@@ -71,6 +72,10 @@ export interface ClassificationContextLike {
         filePath?: string | null;
         rules?: unknown[];
     } | null;
+    probeKnowledge?: {
+        filePath?: string | null;
+        entries?: ProbeKnowledgeFile['entries'];
+    } | null;
 }
 
 export interface RegistryRuntimeBundle {
@@ -84,6 +89,10 @@ export interface RegistryRuntimeBundle {
 export interface LoadRuntimeStateResult {
     blockList: string[];
     registryRuntime: RegistryRuntimeBundle;
+    probeKnowledge: {
+        filePath: string | null;
+        entries: ProbeKnowledgeFile['entries'];
+    };
     classificationContext: ClassificationContextLike;
 }
 

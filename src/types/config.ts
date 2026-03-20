@@ -5,6 +5,7 @@ export type ArbiterProfile = 'safe' | 'balanced' | 'aggressive';
 export type DeepCheckMode = 'auto' | 'off' | 'force';
 export type ValidationMode = 'off' | 'auto' | 'require' | 'force';
 export type RegistryMode = 'auto' | 'offline' | 'refresh' | 'pinned';
+export type ProbeMode = 'off' | 'auto' | 'force';
  
 
 export interface CliOptions {
@@ -26,6 +27,10 @@ export interface CliOptions {
     validationTimeoutMs?: number | string | null;
     validationEntrypointPath?: string | null;
     validationSaveArtifacts?: boolean;
+    probeMode?: ProbeMode | null;
+    probeTimeoutMs?: number | string | null;
+    probeKnowledgePath?: string | null;
+    probeMaxMods?: number | string | null;
     engineNames?: string[];
     disabledEngineNames?: string[];
     dryRun?: boolean;
@@ -66,6 +71,10 @@ export interface RuntimeConfig {
     validationTimeoutMs: number;
     validationEntrypointPath: string | null;
     validationSaveArtifacts: boolean;
+    probeMode: ProbeMode;
+    probeTimeoutMs: number;
+    probeKnowledgePath: string;
+    probeMaxMods: number;
     registryMode: RegistryMode;
     registryManifestUrl: string | null;
     registryBundleUrl: string | null;

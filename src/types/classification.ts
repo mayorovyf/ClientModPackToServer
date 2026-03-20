@@ -2,7 +2,16 @@ import type { ModDescriptor } from './descriptor';
 import type { EffectiveRegistry, RegistryRule } from './registry';
 import type { RunContext } from './run';
 
-export type EngineName = 'metadata-engine' | 'forge-bytecode-engine' | 'forge-semantic-engine' | 'registry-engine' | 'filename-engine' | string;
+export type EngineName =
+    | 'probe-knowledge-engine'
+    | 'metadata-engine'
+    | 'forge-bytecode-engine'
+    | 'client-signature-engine'
+    | 'forge-semantic-engine'
+    | 'dependency-role-engine'
+    | 'registry-engine'
+    | 'filename-engine'
+    | string;
 export type EngineDecision = 'keep' | 'remove' | 'unknown' | 'error';
 export type SemanticDecision = 'keep' | 'remove' | 'review' | 'unknown';
 export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'none';
@@ -85,6 +94,10 @@ export interface ClassificationEngine {
 export interface ClassificationContext {
     blockList: string[];
     localRegistry: EffectiveRegistry;
+    probeKnowledge?: {
+        filePath?: string | null;
+        entries?: unknown[];
+    } | null;
     availableEngines: string[];
     enabledEngines: string[];
 }

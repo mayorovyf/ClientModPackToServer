@@ -1,5 +1,6 @@
 const { createClassificationContext } = require('../classification/context');
 const { loadBlockList } = require('../io/block-list');
+const { loadProbeKnowledge } = require('../probe/knowledge-store');
 const { loadEffectiveRegistry } = require('../registry/effective-registry');
 
 import type { RuntimeConfig } from '../types/config';
@@ -26,9 +27,14 @@ async function loadRuntimeState({ config, logger }: LoadRuntimeStateParams): Pro
         timeoutMs: config.registryFetchTimeoutMs,
         logger
     }) as RegistryRuntimeBundle;
+    const probeKnowledge = {
+        filePath: config.probeKnowledgePath,
+        entries: loadProbeKnowledge(config.probeKnowledgePath).entries
+    };
     const classificationContext = createClassificationContext({
         blockList,
         localRegistry: registryRuntime.registry,
+        probeKnowledge,
         enabledEngines: config.enabledEngines,
         disabledEngines: config.disabledEngines
     });
@@ -36,6 +42,7 @@ async function loadRuntimeState({ config, logger }: LoadRuntimeStateParams): Pro
     return {
         blockList,
         registryRuntime,
+        probeKnowledge,
         classificationContext
     };
 }

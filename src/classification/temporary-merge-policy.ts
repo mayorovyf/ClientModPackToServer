@@ -11,7 +11,7 @@ import type {
 } from '../types/classification';
 
 const STRONG_CONFIDENCE = new Set([CONFIDENCE_LEVELS.high, CONFIDENCE_LEVELS.medium]);
-const ENGINE_PRIORITY = ['metadata-engine', 'forge-bytecode-engine', 'forge-semantic-engine', 'registry-engine', 'filename-engine'];
+const ENGINE_PRIORITY = ['probe-knowledge-engine', 'metadata-engine', 'forge-bytecode-engine', 'client-signature-engine', 'forge-semantic-engine', 'dependency-role-engine', 'registry-engine', 'filename-engine'];
 const ROLE_TYPES: RoleType[] = [
     'client-ui',
     'client-visual',
@@ -196,17 +196,40 @@ function mergeClassificationResults(results: EngineResult[]): FinalClassificatio
     const actionable = results.filter((result) => result.decision === ENGINE_DECISIONS.keep || result.decision === ENGINE_DECISIONS.remove);
     const conflict = buildConflict(actionable);
     const roleState = resolveFinalRole(results);
+    const probeKnowledgeRemove = results.find((result) => result.engine === 'probe-knowledge-engine' && result.decision === ENGINE_DECISIONS.remove && isStrong(result));
+    const probeKnowledgeKeep = results.find((result) => result.engine === 'probe-knowledge-engine' && result.decision === ENGINE_DECISIONS.keep && isStrong(result));
     const metadataRemove = results.find((result) => result.engine === 'metadata-engine' && result.decision === ENGINE_DECISIONS.remove && isStrong(result));
     const metadataKeep = results.find((result) => result.engine === 'metadata-engine' && result.decision === ENGINE_DECISIONS.keep && isStrong(result));
     const forgeBytecodeRemove = results.find((result) => result.engine === 'forge-bytecode-engine' && result.decision === ENGINE_DECISIONS.remove && isStrong(result));
     const forgeBytecodeKeep = results.find((result) => result.engine === 'forge-bytecode-engine' && result.decision === ENGINE_DECISIONS.keep && isStrong(result));
+    const clientSignatureRemove = results.find((result) => result.engine === 'client-signature-engine' && result.decision === ENGINE_DECISIONS.remove && isStrong(result));
+    const clientSignatureKeep = results.find((result) => result.engine === 'client-signature-engine' && result.decision === ENGINE_DECISIONS.keep && isStrong(result));
     const forgeSemanticRemove = results.find((result) => result.engine === 'forge-semantic-engine' && result.decision === ENGINE_DECISIONS.remove && isStrong(result));
     const forgeSemanticKeep = results.find((result) => result.engine === 'forge-semantic-engine' && result.decision === ENGINE_DECISIONS.keep && isStrong(result));
+    const dependencyRoleRemove = results.find((result) => result.engine === 'dependency-role-engine' && result.decision === ENGINE_DECISIONS.remove && isStrong(result));
+    const dependencyRoleKeep = results.find((result) => result.engine === 'dependency-role-engine' && result.decision === ENGINE_DECISIONS.keep && isStrong(result));
     const registryRemove = results.find((result) => result.engine === 'registry-engine' && result.decision === ENGINE_DECISIONS.remove && isStrong(result));
     const registryKeep = results.find((result) => result.engine === 'registry-engine' && result.decision === ENGINE_DECISIONS.keep && isStrong(result));
     const filenameRemove = results.find((result) => result.engine === 'filename-engine' && result.decision === ENGINE_DECISIONS.remove);
     const bestKeep = chooseBestResult(results, ENGINE_DECISIONS.keep);
     const engineErrors = results.filter((result) => result.decision === ENGINE_DECISIONS.error);
+
+    if (probeKnowledgeRemove || probeKnowledgeKeep) {
+        const winner = probeKnowledgeRemove || probeKnowledgeKeep;
+
+        return createFinalClassification({
+            finalDecision: (winner as EngineResult).decision as 'keep' | 'remove',
+            confidence: (winner as EngineResult).confidence,
+            reason: (winner as EngineResult).reason,
+            winningEngine: (winner as EngineResult).engine,
+            matchedRule: (winner as EngineResult).matchedRule,
+            matchedRuleSource: (winner as EngineResult).matchedRuleSource,
+            ...roleState,
+            usedFallback: false,
+            conflict,
+            results
+        });
+    }
 
     if (conflict.hasConflict) {
         const winner = bestKeep || chooseBestResult(results, ENGINE_DECISIONS.remove);
@@ -225,7 +248,7 @@ function mergeClassificationResults(results: EngineResult[]): FinalClassificatio
         });
     }
 
-    for (const winner of [metadataRemove, metadataKeep, forgeBytecodeRemove, forgeBytecodeKeep, forgeSemanticRemove, forgeSemanticKeep, registryRemove, registryKeep, filenameRemove]) {
+    for (const winner of [probeKnowledgeRemove, probeKnowledgeKeep, metadataRemove, metadataKeep, forgeBytecodeRemove, forgeBytecodeKeep, clientSignatureRemove, clientSignatureKeep, forgeSemanticRemove, forgeSemanticKeep, dependencyRoleRemove, dependencyRoleKeep, registryRemove, registryKeep, filenameRemove]) {
         if (!winner) {
             continue;
         }

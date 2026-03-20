@@ -12,7 +12,8 @@ const FINDING_TYPES = Object.freeze({
     providerAmbiguous: 'provider-ambiguous',
     incompatibility: 'incompatibility',
     preservedByDependency: 'preserved-by-dependency',
-    orphanLibrary: 'orphan-library'
+    orphanLibrary: 'orphan-library',
+    rolePropagation: 'role-propagation'
 });
 
 const VALIDATION_MODES = Object.freeze({

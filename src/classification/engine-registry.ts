@@ -1,4 +1,6 @@
 const { DEFAULT_ENABLED_ENGINES } = require('./constants');
+const { probeKnowledgeEngine } = require('./engines/probe-knowledge-engine');
+const { clientSignatureEngine } = require('./engines/client-signature-engine');
 const { filenameEngine } = require('./engines/filename-engine');
 const { forgeBytecodeEngine } = require('./engines/forge-bytecode-engine');
 const { forgeSemanticEngine } = require('./engines/forge-semantic-engine');
@@ -8,8 +10,10 @@ const { registryEngine } = require('./engines/registry-engine');
 import type { ClassificationEngine } from '../types/classification';
 
 const AVAILABLE_ENGINES: Readonly<Record<string, ClassificationEngine>> = Object.freeze({
+    'probe-knowledge-engine': probeKnowledgeEngine,
     'metadata-engine': metadataEngine,
     'forge-bytecode-engine': forgeBytecodeEngine,
+    'client-signature-engine': clientSignatureEngine,
     'forge-semantic-engine': forgeSemanticEngine,
     'registry-engine': registryEngine,
     'filename-engine': filenameEngine

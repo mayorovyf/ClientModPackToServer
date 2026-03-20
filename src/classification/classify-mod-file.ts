@@ -42,6 +42,35 @@ function classifyModFile({
     record('info', 'parse', `Loader ${descriptor.loader}: ${fileName}`);
     logParsingIssues(fileName, descriptor, record);
 
+    const classification = classifyDescriptor({
+        descriptor,
+        classificationContext,
+        runContext,
+        record
+    });
+
+    record('info', 'parse', `Descriptor: ${JSON.stringify(summarizeDescriptor(descriptor))}`);
+
+    return createFileDecision({
+        fileName,
+        sourcePath,
+        descriptor,
+        classification
+    });
+}
+
+function classifyDescriptor({
+    descriptor,
+    classificationContext,
+    runContext,
+    record = () => {}
+}: {
+    descriptor: ReturnType<typeof parseModFile>;
+    classificationContext: ClassificationContext;
+    runContext: RunContext;
+    record?: (level: string, kind: string, message: string) => void;
+}) {
+
     const engines = createEngineList(classificationContext.enabledEngines);
     const engineResults = runClassificationEngines({
         descriptor,
@@ -56,25 +85,20 @@ function classifyModFile({
         record(
             'warn',
             'engine-conflict',
-            `${fileName}: conflict between keep=[${classification.conflict.keepEngines.join(', ')}] and remove=[${classification.conflict.removeEngines.join(', ')}]`
+            `${descriptor.fileName}: conflict between keep=[${classification.conflict.keepEngines.join(', ')}] and remove=[${classification.conflict.removeEngines.join(', ')}]`
         );
     }
 
     record(
         'info',
         'classification',
-        `${fileName}: final ${classification.finalDecision} via ${classification.winningEngine || 'conservative-default'} (${classification.confidence})`
+        `${descriptor.fileName}: final ${classification.finalDecision} via ${classification.winningEngine || 'conservative-default'} (${classification.confidence})`
     );
-    record('info', 'parse', `Descriptor: ${JSON.stringify(summarizeDescriptor(descriptor))}`);
 
-    return createFileDecision({
-        fileName,
-        sourcePath,
-        descriptor,
-        classification
-    });
+    return classification;
 }
 
 module.exports = {
+    classifyDescriptor,
     classifyModFile
 };

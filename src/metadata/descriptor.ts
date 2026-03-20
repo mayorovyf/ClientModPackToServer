@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -59,11 +60,21 @@ function createDependencyRecord({
 
 function createModDescriptor(filePath: string): ModDescriptor {
     const stats = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
+    let fileSha256 = null;
+
+    if (stats && stats.isFile()) {
+        try {
+            fileSha256 = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+        } catch {
+            fileSha256 = null;
+        }
+    }
 
     return {
         fileName: path.basename(filePath),
         filePath,
         fileSize: stats ? stats.size : null,
+        fileSha256,
         loader: LOADER_TYPES.unknown,
         modIds: [],
         displayName: null,
@@ -101,7 +112,8 @@ function mergeArchiveIndex(current: ArchiveIndex | null, next: ArchiveIndex | nu
         hasClientCodeReferences: current.hasClientCodeReferences || next.hasClientCodeReferences,
         hintCategories: dedupeStrings([...current.hintCategories, ...next.hintCategories]) as ArchiveIndex['hintCategories'],
         sampleEntries: dedupeStrings([...current.sampleEntries, ...next.sampleEntries]).slice(0, 12),
-        bytecode: next.bytecode || current.bytecode || null
+        bytecode: next.bytecode || current.bytecode || null,
+        clientSignatures: next.clientSignatures || current.clientSignatures || null
     };
 }
 
@@ -181,6 +193,7 @@ function summarizeDescriptor(descriptor: ModDescriptor): DescriptorSummary {
         modIds: descriptor.modIds,
         displayName: descriptor.displayName,
         version: descriptor.version,
+        fileSha256: descriptor.fileSha256,
         declaredSide: descriptor.declaredSide,
         metadataFilesFound: descriptor.metadataFilesFound,
         dependencies: descriptor.dependencies.length,

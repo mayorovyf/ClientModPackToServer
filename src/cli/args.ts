@@ -18,7 +18,11 @@ type ValueFlag =
     | '--deep-check'
     | '--validation'
     | '--validation-timeout-ms'
-    | '--validation-entrypoint';
+    | '--validation-entrypoint'
+    | '--probe'
+    | '--probe-timeout-ms'
+    | '--probe-knowledge'
+    | '--probe-max-mods';
 
 type MultiValueFlag = '--engine' | '--disable-engine';
 type BooleanFlag = '--dry-run' | '--help' | '--validation-save-artifacts';
@@ -41,6 +45,10 @@ interface ParsedCliOptions {
     validationTimeoutMs: string | null;
     validationEntrypointPath: string | null;
     validationSaveArtifacts: boolean;
+    probeMode: CliOptions['probeMode'];
+    probeTimeoutMs: string | null;
+    probeKnowledgePath: string | null;
+    probeMaxMods: string | null;
     engineNames: string[];
     disabledEngineNames: string[];
     dryRun: boolean;
@@ -63,7 +71,11 @@ const VALUE_FLAGS = new Set<ValueFlag>([
     '--deep-check',
     '--validation',
     '--validation-timeout-ms',
-    '--validation-entrypoint'
+    '--validation-entrypoint',
+    '--probe',
+    '--probe-timeout-ms',
+    '--probe-knowledge',
+    '--probe-max-mods'
 ]);
 const MULTI_VALUE_FLAGS = new Set<MultiValueFlag>(['--engine', '--disable-engine']);
 const BOOLEAN_FLAGS = new Set<BooleanFlag>(['--dry-run', '--help', '--validation-save-artifacts']);
@@ -110,6 +122,10 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
         validationTimeoutMs: null,
         validationEntrypointPath: null,
         validationSaveArtifacts: false,
+        probeMode: null,
+        probeTimeoutMs: null,
+        probeKnowledgePath: null,
+        probeMaxMods: null,
         engineNames: [],
         disabledEngineNames: [],
         dryRun: false,
@@ -214,6 +230,18 @@ function parseCliArgs(argv: string[] = []): ParsedCliOptions {
             case '--validation-entrypoint':
                 options.validationEntrypointPath = resolvedValue;
                 break;
+            case '--probe':
+                options.probeMode = resolvedValue as ParsedCliOptions['probeMode'];
+                break;
+            case '--probe-timeout-ms':
+                options.probeTimeoutMs = resolvedValue;
+                break;
+            case '--probe-knowledge':
+                options.probeKnowledgePath = resolvedValue;
+                break;
+            case '--probe-max-mods':
+                options.probeMaxMods = resolvedValue;
+                break;
             default:
                 throw new RunConfigurationError(`Argument is not supported: ${key}`);
         }
@@ -229,6 +257,7 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('                [--registry-mode <auto|offline|refresh|pinned>] [--registry-manifest-url <url>] [--registry-bundle-url <url>]');
     logger.raw('                [--profile <safe|balanced|aggressive>] [--deep-check <auto|off|force>]');
     logger.raw('                [--validation <off|auto|require|force>] [--validation-timeout-ms <ms>] [--validation-entrypoint <path>]');
+    logger.raw('                [--probe <off|auto|force>] [--probe-timeout-ms <ms>] [--probe-knowledge <path>] [--probe-max-mods <n>]');
     logger.raw('                [--validation-save-artifacts]');
     logger.raw('  node index.js preset list');
     logger.raw('  node index.js preset save <name> [run-options]');
@@ -260,6 +289,10 @@ function printHelp(logger: { raw: (message?: string) => void }): void {
     logger.raw('  --validation-timeout-ms Timeout in milliseconds for smoke-test');
     logger.raw('  --validation-entrypoint Explicit path to server launcher for smoke-test');
     logger.raw('  --validation-save-artifacts Save validation stdout/stderr artifacts into report dir');
+    logger.raw('  --probe            Dedicated server probe mode: off, auto, or force');
+    logger.raw('  --probe-timeout-ms Timeout in milliseconds for one probe run');
+    logger.raw('  --probe-knowledge  Path to persistent probe knowledge JSON file');
+    logger.raw('  --probe-max-mods   Maximum number of disputed mods to probe in one run');
     logger.raw('  --target-dir       Managed server target directory for server commands');
     logger.raw('  --core             Managed server core type: fabric, forge, or neoforge');
     logger.raw('  --minecraft        Minecraft version for server core installation');

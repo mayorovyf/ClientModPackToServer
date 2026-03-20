@@ -62,6 +62,9 @@ function buildFindingSummary(findings: DependencyFinding[] = [], graphSummary: P
         incompatibilities: 0,
         preservedByDependency: 0,
         orphanLibraries: 0,
+        rolePropagations: graphSummary.rolePropagations || 0,
+        roleKeepConstraints: graphSummary.roleKeepConstraints || 0,
+        roleRemoveSignals: graphSummary.roleRemoveSignals || 0,
         graphErrors: 0
     };
 
@@ -84,6 +87,9 @@ function buildFindingSummary(findings: DependencyFinding[] = [], graphSummary: P
                 break;
             case FINDING_TYPES.orphanLibrary:
                 summary.orphanLibraries += 1;
+                break;
+            case FINDING_TYPES.rolePropagation:
+                summary.rolePropagations += 1;
                 break;
             default:
                 break;

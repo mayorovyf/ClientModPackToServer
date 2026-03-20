@@ -1,6 +1,7 @@
 const { finalizeDecision } = require('../build/decision-model');
 const { VALIDATION_MODES } = require('./constants');
 const { buildDependencyGraph } = require('./graph-builder');
+const { applyDependencyRolePropagation } = require('./role-propagation');
 const { runDependencyValidation } = require('./validator');
 
 import type { DependencyGraph, DependencyValidationMode } from '../types/dependency';
@@ -15,16 +16,23 @@ function analyzeDependencies({
     record?: (level: string, kind: string, message: string) => void;
 }) {
     record('info', 'graph', `Building dependency graph for ${decisions.length} jar(s)`);
-    const graph: DependencyGraph = buildDependencyGraph(decisions);
+    const initialGraph: DependencyGraph = buildDependencyGraph(decisions);
     record(
         'info',
         'graph',
-        `Dependency graph built: nodes=${graph.summary.totalNodes}, edges=${graph.summary.totalEdges}, ambiguousProviders=${graph.summary.ambiguousProviderIds}`
+        `Dependency graph built: nodes=${initialGraph.summary.totalNodes}, edges=${initialGraph.summary.totalEdges}, ambiguousProviders=${initialGraph.summary.ambiguousProviderIds}`
     );
+    const propagation = applyDependencyRolePropagation({
+        decisions,
+        graph: initialGraph,
+        record
+    });
+    const graph: DependencyGraph = buildDependencyGraph(propagation.decisions);
 
     const validation = runDependencyValidation({
-        decisions,
+        decisions: propagation.decisions,
         graph,
+        initialFindingsByFile: propagation.initialFindingsByFile,
         mode,
         record
     });
@@ -35,7 +43,7 @@ function analyzeDependencies({
         `Dependency validation complete: findings=${validation.summary.totalFindings}, preserved=${validation.summary.preservedByDependency}, missingRequired=${validation.summary.missingRequired}`
     );
 
-    const adjustedDecisions = decisions.map((decision) =>
+    const adjustedDecisions = propagation.decisions.map((decision: Record<string, any>) =>
         finalizeDecision(decision, validation.decisionUpdatesByFile[decision.fileName] || {})
     );
     const reportedProviderIndex = {
@@ -60,7 +68,12 @@ function analyzeDependencies({
         report: {
             status: 'ok',
             mode,
-            summary: validation.summary,
+            summary: {
+                ...validation.summary,
+                rolePropagations: propagation.summary.rolePropagations,
+                roleKeepConstraints: propagation.summary.roleKeepConstraints,
+                roleRemoveSignals: propagation.summary.roleRemoveSignals
+            },
             providerIndex: reportedProviderIndex,
             nodes: graph.nodes.map((node) => ({
                 ...node,

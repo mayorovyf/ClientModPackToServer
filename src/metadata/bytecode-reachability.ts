@@ -309,5 +309,6 @@ function summarizeBytecodeReachability({
 }
 
 module.exports = {
+    selectRootClasses,
     summarizeBytecodeReachability
 };

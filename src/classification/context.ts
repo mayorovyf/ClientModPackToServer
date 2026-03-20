@@ -2,6 +2,7 @@ const { RunConfigurationError } = require('../core/errors');
 const { DEFAULT_ENABLED_ENGINES } = require('./constants');
 const { getAvailableEngineNames } = require('./engine-registry');
 const { createEmptyLocalRegistry } = require('./local-registry');
+const { EMPTY_PROBE_KNOWLEDGE } = require('../probe/knowledge-store');
 
 import type { ClassificationContext } from '../types/classification';
 
@@ -14,11 +15,13 @@ function normalizeEngineNames(engineNames: unknown): string[] {
 function createClassificationContext({
     blockList = [],
     localRegistry = null,
+    probeKnowledge = null,
     enabledEngines = DEFAULT_ENABLED_ENGINES,
     disabledEngines = []
 }: {
     blockList?: string[];
     localRegistry?: ClassificationContext['localRegistry'] | null;
+    probeKnowledge?: ClassificationContext['probeKnowledge'] | null;
     enabledEngines?: string[];
     disabledEngines?: string[];
 } = {}): ClassificationContext {
@@ -39,6 +42,10 @@ function createClassificationContext({
     return {
         blockList,
         localRegistry: localRegistry || createEmptyLocalRegistry(),
+        probeKnowledge: probeKnowledge || {
+            filePath: null,
+            entries: EMPTY_PROBE_KNOWLEDGE.entries
+        },
         availableEngines,
         enabledEngines: configured
     };

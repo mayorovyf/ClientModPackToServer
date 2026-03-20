@@ -25,6 +25,21 @@ export interface BytecodeReachabilityIndex {
     deepClientReferenceSamples: string[];
 }
 
+export interface ClientSignatureIndex {
+    analyzedClassCount: number;
+    rootClassNames: string[];
+    clientApiExtendsCount: number;
+    clientApiImplementsCount: number;
+    clientMethodSignatureCount: number;
+    clientFieldSignatureCount: number;
+    forgeClientEventHitCount: number;
+    serviceClientAdapterCount: number;
+    mixinClientTargetCount: number;
+    clientBootstrapPatternCount: number;
+    signatureKinds: string[];
+    evidenceSamples: string[];
+}
+
 export interface ArchiveIndex {
     entryCount: number;
     classEntryCount: number;
@@ -35,12 +50,14 @@ export interface ArchiveIndex {
     hintCategories: ArchiveHintCategory[];
     sampleEntries: string[];
     bytecode: BytecodeReachabilityIndex | null;
+    clientSignatures: ClientSignatureIndex | null;
 }
 
 export interface ModDescriptor {
     fileName: string;
     filePath: string;
     fileSize: number | null;
+    fileSha256: string | null;
     loader: LoaderKind;
     modIds: string[];
     displayName: string | null;
@@ -84,6 +101,7 @@ export interface DescriptorSummary {
     modIds: string[];
     displayName: string | null;
     version: string | null;
+    fileSha256: string | null;
     declaredSide: SideHint;
     metadataFilesFound: string[];
     dependencies: number;

@@ -10,7 +10,10 @@ import type {
     DependencyValidationUpdate
 } from '../types/dependency';
 
-function createFindingStore(decisions: Array<Record<string, any>>) {
+function createFindingStore(
+    decisions: Array<Record<string, any>>,
+    initialFindingsByFile: Record<string, DependencyFinding[]> = {}
+) {
     const findingsByFile: Record<string, DependencyFinding[]> = {};
     const seenByFile: Record<string, Set<string>> = {};
 
@@ -19,7 +22,7 @@ function createFindingStore(decisions: Array<Record<string, any>>) {
         seenByFile[decision.fileName] = new Set();
     }
 
-    return {
+    const store = {
         add(fileName: string, finding: DependencyFinding) {
             let fileFindings = findingsByFile[fileName];
             let seenKeys = seenByFile[fileName];
@@ -56,6 +59,14 @@ function createFindingStore(decisions: Array<Record<string, any>>) {
         },
         byFile: findingsByFile
     };
+
+    for (const [fileName, findings] of Object.entries(initialFindingsByFile)) {
+        for (const finding of findings || []) {
+            store.add(fileName, finding);
+        }
+    }
+
+    return store;
 }
 
 function buildOutgoingSummary(node: DependencyGraph['nodes'][number], effectiveDecisionByFile: Record<string, string>): DependencyOutgoingSummary {
@@ -134,16 +145,18 @@ function shouldPreserveProviders(mode: string): boolean {
 function runDependencyValidation({
     decisions,
     graph,
+    initialFindingsByFile = {},
     mode = VALIDATION_MODES.conservative,
     record = () => {}
 }: {
     decisions: Array<Record<string, any>>;
     graph: DependencyGraph;
+    initialFindingsByFile?: Record<string, DependencyFinding[]>;
     mode?: string;
     record?: (level: string, kind: string, message: string) => void;
 }): DependencyValidationResult {
     const effectiveDecisionByFile = Object.fromEntries(decisions.map((decision) => [decision.fileName, decision.decision])) as Record<string, string>;
-    const findings = createFindingStore(decisions);
+    const findings = createFindingStore(decisions, initialFindingsByFile);
 
     if (shouldPreserveProviders(mode)) {
         let changed = true;

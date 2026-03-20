@@ -6,6 +6,8 @@ const { DEFAULT_ENABLED_ENGINES } = require('../classification/constants');
 const { getAvailableEngineNames } = require('../classification/engine-registry');
 const { RunConfigurationError } = require('../core/errors');
 const { DEEP_CHECK_MODES, normalizeDeepCheckMode } = require('../deep-check/constants');
+const { DEFAULT_PROBE_MAX_MODS, DEFAULT_PROBE_TIMEOUT_MS, PROBE_MODES } = require('../probe/constants');
+const { resolveProbeKnowledgePath } = require('../probe/knowledge-store');
 const { DEFAULT_VALIDATION_TIMEOUT_MS, normalizeValidationMode } = require('../validation/constants');
 const {
     DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
@@ -25,6 +27,7 @@ import type {
     CliOptions,
     DeepCheckMode,
     OutputPolicy,
+    ProbeMode,
     RegistryMode,
     RunMode,
     RuntimeConfig,
@@ -57,6 +60,8 @@ interface DefaultConfigShape {
     deepCheckMode: DeepCheckMode;
     validationMode: ValidationMode;
     validationTimeoutMs: number;
+    probeMode: ProbeMode;
+    probeTimeoutMs: number;
     serverDirName: string | null;
     registryMode: RegistryMode;
     registryManifestUrl: string | null;
@@ -95,6 +100,8 @@ const DEFAULT_CONFIG: Readonly<DefaultConfigShape> = Object.freeze({
     deepCheckMode: DEEP_CHECK_MODES.auto,
     validationMode: 'auto',
     validationTimeoutMs: DEFAULT_VALIDATION_TIMEOUT_MS,
+    probeMode: PROBE_MODES.auto,
+    probeTimeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
     serverDirName: null,
     registryMode: REGISTRY_RUNTIME_MODES.auto,
     registryManifestUrl: process.env.CLIENT_TO_SERVER_REGISTRY_MANIFEST_URL || DEFAULT_REMOTE_REGISTRY_MANIFEST_URL,
@@ -227,6 +234,46 @@ function normalizeValidationTimeout(value: number | string | null | undefined): 
     return normalized;
 }
 
+function normalizeProbeMode(mode: RuntimeCliOptions['probeMode']): ProbeMode {
+    if (!mode || mode === DEFAULT_CONFIG.probeMode) {
+        return DEFAULT_CONFIG.probeMode;
+    }
+
+    if (mode === PROBE_MODES.off || mode === PROBE_MODES.auto || mode === PROBE_MODES.force) {
+        return mode;
+    }
+
+    throw new RunConfigurationError(`Unknown probe mode: ${mode}`);
+}
+
+function normalizeProbeTimeout(value: number | string | null | undefined): number {
+    if (value === null || value === undefined || value === '') {
+        return DEFAULT_CONFIG.probeTimeoutMs;
+    }
+
+    const normalized = Number(value);
+
+    if (!Number.isInteger(normalized) || normalized <= 0) {
+        throw new RunConfigurationError(`Invalid probe timeout: ${value}`);
+    }
+
+    return normalized;
+}
+
+function normalizeProbeMaxMods(value: number | string | null | undefined): number {
+    if (value === null || value === undefined || value === '') {
+        return DEFAULT_PROBE_MAX_MODS;
+    }
+
+    const normalized = Number(value);
+
+    if (!Number.isInteger(normalized) || normalized < 0) {
+        throw new RunConfigurationError(`Invalid probe max mods: ${value}`);
+    }
+
+    return normalized;
+}
+
 function normalizeServerDirName(value: string | null | undefined): string | null {
     if (value === null || value === undefined) {
         return null;
@@ -278,6 +325,10 @@ function createRuntimeConfig({
     const validationTimeoutMs = normalizeValidationTimeout(cliOptions.validationTimeoutMs || DEFAULT_CONFIG.validationTimeoutMs);
     const validationEntrypointPath = resolveOptionalPath(cliOptions.validationEntrypointPath);
     const validationSaveArtifacts = Boolean(cliOptions.validationSaveArtifacts);
+    const probeMode = normalizeProbeMode(cliOptions.probeMode || DEFAULT_CONFIG.probeMode);
+    const probeTimeoutMs = normalizeProbeTimeout(cliOptions.probeTimeoutMs || DEFAULT_CONFIG.probeTimeoutMs);
+    const probeMaxMods = normalizeProbeMaxMods(cliOptions.probeMaxMods || DEFAULT_PROBE_MAX_MODS);
+    const probeKnowledgePath = resolveProbeKnowledgePath(scriptDir, cliOptions.probeKnowledgePath || null);
     const registryMode = assertRegistryMode(cliOptions.registryMode || DEFAULT_CONFIG.registryMode);
     const registryManifestUrl = normalizeOptionalUrl(
         cliOptions.registryManifestUrl || DEFAULT_CONFIG.registryManifestUrl,
@@ -328,6 +379,10 @@ function createRuntimeConfig({
         validationTimeoutMs,
         validationEntrypointPath,
         validationSaveArtifacts,
+        probeMode,
+        probeTimeoutMs,
+        probeKnowledgePath,
+        probeMaxMods,
         registryMode,
         registryManifestUrl,
         registryBundleUrl,

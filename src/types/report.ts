@@ -5,6 +5,7 @@ import type { DeepCheckResult } from './deep-check';
 import type { DependencyGraphSummary } from './dependency';
 import type { RegistryRuntimeState } from './registry';
 import type { RunContext } from './run';
+import type { ProbeSummary } from './probe';
 import type { ValidationResult } from './validation';
 
 export interface ReportIssue {
@@ -49,12 +50,17 @@ export interface ReportDecisionSummary {
     manualOverrideAction?: 'keep' | 'exclude' | null;
     manualOverrideReason?: string | null;
     manualOverrideUpdatedAt?: string | null;
+    probeOutcome?: string | null;
+    probeReason?: string | null;
+    probeConfidence?: string | null;
+    probeLogPath?: string | null;
     descriptor?: {
         fileName?: string;
         loader?: string;
         modIds?: string[];
         displayName?: string | null;
         version?: string | null;
+        fileSha256?: string | null;
         manifestHints?: Record<string, string> | null;
         archiveIndex?: ArchiveIndex | null;
     } | null;
@@ -66,6 +72,7 @@ export interface RunReport {
         registrySource?: string;
         registryVersion?: string;
         registryFilePath?: string | null;
+        probeKnowledgePath?: string | null;
         reviewOverridesPath?: string | null;
     };
     stats: {
@@ -106,6 +113,7 @@ export interface RunReport {
         results?: DeepCheckResult[];
     };
     validation?: ValidationResult;
+    probe?: ProbeSummary;
     registry?: RegistryRuntimeState;
     manualReview?: {
         overridesPath: string | null;

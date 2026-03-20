@@ -1,4 +1,5 @@
 const { summarizeBytecodeReachability } = require('./bytecode-reachability');
+const { summarizeClientSignatures } = require('./client-signature-index');
 
 import type { ArchiveHintCategory, ArchiveIndex, ModDescriptor } from '../types/descriptor';
 
@@ -159,6 +160,10 @@ function buildArchiveIndex(archive: ArchiveHandle, descriptor: ModDescriptor | n
         archive,
         descriptor
     });
+    const clientSignatures = summarizeClientSignatures({
+        archive,
+        descriptor
+    });
 
     return {
         entryCount: entries.length,
@@ -169,7 +174,8 @@ function buildArchiveIndex(archive: ArchiveHandle, descriptor: ModDescriptor | n
         hasClientCodeReferences: clientState.clientReferenceCount > 0,
         hintCategories: categoryState.hintCategories,
         sampleEntries: [...new Set([...categoryState.sampleEntries, ...clientState.sampleEntries])].slice(0, 12),
-        bytecode
+        bytecode,
+        clientSignatures
     };
 }
 
