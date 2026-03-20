@@ -8,7 +8,8 @@ function createValidationSummary(report: Pick<ValidationResult, 'issues' | 'susp
         suspectedFalseRemovals: report.suspectedFalseRemovals.length,
         successMarkers: report.successMarkers.length,
         failureMarkers: report.failureMarkers.length,
-        linkedIssues: report.issues.filter((issue) => Array.isArray(issue.linkedDecisions) && issue.linkedDecisions.length > 0).length
+        linkedIssues: report.issues.filter((issue) => Array.isArray(issue.linkedDecisions) && issue.linkedDecisions.length > 0).length,
+        joinabilityStatus: (report as ValidationResult).joinability?.status || 'not-checked'
     };
 }
 
@@ -40,6 +41,12 @@ function createEmptyValidationReport(
         failureMarkers: [],
         issues: [],
         suspectedFalseRemovals: [],
+        joinability: {
+            status: 'not-checked',
+            successMarkers: [],
+            failureMarkers: [],
+            evidence: []
+        },
         logArtifacts: {},
         warnings,
         errors,
@@ -48,7 +55,8 @@ function createEmptyValidationReport(
             suspectedFalseRemovals: 0,
             successMarkers: 0,
             failureMarkers: 0,
-            linkedIssues: 0
+            linkedIssues: 0,
+            joinabilityStatus: 'not-checked'
         }
     };
 

@@ -42,6 +42,7 @@ export interface RuntimeTopologyAssessment {
     code: string;
     summary: string;
     topologyId: RuntimeTopologyId | null;
+    candidateTopologyIds: RuntimeTopologyId[];
     topologyClass: RuntimeTopologyClass;
     baseLoader: LoaderKind | null;
     connectorLayer: ConnectorLayerId | null;

@@ -59,6 +59,7 @@ function createMinimalRecipe({
         detectedLoaders: [],
         inputKind: runContext.inputKind,
         instanceSource: runContext.instanceSource,
+        selectedRuntimeTopologyId: null,
         files: []
     };
     const launchProfile = currentCandidate ? currentCandidate.launchProfile : {

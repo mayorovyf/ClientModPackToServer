@@ -63,6 +63,7 @@ function createEvidenceSummary(report: RunReport): string[] {
 
 function createStateDigest({
     fingerprintDigest,
+    runtimeTopologyId,
     core,
     javaProfile,
     validationTimeoutMs,
@@ -70,6 +71,7 @@ function createStateDigest({
     currentModDecisions
 }: {
     fingerprintDigest: string;
+    runtimeTopologyId: CandidateState['runtimeTopologyId'];
     core: string | null;
     javaProfile: string | null;
     validationTimeoutMs: number | null;
@@ -78,6 +80,7 @@ function createStateDigest({
 }): string {
     const payload = {
         fingerprintDigest,
+        runtimeTopologyId: runtimeTopologyId || null,
         core: core || null,
         javaProfile: javaProfile || null,
         validationTimeoutMs,
@@ -133,7 +136,8 @@ function createCandidateState({
         : null);
     const fingerprint = createCandidateFingerprint({
         runContext,
-        decisions: (report.decisions || []) as Array<Record<string, any>>
+        decisions: (report.decisions || []) as Array<Record<string, any>>,
+        selectedRuntimeTopologyId: report.releaseContract?.supportBoundary.runtimeTopology.topologyId || null
     });
     const launchProfile = {
         validationEntrypointKind: report.validation?.entrypoint?.kind || null,
@@ -151,6 +155,7 @@ function createCandidateState({
     }));
     const stateDigest = createStateDigest({
         fingerprintDigest: fingerprint.digest,
+        runtimeTopologyId: report.releaseContract?.supportBoundary.runtimeTopology.topologyId || null,
         core: report.serverCoreInstall?.coreType || report.runtimeDetection?.supportedServerCore || null,
         javaProfile: null,
         validationTimeoutMs: runContext.validationTimeoutMs,

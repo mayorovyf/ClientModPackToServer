@@ -75,19 +75,12 @@ function collectDecisionTokens(decision: DecisionLike): string[] {
     return [...new Set(tokens)];
 }
 
-function isConnectorLayerArtifact(decision: DecisionLike, connectorLayer: RuntimeTopologyAssessment['connectorLayer']): boolean {
-    if (!connectorLayer) {
-        return false;
-    }
-
+function hasConnectorArtifactHints(decision: DecisionLike): boolean {
     const tokens = collectDecisionTokens(decision);
 
-    if (connectorLayer === 'sinytra-connector') {
-        return tokens.some((token) => token.includes('sinytra-connector') || token.includes('sinytra_connector'))
-            || (tokens.some((token) => token.includes('sinytra')) && tokens.some((token) => token.includes('connector')));
-    }
-
-    return tokens.some((token) => token.includes('connector') || token.includes('bridge'));
+    return tokens.some((token) => token.includes('sinytra-connector') || token.includes('sinytra_connector'))
+        || (tokens.some((token) => token.includes('sinytra')) && tokens.some((token) => token.includes('connector')))
+        || tokens.some((token) => token.includes('connector') || token.includes('bridge'));
 }
 
 function createEmptySummary(): PartitionSummary {
@@ -146,6 +139,7 @@ function partitionDecision({
     const loader = decision.descriptor?.loader || 'unknown';
     const baseLoader = topologyAssessment.baseLoader;
     const bridgedEcosystem = topologyAssessment.bridgedEcosystem;
+    const connectorArtifact = hasConnectorArtifactHints(decision);
 
     if (topologyAssessment.assessment !== 'supported' || !topologyId) {
         return createPartitionedDecision({
@@ -156,12 +150,21 @@ function partitionDecision({
         });
     }
 
-    if (isConnectorLayerArtifact(decision, topologyAssessment.connectorLayer)) {
+    if (connectorArtifact && topologyAssessment.connectorLayer) {
         return createPartitionedDecision({
             decision,
             topologyAssessment,
             partition: 'connector-layer-artifact',
             topologyReason: `Included ${decision.fileName} as connector-layer artifact for runtime topology ${topologyId}.`
+        });
+    }
+
+    if (connectorArtifact && !topologyAssessment.connectorLayer) {
+        return createPartitionedDecision({
+            decision,
+            topologyAssessment,
+            partition: 'topology-incompatible-artifact',
+            topologyReason: `Excluded ${decision.fileName} from runtime topology ${topologyId} because this topology does not include a connector layer.`
         });
     }
 

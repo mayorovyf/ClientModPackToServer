@@ -5,6 +5,11 @@ import type { SupportBoundaryAssessment, TrustPolicyAction, TrustPolicyActionDec
 import type { ValidationIssue, ValidationResult } from '../types/validation';
 
 export type FailureFamily =
+    | 'wrong-runtime-topology'
+    | 'connector-layer-incompatibility'
+    | 'missing-trusted-connector-dependency'
+    | 'topology-incompatible-artifact-kept'
+    | 'client-server-joinability-failure'
     | 'wrong-java-or-launch-profile'
     | 'missing-trusted-dependency'
     | 'client-only-or-side-mismatch'
@@ -33,6 +38,11 @@ export interface NormalizedFailureAnalysis {
 }
 
 const FAMILY_ACTIONS: Record<FailureFamily, TrustPolicyAction[]> = {
+    'wrong-runtime-topology': ['switch-whitelisted-runtime-topology'],
+    'connector-layer-incompatibility': ['switch-whitelisted-runtime-topology', 'add-trusted-connector-dependency'],
+    'missing-trusted-connector-dependency': ['add-trusted-connector-dependency', 'restore-server-required-artifact'],
+    'topology-incompatible-artifact-kept': ['remove-confirmed-topology-incompatible-artifact'],
+    'client-server-joinability-failure': ['switch-whitelisted-runtime-topology', 'restore-server-required-artifact'],
     'wrong-java-or-launch-profile': ['select-java-profile', 'switch-whitelisted-entrypoint'],
     'missing-trusted-dependency': ['add-trusted-dependency'],
     'client-only-or-side-mismatch': ['remove-explicit-client-only-mod', 'remove-confirmed-client-only-support-library'],
@@ -42,6 +52,11 @@ const FAMILY_ACTIONS: Record<FailureFamily, TrustPolicyAction[]> = {
 };
 
 const FAMILY_EXPLANATIONS: Record<FailureFamily, string> = {
+    'wrong-runtime-topology': 'Validation evidence points to the wrong runtime topology being selected for this candidate.',
+    'connector-layer-incompatibility': 'Validation evidence points to an incompatible connector layer or connector bootstrap failure.',
+    'missing-trusted-connector-dependency': 'Validation evidence points to a missing connector-side dependency that should come from the trusted source instance.',
+    'topology-incompatible-artifact-kept': 'Validation evidence points to a topology-incompatible artifact that was still kept in the candidate.',
+    'client-server-joinability-failure': 'Validation evidence points to a joinability mismatch between the built server and the original client pack.',
     'wrong-java-or-launch-profile': 'Validation evidence points to a Java/runtime launch profile mismatch.',
     'missing-trusted-dependency': 'Validation evidence points to a missing required dependency that should come from a trusted source.',
     'client-only-or-side-mismatch': 'Validation evidence points to a client-only mod or a client/server side mismatch.',
@@ -158,8 +173,51 @@ function hasTrustedDependencyCandidateEvidence(validation: ValidationResult | nu
     ));
 }
 
+function hasConnectorDependencyCandidateEvidence(validation: ValidationResult | null | undefined): boolean {
+    if (!validation) {
+        return false;
+    }
+
+    return listIssuesByKind(validation.issues || [], 'missing-dependency').some((issue) => {
+        const evidence = `${issue.evidence} ${issue.message}`.toLowerCase();
+        const hasConnectorHints = /connector|sinytra|fabric-api|forgified/i.test(evidence)
+            || issue.suspectedModIds.some((modId) => /connector|sinytra|fabric-api|forgified/i.test(modId))
+            || issue.jarHints.some((jarHint) => /connector|sinytra|fabric-api|forgified/i.test(jarHint));
+
+        return hasConnectorHints;
+    });
+}
+
 function hasEulaEvidence(validation: ValidationResult | null | undefined): boolean {
     return /eula|accept the eula|eula\.txt/i.test(collectValidationText(validation));
+}
+
+function hasRuntimeTopologyIssue(validation: ValidationResult | null | undefined): boolean {
+    return hasIssueKind(validation?.issues || [], 'runtime-topology')
+        || /wrong runtime topology|runtime topology mismatch|not compatible with selected runtime topology|requires runtime topology/i.test(collectValidationText(validation));
+}
+
+function hasConnectorLayerIssue(validation: ValidationResult | null | undefined): boolean {
+    return hasIssueKind(validation?.issues || [], 'connector-layer')
+        || /sinytra connector|connector bootstrap failed|failed to initialize connector|connector layer incompatible/i.test(collectValidationText(validation));
+}
+
+function hasTopologyIncompatibleArtifactIssue(validation: ValidationResult | null | undefined): boolean {
+    return listIssuesByKind(validation?.issues || [], 'topology-incompatible-artifact').length > 0
+        || listIssuesByKind(validation?.issues || [], 'joinability-failure').some((issue) => (
+            (issue.linkedDecisions || []).some((decision) => decision.topologyPartition === 'topology-incompatible-artifact')
+        ))
+        || listIssuesByKind(validation?.issues || [], 'class-loading').some((issue) => (
+            (issue.linkedDecisions || []).some((decision) => (
+                decision.topologyPartition === 'topology-incompatible-artifact'
+                && (decision.buildDecision === 'keep' || decision.actionStatus === 'copied')
+            ))
+        ));
+}
+
+function hasJoinabilityFailure(validation: ValidationResult | null | undefined): boolean {
+    return validation?.joinability?.status === 'failed'
+        || hasIssueKind(validation?.issues || [], 'joinability-failure');
 }
 
 function resolveValidationFailureFamily(validation: ValidationResult | null | undefined): FailureFamily | null {
@@ -169,6 +227,26 @@ function resolveValidationFailureFamily(validation: ValidationResult | null | un
 
     const issues = validation.issues || [];
     const evidenceText = collectValidationText(validation);
+
+    if (hasJoinabilityFailure(validation)) {
+        return 'client-server-joinability-failure';
+    }
+
+    if (hasTopologyIncompatibleArtifactIssue(validation)) {
+        return 'topology-incompatible-artifact-kept';
+    }
+
+    if (hasIssueKind(issues, 'missing-dependency') && hasConnectorDependencyCandidateEvidence(validation)) {
+        return 'missing-trusted-connector-dependency';
+    }
+
+    if (hasConnectorLayerIssue(validation)) {
+        return 'connector-layer-incompatibility';
+    }
+
+    if (hasRuntimeTopologyIssue(validation)) {
+        return 'wrong-runtime-topology';
+    }
 
     if (isLikelyEntrypointFailure(evidenceText)) {
         return 'wrong-core-or-entrypoint';
@@ -240,6 +318,18 @@ function resolveFailureConfidence({
 
     if (family === 'timeout-before-ready') {
         return 'medium';
+    }
+
+    if (family === 'wrong-runtime-topology' || family === 'connector-layer-incompatibility' || family === 'topology-incompatible-artifact-kept') {
+        return 'high';
+    }
+
+    if (family === 'missing-trusted-connector-dependency') {
+        return hasConnectorDependencyCandidateEvidence(validation) ? 'high' : 'medium';
+    }
+
+    if (family === 'client-server-joinability-failure') {
+        return validation?.joinability?.status === 'failed' ? 'high' : 'medium';
     }
 
     if (family === 'wrong-java-or-launch-profile') {
@@ -316,6 +406,18 @@ function evaluateRecommendedActions({
         if (action === 'add-trusted-dependency') {
             return evaluateTrustPolicyAction(action, {
                 trustedSource: hasTrustedDependencyCandidateEvidence(validation) ? null : false
+            });
+        }
+
+        if (action === 'add-trusted-connector-dependency') {
+            return evaluateTrustPolicyAction(action, {
+                trustedSource: hasConnectorDependencyCandidateEvidence(validation) ? null : false
+            });
+        }
+
+        if (action === 'restore-server-required-artifact') {
+            return evaluateTrustPolicyAction(action, {
+                trustedSource: hasTrustedDependencyCandidateEvidence(validation) || hasConnectorDependencyCandidateEvidence(validation) ? null : false
             });
         }
 

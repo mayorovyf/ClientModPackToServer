@@ -55,6 +55,7 @@ function meetsSuccessContract(report: RunReport): boolean {
         && report.validation.runAttempted
         && report.validation.status === 'passed'
         && report.validation.successMarkers.length > 0
+        && report.validation.joinability?.status !== 'failed'
         && report.validation.errors.length === 0
     );
 }

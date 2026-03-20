@@ -183,6 +183,103 @@ function parseLaunchProfileIssues(text: string): ValidationIssue[] {
     return issues;
 }
 
+function parseRuntimeTopologyIssues(text: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const patterns = [
+        /wrong runtime topology[^\r\n]*/ig,
+        /runtime topology mismatch[^\r\n]*/ig,
+        /not compatible with selected runtime topology[^\r\n]*/ig,
+        /requires runtime topology[^\r\n]*/ig
+    ];
+
+    for (const pattern of patterns) {
+        let match = pattern.exec(text);
+
+        while (match) {
+            const evidence = match[0].replace(/\s+/g, ' ').trim();
+
+            issues.push({
+                kind: 'runtime-topology',
+                message: 'Validation detected a runtime topology mismatch',
+                evidence,
+                modIds: [],
+                suspectedModIds: [],
+                jarHints: extractJarHints(evidence),
+                confidence: 'high'
+            });
+
+            match = pattern.exec(text);
+        }
+    }
+
+    return issues;
+}
+
+function parseConnectorLayerIssues(text: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const patterns = [
+        /sinytra(?:\s+connector)?[^\r\n]*(?:failed|error|incompatible|missing)/ig,
+        /connector bootstrap failed[^\r\n]*/ig,
+        /failed to initialize connector[^\r\n]*/ig,
+        /connector layer incompatible[^\r\n]*/ig
+    ];
+
+    for (const pattern of patterns) {
+        let match = pattern.exec(text);
+
+        while (match) {
+            const evidence = match[0].replace(/\s+/g, ' ').trim();
+
+            issues.push({
+                kind: 'connector-layer',
+                message: 'Validation detected a connector-layer incompatibility',
+                evidence,
+                modIds: [],
+                suspectedModIds: toUniqueList([
+                    /sinytra/i.test(evidence) ? 'sinytra_connector' : null
+                ]),
+                jarHints: extractJarHints(evidence),
+                confidence: 'high'
+            });
+
+            match = pattern.exec(text);
+        }
+    }
+
+    return issues;
+}
+
+function parseTopologyIncompatibleArtifactIssues(text: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const patterns = [
+        /topology-incompatible artifact[^\r\n]*/ig,
+        /kept incompatible artifact[^\r\n]*/ig,
+        /runtime topology rejected kept jar[^\r\n]*/ig
+    ];
+
+    for (const pattern of patterns) {
+        let match = pattern.exec(text);
+
+        while (match) {
+            const evidence = match[0].replace(/\s+/g, ' ').trim();
+
+            issues.push({
+                kind: 'topology-incompatible-artifact',
+                message: 'Validation detected a kept topology-incompatible artifact',
+                evidence,
+                modIds: [],
+                suspectedModIds: [],
+                jarHints: extractJarHints(evidence),
+                confidence: 'high'
+            });
+
+            match = pattern.exec(text);
+        }
+    }
+
+    return issues;
+}
+
 function parseMixinIssues(text: string): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
     const patterns = [
@@ -235,6 +332,39 @@ function parseEntrypointIssues(text: string): ValidationIssue[] {
                 suspectedModIds: [],
                 jarHints: extractJarHints(evidence),
                 confidence: 'medium'
+            });
+
+            match = pattern.exec(text);
+        }
+    }
+
+    return issues;
+}
+
+function parseJoinabilityIssues(text: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    const patterns = [
+        /\bCLIENT_JOIN_FAILED\b[^\r\n]*/ig,
+        /\bJOINABILITY_FAILED\b[^\r\n]*/ig,
+        /joinability check failed[^\r\n]*/ig,
+        /client-server joinability failed[^\r\n]*/ig,
+        /mismatched mod list[^\r\n]*/ig
+    ];
+
+    for (const pattern of patterns) {
+        let match = pattern.exec(text);
+
+        while (match) {
+            const evidence = match[0].replace(/\s+/g, ' ').trim();
+
+            issues.push({
+                kind: 'joinability-failure',
+                message: 'Validation detected a client/server joinability failure',
+                evidence,
+                modIds: [],
+                suspectedModIds: [],
+                jarHints: extractJarHints(evidence),
+                confidence: /mismatched mod list|CLIENT_JOIN_FAILED|JOINABILITY_FAILED/i.test(evidence) ? 'high' : 'medium'
             });
 
             match = pattern.exec(text);
@@ -310,8 +440,12 @@ function parseValidationIssues(text: string | null | undefined): ValidationParse
         ...parseClassLoadingIssues(normalizedText),
         ...parseJavaRuntimeIssues(normalizedText),
         ...parseLaunchProfileIssues(normalizedText),
+        ...parseRuntimeTopologyIssues(normalizedText),
+        ...parseConnectorLayerIssues(normalizedText),
+        ...parseTopologyIncompatibleArtifactIssues(normalizedText),
         ...parseMixinIssues(normalizedText),
-        ...parseEntrypointIssues(normalizedText)
+        ...parseEntrypointIssues(normalizedText),
+        ...parseJoinabilityIssues(normalizedText)
     ]);
     const fallbackIssues = parseUnknownCriticalIssue(normalizedText, issues);
     const failureMarkers = detectFailureMarkers(normalizedText);

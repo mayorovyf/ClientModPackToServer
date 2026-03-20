@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { ensureDirectory } = require('../io/history');
+const { detectJoinabilityFailureMarkers, detectJoinabilitySuccessMarkers } = require('./markers');
 const {
     DEFAULT_VALIDATION_LOG_FILE_NAME,
     DEFAULT_VALIDATION_STDOUT_FILE_NAME,
@@ -20,6 +21,7 @@ import type {
     ValidationDecisionLike,
     ValidationError,
     ValidationIssue,
+    ValidationJoinabilityResult,
     ValidationLogArtifacts,
     ValidationMode,
     ValidationProcessRuntime,
@@ -199,6 +201,48 @@ function determineValidationStatus(
     return VALIDATION_STATUSES.failed;
 }
 
+function deriveJoinabilityResult({
+    output,
+    issues
+}: {
+    output: string;
+    issues: ValidationIssue[];
+}): ValidationJoinabilityResult {
+    const successMarkers = detectJoinabilitySuccessMarkers(output);
+    const failureMarkers = detectJoinabilityFailureMarkers(output);
+    const joinabilityIssues = issues.filter((issue) => issue.kind === 'joinability-failure');
+    const evidence = [
+        ...failureMarkers.map((marker: ValidationJoinabilityResult['failureMarkers'][number]) => marker.evidence),
+        ...joinabilityIssues.map((issue) => issue.evidence),
+        ...successMarkers.map((marker: ValidationJoinabilityResult['successMarkers'][number]) => marker.evidence)
+    ].filter(Boolean).slice(0, 5);
+
+    if (failureMarkers.length > 0 || joinabilityIssues.length > 0) {
+        return {
+            status: 'failed',
+            successMarkers,
+            failureMarkers,
+            evidence
+        };
+    }
+
+    if (successMarkers.length > 0) {
+        return {
+            status: 'passed',
+            successMarkers,
+            failureMarkers,
+            evidence
+        };
+    }
+
+    return {
+        status: 'not-checked',
+        successMarkers: [],
+        failureMarkers: [],
+        evidence: []
+    };
+}
+
 function ensureFailureIssue(issues: ValidationIssue[], processRuntime: ValidationProcessRuntime): ValidationIssue[] {
     if (issues.length > 0) {
         return issues;
@@ -306,6 +350,10 @@ async function runValidationStage({
             issues: ensuredIssues,
             decisions
         });
+        const joinability = deriveJoinabilityResult({
+            output: processRuntime.combinedOutput,
+            issues: linked.issues
+        });
         const status = determineValidationStatus(processRuntime, linked.issues, processRuntime.successMarkers);
         const logArtifacts = writeValidationArtifacts({
             runContext,
@@ -344,6 +392,7 @@ async function runValidationStage({
             failureMarkers: parsed.failureMarkers,
             issues: linked.issues,
             suspectedFalseRemovals: linked.suspectedFalseRemovals,
+            joinability,
             logArtifacts,
             warnings: [],
             errors,
@@ -352,7 +401,8 @@ async function runValidationStage({
                 suspectedFalseRemovals: 0,
                 successMarkers: 0,
                 failureMarkers: 0,
-                linkedIssues: 0
+                linkedIssues: 0,
+                joinabilityStatus: 'not-checked'
             }
         });
 

@@ -16,6 +16,10 @@ const SUCCESS_MARKERS = Object.freeze([
     {
         label: 'generic-validation-ready',
         pattern: /\bVALIDATION_READY\b/i
+    },
+    {
+        label: 'joinability-ready',
+        pattern: /\b(CLIENT_JOIN_OK|JOINABILITY_OK)\b/i
     }
 ]);
 
@@ -41,6 +45,18 @@ const FAILURE_MARKERS = Object.freeze([
         pattern: /Could not find or load main class|Unable to access jarfile|no main manifest attribute|entrypoint was not found/i
     },
     {
+        label: 'runtime-topology',
+        pattern: /wrong runtime topology|runtime topology mismatch|not compatible with selected runtime topology|requires runtime topology/i
+    },
+    {
+        label: 'connector-layer',
+        pattern: /sinytra connector|connector bootstrap failed|failed to initialize connector|connector layer incompatible/i
+    },
+    {
+        label: 'topology-incompatible-artifact',
+        pattern: /topology-incompatible artifact|kept incompatible artifact|runtime topology rejected kept jar/i
+    },
+    {
         label: 'mixin-failure',
         pattern: /Mixin(?:\s\w+)* failed|MixinTransformerError|Mixin apply failed/i
     },
@@ -51,6 +67,10 @@ const FAILURE_MARKERS = Object.freeze([
     {
         label: 'fatal-startup',
         pattern: /Failed to start the minecraft server|crashed whilst initializing/i
+    },
+    {
+        label: 'joinability-failure',
+        pattern: /\b(CLIENT_JOIN_FAILED|JOINABILITY_FAILED)\b|joinability check failed|client-server joinability failed|mismatched mod list/i
     }
 ]);
 
@@ -100,9 +120,19 @@ function detectFailureMarkers(text: string | null | undefined): ValidationMarker
     return collectMarkers(text, FAILURE_MARKERS);
 }
 
+function detectJoinabilitySuccessMarkers(text: string | null | undefined): ValidationMarker[] {
+    return collectMarkers(text, SUCCESS_MARKERS.filter((marker) => marker.label === 'joinability-ready'));
+}
+
+function detectJoinabilityFailureMarkers(text: string | null | undefined): ValidationMarker[] {
+    return collectMarkers(text, FAILURE_MARKERS.filter((marker) => marker.label === 'joinability-failure'));
+}
+
 module.exports = {
     FAILURE_MARKERS,
     SUCCESS_MARKERS,
     detectFailureMarkers,
+    detectJoinabilityFailureMarkers,
+    detectJoinabilitySuccessMarkers,
     detectSuccessMarkers
 };

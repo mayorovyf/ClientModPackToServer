@@ -87,7 +87,10 @@ function serializeLinkedDecision(
         arbiterDecision: decision.arbiterDecision || null,
         deepCheckDecision: decision.deepCheckDecision || null,
         dependencyAdjusted: Boolean(decision.dependencyAdjusted),
-        modIds: decision.descriptor && Array.isArray(decision.descriptor.modIds) ? decision.descriptor.modIds : []
+        modIds: decision.descriptor && Array.isArray(decision.descriptor.modIds) ? decision.descriptor.modIds : [],
+        selectedRuntimeTopologyId: decision.selectedRuntimeTopologyId || null,
+        topologyPartition: decision.topologyPartition || null,
+        topologyReason: decision.topologyReason || null
     };
 }
 
@@ -143,7 +146,10 @@ function linkValidationIssues({
                 arbiterDecision: linkedDecision.arbiterDecision,
                 deepCheckDecision: linkedDecision.deepCheckDecision,
                 issueKind: issue.kind,
-                reason: issue.message
+                reason: issue.message,
+                selectedRuntimeTopologyId: linkedDecision.selectedRuntimeTopologyId || null,
+                topologyPartition: linkedDecision.topologyPartition || null,
+                topologyReason: linkedDecision.topologyReason || null
             });
         }
 

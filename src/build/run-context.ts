@@ -4,6 +4,7 @@ const { createRunId } = require('./run-id');
 
 import type { ArbiterProfile, DeepCheckMode, DependencyValidationMode, OutputPolicy, ProbeMode, RegistryMode, RunMode, ValidationMode } from '../types/config';
 import type { InstanceInputKind, InstanceSource } from '../types/intake';
+import type { RuntimeTopologyId } from '../types/topology';
 import type { RunContext } from '../types/run';
 
 interface CreateRunContextOptions {
@@ -26,6 +27,7 @@ interface CreateRunContextOptions {
     validationMode?: ValidationMode;
     validationTimeoutMs?: number;
     validationEntrypointPath?: string | null;
+    preferredRuntimeTopologyId?: RuntimeTopologyId | null;
     validationSaveArtifacts?: boolean;
     installServerCore?: boolean;
     probeMode?: ProbeMode;
@@ -69,6 +71,7 @@ function createRunContext({
     validationMode = 'auto',
     validationTimeoutMs = 15000,
     validationEntrypointPath = null,
+    preferredRuntimeTopologyId = null,
     validationSaveArtifacts = false,
     installServerCore = false,
     probeMode = 'auto',
@@ -121,6 +124,7 @@ function createRunContext({
         validationMode,
         validationTimeoutMs,
         validationEntrypointPath,
+        preferredRuntimeTopologyId,
         validationSaveArtifacts,
         installServerCore,
         probeMode,

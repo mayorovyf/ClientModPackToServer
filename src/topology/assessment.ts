@@ -188,7 +188,22 @@ function inferBaseLoader({
     return null;
 }
 
-function resolveTopologyId({
+function resolveSingleLoaderTopologyId(baseLoader: LoaderKind | null): RuntimeTopologyId | null {
+    switch (baseLoader) {
+        case 'fabric':
+            return 'fabric-single-loader';
+        case 'quilt':
+            return 'quilt-single-loader';
+        case 'forge':
+            return 'forge-single-loader';
+        case 'neoforge':
+            return 'neoforge-single-loader';
+        default:
+            return null;
+    }
+}
+
+function listCandidateRuntimeTopologyIds({
     detectedLoaders,
     baseLoader,
     connectorLayer,
@@ -198,34 +213,53 @@ function resolveTopologyId({
     baseLoader: LoaderKind | null;
     connectorLayer: RuntimeTopologyAssessment['connectorLayer'];
     bridgedEcosystem: RuntimeTopologyAssessment['bridgedEcosystem'];
-}): RuntimeTopologyId | null {
+}): RuntimeTopologyId[] {
+    const candidateTopologyIds: RuntimeTopologyId[] = [];
+
     if (!connectorLayer && detectedLoaders.length === 1 && baseLoader) {
-        switch (baseLoader) {
-            case 'fabric':
-                return 'fabric-single-loader';
-            case 'quilt':
-                return 'quilt-single-loader';
-            case 'forge':
-                return 'forge-single-loader';
-            case 'neoforge':
-                return 'neoforge-single-loader';
-            default:
-                return null;
+        const topologyId = resolveSingleLoaderTopologyId(baseLoader);
+
+        if (topologyId) {
+            candidateTopologyIds.push(topologyId);
         }
     }
 
-    if (connectorLayer === 'sinytra-connector' && baseLoader === 'neoforge' && bridgedEcosystem === 'fabric') {
+    if (connectorLayer === 'sinytra-connector' && baseLoader === 'neoforge') {
+        candidateTopologyIds.push('neoforge-single-loader');
+
+        if (bridgedEcosystem === 'fabric') {
+            candidateTopologyIds.push('neoforge-sinytra-fabric-bridge');
+        }
+    }
+
+    return toSortedUniqueList(candidateTopologyIds) as RuntimeTopologyId[];
+}
+
+function resolveTopologyId({
+    candidateTopologyIds,
+    preferredRuntimeTopologyId
+}: {
+    candidateTopologyIds: RuntimeTopologyId[];
+    preferredRuntimeTopologyId: RuntimeTopologyId | null | undefined;
+}): RuntimeTopologyId | null {
+    if (preferredRuntimeTopologyId && candidateTopologyIds.includes(preferredRuntimeTopologyId)) {
+        return preferredRuntimeTopologyId;
+    }
+
+    if (candidateTopologyIds.includes('neoforge-sinytra-fabric-bridge')) {
         return 'neoforge-sinytra-fabric-bridge';
     }
 
-    return null;
+    return candidateTopologyIds[0] || null;
 }
 
 function buildPendingAssessment({
+    candidateTopologyIds,
     supportedTopologyIds,
     pendingTopologyIds,
     trustedArtifactProvenance
 }: {
+    candidateTopologyIds: RuntimeTopologyAssessment['candidateTopologyIds'];
     supportedTopologyIds: RuntimeTopologyAssessment['supportedTopologyIds'];
     pendingTopologyIds: RuntimeTopologyAssessment['pendingTopologyIds'];
     trustedArtifactProvenance: RuntimeTopologyAssessment['trustedArtifactProvenance'];
@@ -236,6 +270,7 @@ function buildPendingAssessment({
         code: 'RUNTIME_TOPOLOGY_PENDING',
         summary: 'Runtime topology will be resolved after static analysis.',
         topologyId: null,
+        candidateTopologyIds,
         topologyClass: 'unresolved',
         baseLoader: null,
         connectorLayer: null,
@@ -253,6 +288,7 @@ function buildPendingAssessment({
 function buildUnsupportedAssessment({
     code,
     summary,
+    candidateTopologyIds,
     topologyClass,
     baseLoader,
     connectorLayer,
@@ -266,6 +302,7 @@ function buildUnsupportedAssessment({
 }: {
     code: string;
     summary: string;
+    candidateTopologyIds: RuntimeTopologyAssessment['candidateTopologyIds'];
     topologyClass: RuntimeTopologyAssessment['topologyClass'];
     baseLoader: LoaderKind | null;
     connectorLayer: RuntimeTopologyAssessment['connectorLayer'];
@@ -283,6 +320,7 @@ function buildUnsupportedAssessment({
         code,
         summary,
         topologyId: null,
+        candidateTopologyIds,
         topologyClass,
         baseLoader,
         connectorLayer,
@@ -314,6 +352,7 @@ export function assessRuntimeTopology({
 
     if (!Array.isArray(decisions)) {
         return buildPendingAssessment({
+            candidateTopologyIds: [],
             supportedTopologyIds,
             pendingTopologyIds,
             trustedArtifactProvenance
@@ -331,11 +370,15 @@ export function assessRuntimeTopology({
         detectedLoaders,
         connectorLayer
     });
-    const topologyId = resolveTopologyId({
+    const candidateTopologyIds = listCandidateRuntimeTopologyIds({
         detectedLoaders,
         baseLoader,
         connectorLayer,
         bridgedEcosystem
+    });
+    const topologyId = resolveTopologyId({
+        candidateTopologyIds,
+        preferredRuntimeTopologyId: runContext.preferredRuntimeTopologyId
     });
     const matchedWhitelistEntry = topologyId ? findRuntimeTopologyWhitelistEntry(topologyId) : null;
 
@@ -347,6 +390,7 @@ export function assessRuntimeTopology({
                 code: 'RUNTIME_TOPOLOGY_SUPPORTED',
                 summary: `Resolved whitelist-supported runtime topology ${matchedWhitelistEntry.topologyId}.`,
                 topologyId: matchedWhitelistEntry.topologyId,
+                candidateTopologyIds,
                 topologyClass: matchedWhitelistEntry.topologyClass,
                 baseLoader: matchedWhitelistEntry.baseLoader,
                 connectorLayer: matchedWhitelistEntry.connectorLayer,
@@ -367,6 +411,7 @@ export function assessRuntimeTopology({
             code: 'RUNTIME_TOPOLOGY_PENDING_WHITELIST_ENTRY',
             summary: `Runtime topology ${matchedWhitelistEntry.topologyId} is recognized by the whitelist, but it is still pending automation.`,
             topologyId: matchedWhitelistEntry.topologyId,
+            candidateTopologyIds,
             topologyClass: matchedWhitelistEntry.topologyClass,
             baseLoader: matchedWhitelistEntry.baseLoader,
             connectorLayer: matchedWhitelistEntry.connectorLayer,
@@ -386,6 +431,7 @@ export function assessRuntimeTopology({
             ? buildUnsupportedAssessment({
                 code: 'RUNTIME_TOPOLOGY_UNRESOLVED',
                 summary: 'Static analysis could not resolve the runtime topology into a whitelist entry.',
+                candidateTopologyIds,
                 topologyClass: 'unresolved',
                 baseLoader,
                 connectorLayer,
@@ -397,6 +443,7 @@ export function assessRuntimeTopology({
                 trustedArtifactProvenance
             })
             : buildPendingAssessment({
+                candidateTopologyIds,
                 supportedTopologyIds,
                 pendingTopologyIds,
                 trustedArtifactProvenance
@@ -411,6 +458,7 @@ export function assessRuntimeTopology({
         return buildUnsupportedAssessment({
             code: 'RUNTIME_TOPOLOGY_BLOCKED_BY_TRUST_POLICY',
             summary: `Connector hints were detected (${connectorHints.join(', ') || connectorLayer}), but no trusted whitelist entry matched them.`,
+            candidateTopologyIds,
             topologyClass: 'connector-based',
             baseLoader,
             connectorLayer,
@@ -428,6 +476,7 @@ export function assessRuntimeTopology({
         return buildUnsupportedAssessment({
             code: 'MIXED_ARTIFACT_SET_UNSUPPORTED',
             summary: `Detected mixed artifact set with loaders ${detectedLoaders.join(', ')} and no trusted topology resolution path.`,
+            candidateTopologyIds,
             topologyClass: 'mixed-artifact-set',
             baseLoader,
             connectorLayer,
@@ -443,6 +492,7 @@ export function assessRuntimeTopology({
     return buildUnsupportedAssessment({
         code: 'RUNTIME_TOPOLOGY_OUTSIDE_WHITELIST',
         summary: `Resolved loader ${detectedLoaders[0]} does not map to a whitelist-supported runtime topology.`,
+        candidateTopologyIds,
         topologyClass: 'unresolved',
         baseLoader,
         connectorLayer,
@@ -456,5 +506,6 @@ export function assessRuntimeTopology({
 }
 
 module.exports = {
-    assessRuntimeTopology
+    assessRuntimeTopology,
+    listCandidateRuntimeTopologyIds
 };

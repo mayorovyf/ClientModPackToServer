@@ -31,10 +31,12 @@ function createFingerprintDigest(payload: unknown): string {
 
 function createCandidateFingerprint({
     runContext,
-    decisions
+    decisions,
+    selectedRuntimeTopologyId = null
 }: {
     runContext: RunContext;
     decisions: Array<Record<string, any>>;
+    selectedRuntimeTopologyId?: CandidateFingerprint['selectedRuntimeTopologyId'];
 }): CandidateFingerprint {
     const files = decisions
         .map((decision) => normalizeFingerprintFile(decision))
@@ -48,6 +50,7 @@ function createCandidateFingerprint({
     const stablePayload = {
         inputKind: runContext.inputKind,
         instanceSource: runContext.instanceSource,
+        selectedRuntimeTopologyId,
         files
     };
 
@@ -58,6 +61,7 @@ function createCandidateFingerprint({
         detectedLoaders,
         inputKind: runContext.inputKind,
         instanceSource: runContext.instanceSource,
+        selectedRuntimeTopologyId,
         files
     };
 }

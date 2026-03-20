@@ -26,6 +26,12 @@ const TRUST_POLICY_RULES: Record<TrustPolicyAction, Omit<TrustPolicyActionRule, 
         summary: 'Dependency addition is allowed only when the provider comes from a trusted source.',
         requiresTrustedSource: true
     },
+    'add-trusted-connector-dependency': {
+        disposition: 'safe-by-default',
+        allowed: true,
+        summary: 'Connector dependency addition is allowed only when the provider comes from a trusted source instance.',
+        requiresTrustedSource: true
+    },
     'remove-explicit-client-only-mod': {
         disposition: 'safe-by-default',
         allowed: true,
@@ -36,6 +42,24 @@ const TRUST_POLICY_RULES: Record<TrustPolicyAction, Omit<TrustPolicyActionRule, 
         disposition: 'safe-by-default',
         allowed: true,
         summary: 'Confirmed client-only support libraries may be removed automatically when they are validated as server-unsafe.',
+        requiresTrustedSource: false
+    },
+    'remove-confirmed-topology-incompatible-artifact': {
+        disposition: 'safe-by-default',
+        allowed: true,
+        summary: 'Artifacts confirmed to be incompatible with the selected runtime topology may be removed automatically.',
+        requiresTrustedSource: false
+    },
+    'restore-server-required-artifact': {
+        disposition: 'safe-by-default',
+        allowed: true,
+        summary: 'A wrongly removed server-required artifact may be restored from the trusted source instance.',
+        requiresTrustedSource: true
+    },
+    'switch-whitelisted-runtime-topology': {
+        disposition: 'guarded',
+        allowed: true,
+        summary: 'Runtime topology switching is guarded and only allowed inside the whitelist-supported topology set.',
         requiresTrustedSource: false
     },
     'switch-whitelisted-server-core': {

@@ -10,6 +10,7 @@ import type {
 } from './config';
 import type { InstanceInputKind, InstanceSource } from './intake';
 import type { PackRuntimeDetection } from './runtime-detection';
+import type { RuntimeTopologyId } from './topology';
 
 export interface RunPaths {
     inputPath: string;
@@ -45,6 +46,7 @@ export interface RunContext extends RunPaths {
     validationMode: ValidationMode;
     validationTimeoutMs: number;
     validationEntrypointPath: string | null;
+    preferredRuntimeTopologyId?: RuntimeTopologyId | null;
     validationSaveArtifacts: boolean;
     installServerCore: boolean;
     probeMode: ProbeMode;

@@ -23,6 +23,7 @@ export interface CandidateFingerprint {
     detectedLoaders: LoaderKind[];
     inputKind: InstanceInputKind;
     instanceSource: InstanceSource;
+    selectedRuntimeTopologyId: RuntimeTopologyId | null;
     files: CandidateFingerprintFile[];
 }
 

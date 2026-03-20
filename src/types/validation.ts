@@ -10,8 +10,12 @@ export type ValidationIssueKind =
     | 'class-loading'
     | 'java-runtime'
     | 'launch-profile'
+    | 'runtime-topology'
+    | 'connector-layer'
+    | 'topology-incompatible-artifact'
     | 'mixin-failure'
     | 'entrypoint-crash'
+    | 'joinability-failure'
     | 'unknown-critical'
     | 'validation-no-success-marker';
 export type ValidationLinkMatch = 'modId' | 'jarHint';
@@ -49,6 +53,9 @@ export interface LinkedValidationDecision {
     deepCheckDecision: SemanticDecision | string | null;
     dependencyAdjusted: boolean;
     modIds: string[];
+    selectedRuntimeTopologyId?: string | null;
+    topologyPartition?: string | null;
+    topologyReason?: string | null;
 }
 
 export interface ValidationIssue {
@@ -72,6 +79,18 @@ export interface ValidationSuspectedFalseRemoval {
     deepCheckDecision: SemanticDecision | string | null;
     issueKind: ValidationIssueKind;
     reason: string;
+    selectedRuntimeTopologyId?: string | null;
+    topologyPartition?: string | null;
+    topologyReason?: string | null;
+}
+
+export type ValidationJoinabilityStatus = 'not-checked' | 'passed' | 'failed';
+
+export interface ValidationJoinabilityResult {
+    status: ValidationJoinabilityStatus;
+    successMarkers: ValidationMarker[];
+    failureMarkers: ValidationMarker[];
+    evidence: string[];
 }
 
 export interface ValidationSummary {
@@ -80,6 +99,7 @@ export interface ValidationSummary {
     successMarkers: number;
     failureMarkers: number;
     linkedIssues: number;
+    joinabilityStatus: ValidationJoinabilityStatus;
 }
 
 export interface ValidationResult {
@@ -96,6 +116,7 @@ export interface ValidationResult {
     failureMarkers: ValidationMarker[];
     issues: ValidationIssue[];
     suspectedFalseRemovals: ValidationSuspectedFalseRemoval[];
+    joinability: ValidationJoinabilityResult;
     logArtifacts: ValidationLogArtifacts;
     warnings: string[];
     errors: ValidationError[];
@@ -145,6 +166,9 @@ export interface ValidationDecisionLike {
     arbiterDecision?: SemanticDecision | string | null;
     deepCheckDecision?: SemanticDecision | string | null;
     dependencyAdjusted?: boolean;
+    selectedRuntimeTopologyId?: string | null;
+    topologyPartition?: string | null;
+    topologyReason?: string | null;
 }
 
 export interface ValidationStageResult {
