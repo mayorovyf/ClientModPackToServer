@@ -237,7 +237,8 @@ async function buildStaticSnapshot({
         decisions: initialRealization.decisions,
         runContext,
         knowledgePath: runContext.probeKnowledgePath,
-        record
+        record,
+        progressReporter: effectiveProgressReporter
     });
     let probeSummary = probeRun.summary;
 

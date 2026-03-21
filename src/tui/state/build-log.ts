@@ -1,7 +1,7 @@
 import type { BackendEvent } from '../../types/events.js';
 import type { MessageKey } from '../../i18n/catalog.js';
 import type { Translator } from '../../i18n/types.js';
-import type { RunFormState, RunSessionState } from './app-state.js';
+import type { BuildLogMode, RunFormState, RunSessionState } from './app-state.js';
 import type { RunPreflightSummary } from './run-preflight.js';
 
 export type BuildLogItemStatus = 'pending' | 'running' | 'completed' | 'failed' | 'warning';
@@ -36,6 +36,7 @@ const TRACKED_EVENT_TYPES = new Set([
     'registry.loaded',
     'stage.started',
     'stage.completed',
+    'stage.activity',
     'mod.parsed',
     'classification.completed',
     'dependency.analysis.completed',
@@ -50,6 +51,11 @@ const TRACKED_EVENT_TYPES = new Set([
     'report.written',
     'run.finished',
     'run.failed'
+]);
+
+const COMPACT_HIDDEN_EVENT_TYPES = new Set<BackendEvent['type']>([
+    'mod.parsed',
+    'build.action.completed'
 ]);
 
 function getStageLabel(stageId: string, t: Translator<MessageKey>): string {
@@ -369,6 +375,22 @@ function createEventItem(event: BackendEvent, t: Translator<MessageKey>): BuildL
                 dataLines: createDataLinesFromObject(event.payload as Record<string, unknown>)
             };
         }
+        case 'stage.activity': {
+            const stageId = typeof event.payload.stage === 'string' ? event.payload.stage : 'unknown';
+            const message = stringifyValue(event.payload.message);
+
+            return {
+                id: `${event.timestamp}:stage.activity:${stageId}:${message || 'activity'}`,
+                kind: 'event',
+                title: `${getStageLabel(stageId, t)}: ${t('buildLog.event.stageActivity')}`,
+                subtitle: message || timestamp || t('buildLog.item.running'),
+                description: t('buildLog.description.stageActivity'),
+                status: 'running',
+                timestamp,
+                sourceLabel: 'stage.activity',
+                dataLines: createDataLinesFromObject(event.payload as Record<string, unknown>)
+            };
+        }
         case 'mod.parsed': {
             const fileName = stringifyValue(event.payload.fileName) || t('buildLog.event.modParsed');
             const hasConflict = Boolean(event.payload.hasConflict);
@@ -612,7 +634,307 @@ function createEventItem(event: BackendEvent, t: Translator<MessageKey>): BuildL
     }
 }
 
-export function buildRunLogItems({
+interface CompactLogState {
+    items: BuildLogItem[];
+    itemIndexById: Map<string, number>;
+    currentCandidateScopeKey: string | null;
+    currentStageItemId: string | null;
+    currentStageId: string | null;
+    stageSequenceByScope: Map<string, number>;
+    latestStageItemIdByStage: Map<string, string>;
+    candidateItemIdByCandidateId: Map<string, string>;
+    pendingPlanSummaryByCandidateId: Map<string, string>;
+}
+
+function createCompactLogState(): CompactLogState {
+    return {
+        items: [],
+        itemIndexById: new Map(),
+        currentCandidateScopeKey: null,
+        currentStageItemId: null,
+        currentStageId: null,
+        stageSequenceByScope: new Map(),
+        latestStageItemIdByStage: new Map(),
+        candidateItemIdByCandidateId: new Map(),
+        pendingPlanSummaryByCandidateId: new Map()
+    };
+}
+
+function appendCompactItem(state: CompactLogState, item: BuildLogItem): void {
+    state.itemIndexById.set(item.id, state.items.length);
+    state.items.push(item);
+}
+
+function upsertCompactItem(
+    state: CompactLogState,
+    item: BuildLogItem,
+    updater?: (current: BuildLogItem) => BuildLogItem
+): void {
+    const existingIndex = state.itemIndexById.get(item.id);
+
+    if (existingIndex === undefined) {
+        appendCompactItem(state, item);
+        return;
+    }
+
+    state.items[existingIndex] = updater ? updater(state.items[existingIndex]!) : item;
+}
+
+function patchCompactItem(
+    state: CompactLogState,
+    itemId: string | null,
+    updater: (current: BuildLogItem) => BuildLogItem
+): void {
+    if (!itemId) {
+        return;
+    }
+
+    const existingIndex = state.itemIndexById.get(itemId);
+
+    if (existingIndex === undefined) {
+        return;
+    }
+
+    state.items[existingIndex] = updater(state.items[existingIndex]!);
+}
+
+function formatStageQueueLabel(stageId: string, payload: Record<string, unknown>): string | null {
+    switch (stageId) {
+        case 'classification':
+        case 'dependency':
+        case 'arbiter':
+        case 'deep-check':
+        case 'probe':
+            return typeof payload.total === 'number' && Number.isFinite(payload.total)
+                ? `${payload.total} mods`
+                : null;
+        case 'build':
+        case 'server-core':
+        case 'validation':
+            return typeof payload.total === 'number' && Number.isFinite(payload.total)
+                ? `${payload.total} actions`
+                : null;
+        default:
+            return null;
+    }
+}
+
+function createCompactStageStartedSubtitle(stageId: string, payload: Record<string, unknown>): string {
+    return compactParts([
+        formatStageQueueLabel(stageId, payload),
+        stringifyValue(payload.profile) ? `profile ${stringifyValue(payload.profile)}` : null,
+        stringifyValue(payload.mode) ? `mode ${stringifyValue(payload.mode)}` : null,
+        typeof payload.dryRun === 'boolean' ? (payload.dryRun ? 'dry-run' : 'build output') : null,
+        typeof payload.enabled === 'boolean' ? (payload.enabled ? 'enabled' : 'disabled') : null
+    ]);
+}
+
+function createCompactModActivitySubtitle(payload: Record<string, unknown>): string {
+    const index = stringifyValue(payload.index);
+    const total = stringifyValue(payload.total);
+
+    return compactParts([
+        stringifyValue(payload.fileName),
+        index && total ? `${index}/${total}` : null,
+        stringifyValue(payload.loader),
+        stringifyValue(payload.classificationDecision),
+        stringifyValue(payload.winningEngine),
+        Boolean(payload.hasConflict) ? 'conflict' : null
+    ]);
+}
+
+function createCompactBuildActivitySubtitle(payload: Record<string, unknown>): string {
+    const index = stringifyValue(payload.index);
+    const total = stringifyValue(payload.total);
+
+    return compactParts([
+        stringifyValue(payload.fileName),
+        index && total ? `${index}/${total}` : null,
+        stringifyValue(payload.actionStatus),
+        stringifyValue(payload.decision) || stringifyValue(payload.finalSemanticDecision),
+        stringifyValue(payload.decisionOrigin)
+    ]);
+}
+
+function createCompactStageActivitySubtitle(payload: Record<string, unknown>): string | null {
+    const fileName = stringifyValue(payload.fileName);
+    const index = stringifyValue(payload.index);
+    const total = stringifyValue(payload.total);
+    const progressPart = fileName && index && total ? `${fileName} (${index}/${total})` : fileName;
+    const activityType = stringifyValue(payload.activityType);
+
+    switch (activityType) {
+        case 'mod-parse':
+            return compactParts([
+                'Parsing',
+                progressPart
+            ]);
+        case 'build-copy':
+            return compactParts([
+                'Copying',
+                progressPart
+            ]);
+        case 'build-reuse':
+            return compactParts([
+                'Reusing',
+                progressPart
+            ]);
+        case 'build-restore':
+            return compactParts([
+                'Restoring from stash',
+                progressPart
+            ]);
+        case 'build-exclude':
+            return compactParts([
+                'Excluding',
+                progressPart
+            ]);
+        case 'build-would-copy':
+            return compactParts([
+                'Would copy',
+                progressPart
+            ]);
+        case 'build-would-exclude':
+            return compactParts([
+                'Would exclude',
+                progressPart
+            ]);
+        case 'probe-step':
+            return compactParts([
+                'Probing',
+                progressPart,
+                typeof payload.supportCount === 'number' ? `${payload.supportCount} support jars` : null
+            ]);
+        case 'server-core-install':
+        case 'server-core-install-attempt':
+            return compactParts([
+                stringifyValue(payload.message),
+                stringifyValue(payload.coreType),
+                stringifyValue(payload.minecraftVersion),
+                stringifyValue(payload.loaderVersion)
+            ]);
+        case 'sandbox':
+        case 'entrypoint-resolution':
+        case 'process-launch':
+        case 'result-analysis':
+            return stringifyValue(payload.message);
+        default:
+            return stringifyValue(payload.message);
+    }
+}
+
+function createCompactActivityDataLines(payload: Record<string, unknown>, keys: string[]): string[] {
+    return keys
+        .map((key) => {
+            const value = stringifyValue(payload[key]);
+            return value ? `${humanizeKey(key)}: ${value}` : null;
+        })
+        .filter((line): line is string => Boolean(line));
+}
+
+function getStageEventStatus(payload: Record<string, unknown>): BuildLogItemStatus {
+    const status = String(payload.status || '').toLowerCase();
+
+    if (status === 'failed') {
+        return 'failed';
+    }
+
+    if (stringifyValue(payload.skipReason)) {
+        return 'warning';
+    }
+
+    return 'completed';
+}
+
+function createCompactStageCompletedSubtitle(stageId: string, payload: Record<string, unknown>, t: Translator<MessageKey>): string {
+    const summary = readRecord(payload.summary);
+    const status = getPayloadStatus(payload);
+    const nonDefaultStatus = status && status !== 'completed' ? status : null;
+    const skipReason = stringifyValue(payload.skipReason);
+
+    switch (stageId) {
+        case 'classification':
+            return compactParts([
+                formatCountPart('parsed', summary?.parsed),
+                summarizeDecisionCounts(payload.finalDecisions),
+                formatCountPart('conflicts', payload.conflicts),
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+        case 'dependency':
+            return compactParts([
+                nonDefaultStatus,
+                formatCountPart('warnings', summary?.warnings),
+                formatCountPart('errors', summary?.errors),
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+        case 'arbiter':
+            return compactParts([
+                formatCountPart('review', payload.reviewCount ?? summary?.review),
+                summarizeConfidence(payload.confidence),
+                nonDefaultStatus,
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+        case 'deep-check':
+            return compactParts([
+                nonDefaultStatus,
+                formatCountPart('review', summary?.review),
+                formatCountPart('changed', summary?.changed),
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+        case 'build':
+            return compactParts([
+                formatCountPart('keep', summary?.kept),
+                formatCountPart('exclude', summary?.excluded),
+                formatCountPart('copied', summary?.copied),
+                formatCountPart('linked', summary?.linked),
+                formatCountPart('reused', summary?.reused),
+                formatCountPart('restored', summary?.restoredFromStash),
+                formatCountPart('stashed', summary?.movedToStash),
+                formatCountPart('errors', summary?.errors),
+                nonDefaultStatus,
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+        case 'server-core':
+            return compactParts([
+                stringifyValue(summary?.coreType),
+                stringifyValue(summary?.minecraftVersion),
+                stringifyValue(summary?.loaderVersion),
+                nonDefaultStatus,
+                stringifyValue(summary?.reason),
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+        case 'validation':
+            return compactParts([
+                nonDefaultStatus,
+                formatCountPart('issues', summary?.issues),
+                formatCountPart('errors', summary?.errors),
+                formatCountPart('warnings', summary?.warnings),
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+        default:
+            return compactParts([
+                nonDefaultStatus,
+                skipReason
+            ]) || t('buildLog.event.stageCompletedSubtitle');
+    }
+}
+
+function updateLatestStageItem(
+    state: CompactLogState,
+    stageId: string,
+    updater: (current: BuildLogItem) => BuildLogItem
+): void {
+    patchCompactItem(state, state.latestStageItemIdByStage.get(stageId) || null, updater);
+}
+
+function summarizePlanFixes(payload: Record<string, unknown>): string | null {
+    return compactParts([
+        stringifyValue(payload.newlyAppliedFixKinds),
+        stringifyValue(payload.reasonCode)
+    ]);
+}
+
+function buildCompactRunLogItems({
     form,
     session,
     preflight,
@@ -623,8 +945,340 @@ export function buildRunLogItems({
     preflight: RunPreflightSummary | null;
     t: Translator<MessageKey>;
 }): BuildLogItem[] {
+    const state = createCompactLogState();
+
+    for (const event of session.events) {
+        if (!TRACKED_EVENT_TYPES.has(event.type)) {
+            continue;
+        }
+
+        const payload = event.payload as Record<string, unknown>;
+        const timestamp = formatTimestamp(event.timestamp);
+
+        switch (event.type) {
+            case 'run.started':
+                appendCompactItem(state, {
+                    id: 'compact:run.started',
+                    kind: 'event',
+                    title: t('buildLog.event.runStarted'),
+                    subtitle: stringifyValue(payload.inputPath) || timestamp || t('buildLog.item.completed'),
+                    description: t('buildLog.description.runStarted'),
+                    status: 'completed',
+                    timestamp,
+                    sourceLabel: 'run.started',
+                    dataLines: createDataLinesFromObject(payload)
+                });
+                break;
+            case 'registry.loaded':
+                appendCompactItem(state, {
+                    id: 'compact:registry.loaded',
+                    kind: 'event',
+                    title: t('buildLog.event.registryLoaded'),
+                    subtitle: stringifyValue(payload.sourceDescription) || stringifyValue(payload.source) || timestamp,
+                    description: t('buildLog.description.registryLoaded'),
+                    status: 'completed',
+                    timestamp,
+                    sourceLabel: 'registry.loaded',
+                    dataLines: createDataLinesFromObject(payload)
+                });
+                break;
+            case 'convergence.candidate.started': {
+                const candidateId = stringifyValue(payload.candidateId) || `candidate-${stringifyValue(payload.iteration) || state.items.length}`;
+                const iteration = Number(payload.iteration);
+                const itemId = `compact:candidate:${candidateId}`;
+                const plannedSummary = state.pendingPlanSummaryByCandidateId.get(candidateId) || null;
+
+                state.currentCandidateScopeKey = candidateId;
+                state.pendingPlanSummaryByCandidateId.delete(candidateId);
+
+                if (Number.isFinite(iteration) && iteration > 0) {
+                    state.candidateItemIdByCandidateId.set(candidateId, itemId);
+
+                    upsertCompactItem(state, {
+                        id: itemId,
+                        kind: 'event',
+                        title: `Candidate ${iteration}`,
+                        subtitle: compactParts([
+                            plannedSummary,
+                            stringifyValue(payload.parentCandidateId) ? `from ${stringifyValue(payload.parentCandidateId)}` : null
+                        ]) || timestamp || t('buildLog.item.running'),
+                        description: t('buildLog.description.convergenceCandidateStarted'),
+                        status: 'running',
+                        timestamp,
+                        sourceLabel: 'convergence.candidate',
+                        dataLines: createDataLinesFromObject(payload)
+                    });
+                }
+                break;
+            }
+            case 'stage.started': {
+                const stageId = typeof payload.stage === 'string' ? payload.stage : 'unknown';
+                const scopeKey = state.currentCandidateScopeKey || session.runId || 'run';
+                const stageKey = `${scopeKey}:${stageId}`;
+                const nextSequence = (state.stageSequenceByScope.get(stageKey) || 0) + 1;
+                const itemId = `compact:stage:${stageKey}:${nextSequence}`;
+
+                state.stageSequenceByScope.set(stageKey, nextSequence);
+                state.currentStageItemId = itemId;
+                state.currentStageId = stageId;
+                state.latestStageItemIdByStage.set(stageId, itemId);
+
+                appendCompactItem(state, {
+                    id: itemId,
+                    kind: 'event',
+                    title: getStageLabel(stageId, t),
+                    subtitle: createCompactStageStartedSubtitle(stageId, payload) || timestamp || t('buildLog.item.running'),
+                    description: getStageDescription(stageId, t),
+                    status: 'running',
+                    timestamp,
+                    sourceLabel: `stage.${stageId}`,
+                    dataLines: createDataLinesFromObject(payload)
+                });
+                break;
+            }
+            case 'stage.activity':
+                if (state.currentStageItemId && state.currentStageId === String(payload.stage || state.currentStageId || '')) {
+                    patchCompactItem(state, state.currentStageItemId, (current) => ({
+                        ...current,
+                        subtitle: createCompactStageActivitySubtitle(payload) || current.subtitle,
+                        dataLines: createDataLinesFromObject(payload)
+                    }));
+                }
+                break;
+            case 'mod.parsed':
+                if (state.currentStageItemId && state.currentStageId === 'classification') {
+                    patchCompactItem(state, state.currentStageItemId, (current) => ({
+                        ...current,
+                        subtitle: createCompactModActivitySubtitle(payload) || current.subtitle,
+                        dataLines: createCompactActivityDataLines(payload, [
+                            'fileName',
+                            'index',
+                            'total',
+                            'loader',
+                            'classificationDecision',
+                            'winningEngine'
+                        ])
+                    }));
+                }
+                break;
+            case 'build.action.completed':
+                if (state.currentStageItemId && state.currentStageId === 'build') {
+                    patchCompactItem(state, state.currentStageItemId, (current) => ({
+                        ...current,
+                        subtitle: createCompactBuildActivitySubtitle(payload) || current.subtitle,
+                        dataLines: createCompactActivityDataLines(payload, [
+                            'fileName',
+                            'index',
+                            'total',
+                            'actionStatus',
+                            'decision',
+                            'finalSemanticDecision',
+                            'decisionOrigin'
+                        ])
+                    }));
+                }
+                break;
+            case 'stage.completed': {
+                const stageId = typeof payload.stage === 'string' ? payload.stage : state.currentStageId || 'unknown';
+
+                updateLatestStageItem(state, stageId, (current) => ({
+                    ...current,
+                    subtitle: createCompactStageCompletedSubtitle(stageId, payload, t),
+                    status: getStageEventStatus(payload),
+                    dataLines: createDataLinesFromObject(payload)
+                }));
+
+                if (state.currentStageId === stageId) {
+                    state.currentStageId = null;
+                    state.currentStageItemId = null;
+                }
+                break;
+            }
+            case 'classification.completed':
+                updateLatestStageItem(state, 'classification', (current) => ({
+                    ...current,
+                    subtitle: compactParts([
+                        summarizeDecisionCounts(payload.finalDecisions),
+                        formatCountPart('conflicts', payload.conflicts),
+                        formatCountPart('fallback', payload.fallbackFinalDecisions)
+                    ]) || current.subtitle,
+                    status: 'completed',
+                    dataLines: createDataLinesFromObject(payload)
+                }));
+                break;
+            case 'dependency.analysis.completed':
+                updateLatestStageItem(state, 'dependency', (current) => ({
+                    ...current,
+                    subtitle: compactParts([
+                        getPayloadStatus(payload),
+                        formatCountPart('warnings', readRecord(payload.summary)?.warnings),
+                        formatCountPart('errors', readRecord(payload.summary)?.errors)
+                    ]) || current.subtitle,
+                    status: getPayloadStatus(payload) === 'failed' ? 'failed' : 'completed',
+                    dataLines: createDataLinesFromObject(payload)
+                }));
+                break;
+            case 'arbiter.review-found':
+                updateLatestStageItem(state, 'arbiter', (current) => ({
+                    ...current,
+                    subtitle: compactParts([
+                        formatCountPart('review', payload.reviewCount),
+                        summarizeConfidence(payload.confidence)
+                    ]) || current.subtitle,
+                    status: Number(payload.reviewCount || 0) > 0 ? 'warning' : 'completed',
+                    dataLines: createDataLinesFromObject(payload)
+                }));
+                break;
+            case 'deep-check.completed':
+                updateLatestStageItem(state, 'deep-check', (current) => ({
+                    ...current,
+                    subtitle: compactParts([
+                        getPayloadStatus(payload),
+                        formatCountPart('review', readRecord(payload.summary)?.review),
+                        formatCountPart('changed', readRecord(payload.summary)?.changed)
+                    ]) || current.subtitle,
+                    status: getPayloadStatus(payload) === 'failed' ? 'failed' : 'completed',
+                    dataLines: createDataLinesFromObject(payload)
+                }));
+                break;
+            case 'validation.completed': {
+                const status = getPayloadStatus(payload);
+                const skipReason = stringifyValue(payload.skipReason);
+                updateLatestStageItem(state, 'validation', (current) => ({
+                    ...current,
+                    subtitle: compactParts([
+                        status,
+                        skipReason
+                    ]) || current.subtitle,
+                    status: status === 'failed' ? 'failed' : (skipReason ? 'warning' : 'completed'),
+                    dataLines: createDataLinesFromObject(payload)
+                }));
+                break;
+            }
+            case 'convergence.plan.selected':
+                if (typeof payload.nextCandidateId === 'string' && payload.nextCandidateId.trim()) {
+                    state.pendingPlanSummaryByCandidateId.set(payload.nextCandidateId, summarizePlanFixes(payload) || timestamp || '');
+                }
+                break;
+            case 'convergence.candidate.completed': {
+                const candidateId = stringifyValue(payload.candidateId) || null;
+                const itemId = candidateId ? (state.candidateItemIdByCandidateId.get(candidateId) || null) : null;
+                const outcomeStatus = stringifyValue(payload.outcomeStatus);
+
+                patchCompactItem(state, itemId, (current) => ({
+                    ...current,
+                    title: t('buildLog.event.convergenceCandidateCompleted'),
+                    subtitle: compactParts([
+                        candidateId,
+                        outcomeStatus,
+                        stringifyValue(payload.failureFamily)
+                    ]) || current.subtitle,
+                    description: t('buildLog.description.convergenceCandidateCompleted'),
+                    status: outcomeStatus === 'passed' ? 'completed' : 'warning',
+                    dataLines: createDataLinesFromObject(payload)
+                }));
+                break;
+            }
+            case 'convergence.terminal-outcome': {
+                const terminalOutcomeId = stringifyValue(payload.terminalOutcomeId);
+
+                appendCompactItem(state, {
+                    id: `compact:terminal-outcome:${terminalOutcomeId || event.timestamp}`,
+                    kind: 'event',
+                    title: t('buildLog.event.convergenceTerminalOutcome'),
+                    subtitle: compactParts([
+                        terminalOutcomeId,
+                        stringifyValue(payload.terminalOutcomeExplanation),
+                        formatCountPart('candidates', payload.candidateCount)
+                    ]) || timestamp || t('buildLog.item.completed'),
+                    description: t('buildLog.description.convergenceTerminalOutcome'),
+                    status: terminalOutcomeId === 'success' ? 'completed' : 'failed',
+                    timestamp,
+                    sourceLabel: 'convergence.terminal-outcome',
+                    dataLines: createDataLinesFromObject(payload)
+                });
+                break;
+            }
+            case 'report.written':
+                appendCompactItem(state, {
+                    id: 'compact:report.written',
+                    kind: 'event',
+                    title: t('buildLog.event.reportWritten'),
+                    subtitle: stringifyValue(payload.reportDir) || timestamp || t('buildLog.item.completed'),
+                    description: t('buildLog.description.reportWritten'),
+                    status: 'completed',
+                    timestamp,
+                    sourceLabel: 'report.written',
+                    dataLines: createDataLinesFromObject(payload)
+                });
+                break;
+            case 'run.finished':
+                appendCompactItem(state, {
+                    id: 'compact:run.finished',
+                    kind: 'event',
+                    title: t('buildLog.event.runFinished'),
+                    subtitle: compactParts([
+                        formatCountPart('keep', payload.kept),
+                        formatCountPart('exclude', payload.excluded),
+                        formatCountPart('errors', payload.errors)
+                    ]) || t('buildLog.event.runFinishedSubtitle'),
+                    description: t('buildLog.description.runFinished'),
+                    status: 'completed',
+                    timestamp,
+                    sourceLabel: 'run.finished',
+                    dataLines: createDataLinesFromObject(payload)
+                });
+                break;
+            case 'run.failed':
+                appendCompactItem(state, {
+                    id: 'compact:run.failed',
+                    kind: 'event',
+                    title: t('buildLog.event.runFailed'),
+                    subtitle: stringifyValue(payload.message) || t('buildLog.event.runFailedSubtitle'),
+                    description: t('buildLog.description.runFailed'),
+                    status: 'failed',
+                    timestamp,
+                    sourceLabel: 'run.failed',
+                    dataLines: createDataLinesFromObject(payload)
+                });
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (state.items.length === 0) {
+        return getPlanItems({ form, preflight, t });
+    }
+
+    return state.items;
+}
+
+export function buildRunLogItems({
+    form,
+    mode,
+    session,
+    preflight,
+    t
+}: {
+    form: RunFormState;
+    mode: BuildLogMode;
+    session: RunSessionState;
+    preflight: RunPreflightSummary | null;
+    t: Translator<MessageKey>;
+}): BuildLogItem[] {
+    if (mode === 'compact') {
+        return buildCompactRunLogItems({
+            form,
+            session,
+            preflight,
+            t
+        });
+    }
+
     const trackedEvents = session.events
         .filter((event) => TRACKED_EVENT_TYPES.has(event.type))
+        .filter((event) => mode === 'full' || !COMPACT_HIDDEN_EVENT_TYPES.has(event.type))
         .map((event) => createEventItem(event, t))
         .filter((item): item is BuildLogItem => Boolean(item));
 

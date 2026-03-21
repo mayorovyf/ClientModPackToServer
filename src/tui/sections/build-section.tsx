@@ -11,7 +11,7 @@ import { PresetsScreen } from '../screens/PresetsScreen.js';
 
 import type { MessageKey } from '../../i18n/catalog.js';
 import type { Translator } from '../../i18n/types.js';
-import type { RunFormState, RunSessionState, TuiMode } from '../state/app-state.js';
+import type { BuildLogMode, RunFormState, RunSessionState, TuiMode } from '../state/app-state.js';
 import type { BuildLogItem } from '../state/build-log.js';
 import type { RunPreset } from '../state/presets.js';
 import type { RunPreflightCheck, RunPreflightSummary } from '../state/run-preflight.js';
@@ -37,6 +37,7 @@ export function createBuildSection({
     uiMode,
     session,
     buildLogItems,
+    buildLogMode,
     selectedBuildLogItem,
     selectedBuildLogItemId,
     selectedRunField,
@@ -48,6 +49,7 @@ export function createBuildSection({
     selectedPreset,
     selectedPresetId,
     compact,
+    onBuildLogModeChange,
     onChange,
     onRun,
     onInteractionChange,
@@ -65,6 +67,7 @@ export function createBuildSection({
     uiMode: TuiMode;
     session: RunSessionState;
     buildLogItems: BuildLogItem[];
+    buildLogMode: BuildLogMode;
     selectedBuildLogItem: BuildLogItem | null;
     selectedBuildLogItemId: string;
     selectedRunField: RunFieldKey;
@@ -76,6 +79,7 @@ export function createBuildSection({
     selectedPreset: RunPreset | null;
     selectedPresetId: string;
     compact: boolean;
+    onBuildLogModeChange: (nextMode: BuildLogMode) => void;
     onChange: (nextForm: RunFormState) => void;
     onRun: () => void;
     onInteractionChange: (isLocked: boolean) => void;
@@ -210,6 +214,8 @@ export function createBuildSection({
                 renderContent: ({ contentHeight, isContentFocused }) => (
                     <BuildLogScreen
                         items={buildLogItems}
+                        mode={buildLogMode}
+                        onModeChange={onBuildLogModeChange}
                         selectedItemId={selectedBuildLogItemId}
                         onSelectedItemChange={onSelectedBuildLogItemIdChange}
                         session={session}

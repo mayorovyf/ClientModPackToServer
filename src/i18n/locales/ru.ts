@@ -41,6 +41,7 @@ export const ru = {
     'sidebar.page': 'Страница: {page}',
     'sidebar.hint.build.compact': 'Enter: правка',
     'sidebar.hint.build.full': 'Enter: правка',
+    'sidebar.hint.build.logMode': 'L: режим лога',
     'sidebar.hint.presets.apply': 'Enter: применить',
     'sidebar.hint.presets.save': 'N: сохранить',
     'sidebar.hint.presets.update': 'U: обновить',

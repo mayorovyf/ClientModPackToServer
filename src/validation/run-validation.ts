@@ -18,6 +18,7 @@ const { linkValidationIssues } = require('./link-issues');
 const { createEmptyValidationReport, finalizeValidationReport } = require('./report-model');
 const { runValidationProcess } = require('./process-runner');
 
+import type { BuildProgressReporter } from '../types/app';
 import type { RunContext } from '../types/run';
 import type {
     ValidationDecisionLike,
@@ -280,11 +281,13 @@ function ensureFailureIssue(issues: ValidationIssue[], processRuntime: Validatio
 async function runValidationStage({
     decisions,
     runContext,
-    record = () => {}
+    record = () => {},
+    progressReporter = null
 }: {
     decisions: ValidationDecisionLike[];
     runContext: RunContext;
     record?: (level: string, kind: string, message: string) => void;
+    progressReporter?: BuildProgressReporter | null;
 }): Promise<ValidationStageResult> {
     const policy = createRunPolicyDecision({ runContext, decisions });
 
@@ -307,9 +310,21 @@ async function runValidationStage({
 
     try {
         record('info', 'validation', `Preparing validation workspace for run ${runContext.runId}`);
+        progressReporter?.onStageActivity({
+            stage: 'validation',
+            activityType: 'sandbox',
+            message: 'Preparing validation sandbox',
+            javaProfile: runContext.javaProfile
+        });
         const workspace = createValidationSandbox(runContext);
         workspaceRoot = workspace.workspaceRoot;
 
+        progressReporter?.onStageActivity({
+            stage: 'validation',
+            activityType: 'entrypoint-resolution',
+            message: 'Resolving validation entrypoint',
+            workspaceDir: workspace.workspaceDir
+        });
         const explicitEntrypoint = materializeExplicitEntrypoint({
             buildDir: runContext.buildDir,
             workspaceDir: workspace.workspaceDir,
@@ -343,12 +358,25 @@ async function runValidationStage({
         }
 
         record('info', 'validation', `Validation entrypoint: ${entrypoint.path}`);
+        progressReporter?.onStageActivity({
+            stage: 'validation',
+            activityType: 'process-launch',
+            message: `Launching ${path.basename(entrypoint.path)}`,
+            entrypointPath: entrypoint.path,
+            javaProfile: runContext.javaProfile
+        });
         const processRuntime = await runValidationProcess({
             entrypoint,
             workingDirectory: workspace.workspaceDir,
             timeoutMs: runContext.validationTimeoutMs,
             javaProfile: runContext.javaProfile,
             record
+        });
+        progressReporter?.onStageActivity({
+            stage: 'validation',
+            activityType: 'result-analysis',
+            message: 'Parsing validation output and joinability',
+            entrypointPath: entrypoint.path
         });
         const parsed = parseValidationIssues(processRuntime.combinedOutput);
         const ensuredIssues = ensureFailureIssue(parsed.issues, processRuntime);

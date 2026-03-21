@@ -25,6 +25,10 @@ export interface StageCompletedEvent extends BackendEvent {
     type: 'stage.completed';
 }
 
+export interface StageActivityEvent extends BackendEvent {
+    type: 'stage.activity';
+}
+
 export interface ModParsedEvent extends BackendEvent {
     type: 'mod.parsed';
 }

@@ -301,7 +301,8 @@ async function runInitialCandidateIteration({
     const serverCoreInstall = await installDetectedServerCore({
         runContext,
         runtimeDetection,
-        record: collector.record
+        record: collector.record,
+        progressReporter: effectiveProgressReporter
     });
     effectiveProgressReporter.onStageCompleted({
         stage: 'server-core',
@@ -347,7 +348,8 @@ async function runInitialCandidateIteration({
             validationStage = await runValidationStage({
                 decisions: finalizedDecisions,
                 runContext: validationRunContext,
-                record: collector.record
+                record: collector.record,
+                progressReporter: effectiveProgressReporter
             });
         } catch (error) {
             const serializedError = {

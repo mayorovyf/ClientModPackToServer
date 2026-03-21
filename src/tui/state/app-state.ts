@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 const { DEFAULT_REMOTE_REGISTRY_MANIFEST_URL } = require('../../registry/constants.js');
 
 export type TuiMode = 'simple' | 'expert';
+export type BuildLogMode = 'compact' | 'full';
 export type ScreenId = 'build' | 'server' | 'results' | 'settings';
 export type BuildPageId = 'paths' | 'strategy' | 'check' | 'launch' | 'presets';
 export type ServerPageId = 'setup' | 'install' | 'doctor' | 'launch' | 'logs';

@@ -5,6 +5,7 @@ const { loadWorkspaceManifest, saveWorkspaceManifest } = require('../build/works
 const { removePathIfExists } = require('../build/file-transfer');
 const { canReuseWorkspaceServerCore, createServerCoreCacheKey } = require('./core-cache');
 
+import type { BuildProgressReporter } from '../types/app';
 import type { BuildServerCoreInstallReport, PackRuntimeDetection } from '../types/runtime-detection';
 import type { RunContext } from '../types/run';
 import type { ServerCoreType } from './types';
@@ -171,11 +172,13 @@ function createServerCoreInstallReport({
 export async function installDetectedServerCore({
     runContext,
     runtimeDetection,
-    record = () => {}
+    record = () => {},
+    progressReporter = null
 }: {
     runContext: RunContext;
     runtimeDetection: PackRuntimeDetection | null;
     record?: (level: string, kind: string, message: string) => void;
+    progressReporter?: BuildProgressReporter | null;
 }): Promise<BuildServerCoreInstallReport> {
     if (!runContext.installServerCore) {
         cleanupTrackedManagedCore({
@@ -290,6 +293,14 @@ export async function installDetectedServerCore({
     }
 
     record('info', 'server-core', `Installing managed ${coreType} core into ${runContext.buildDir}`);
+    progressReporter?.onStageActivity({
+        stage: 'server-core',
+        activityType: 'server-core-install',
+        message: `Installing managed ${coreType} core`,
+        coreType,
+        minecraftVersion,
+        loaderVersion
+    });
 
     if (!resolvedJavaRuntime.available || !resolvedJavaRuntime.command) {
         cleanupTrackedManagedCore({
@@ -315,6 +326,16 @@ export async function installDetectedServerCore({
 
         while (attempt < SERVER_CORE_INSTALL_MAX_ATTEMPTS) {
             attempt += 1;
+            progressReporter?.onStageActivity({
+                stage: 'server-core',
+                activityType: 'server-core-install-attempt',
+                message: `Installing managed ${coreType} core (attempt ${attempt}/${SERVER_CORE_INSTALL_MAX_ATTEMPTS})`,
+                coreType,
+                minecraftVersion,
+                loaderVersion,
+                attempt,
+                maxAttempts: SERVER_CORE_INSTALL_MAX_ATTEMPTS
+            });
 
             try {
                 result = await installServerCore({

@@ -6,6 +6,7 @@ import type { ManualReviewAction } from '../../review/manual-overrides.js';
 import type { RunReport } from '../../types/report.js';
 import type { ServerManagerState } from '../hooks/use-server-manager.js';
 import type {
+    BuildLogMode,
     RunFormState,
     RunSessionState,
     ScreenId,
@@ -68,6 +69,8 @@ export interface SectionRegistryContext {
     setShowHints: (nextValue: boolean) => void;
     session: RunSessionState;
     compact: boolean;
+    buildLogMode: BuildLogMode;
+    setBuildLogMode: (nextMode: BuildLogMode) => void;
     buildLogItems?: BuildLogItem[];
     selectedBuildLogItem?: BuildLogItem | null;
     selectedBuildLogItemId?: string;

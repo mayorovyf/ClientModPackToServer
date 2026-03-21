@@ -22,6 +22,12 @@ export interface ProgressStageEvent {
     [key: string]: unknown;
 }
 
+export interface ProgressStageActivityEvent extends ProgressStageEvent {
+    message?: string | null;
+    activityType?: string | null;
+    [key: string]: unknown;
+}
+
 export interface ProgressModEvent {
     fileName: string;
     descriptor?: {
@@ -86,6 +92,7 @@ export interface ProgressConvergenceEvent {
 export interface BuildProgressReporter {
     onStageStarted: (event: ProgressStageEvent) => void;
     onStageCompleted: (event: ProgressStageEvent) => void;
+    onStageActivity: (event: ProgressStageActivityEvent) => void;
     onModParsed: (event: ProgressModEvent) => void;
     onBuildActionCompleted: (event: ProgressBuildActionEvent) => void;
     onConvergenceCandidateStarted: (event: ProgressConvergenceEvent) => void;

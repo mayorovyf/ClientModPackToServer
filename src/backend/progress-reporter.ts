@@ -4,6 +4,7 @@ import type {
     ProgressConvergenceEvent,
     ProgressBuildActionEvent,
     ProgressModEvent,
+    ProgressStageActivityEvent,
     ProgressStageEvent
 } from '../types/app';
 import { BACKEND_EVENT_TYPES } from './event-types';
@@ -51,6 +52,29 @@ function createConvergencePayload(event: ProgressConvergenceEvent): Record<strin
     };
 }
 
+function createStageActivityPayload(event: ProgressStageActivityEvent): Record<string, unknown> {
+    return {
+        stage: typeof event.stage === 'string' ? event.stage : null,
+        message: typeof event.message === 'string' ? event.message : null,
+        activityType: typeof event.activityType === 'string' ? event.activityType : null,
+        fileName: typeof event.fileName === 'string' ? event.fileName : null,
+        index: typeof event.index === 'number' ? event.index : null,
+        total: typeof event.total === 'number' ? event.total : null,
+        loader: typeof event.loader === 'string' ? event.loader : null,
+        decision: typeof event.decision === 'string' ? event.decision : null,
+        actionStatus: typeof event.actionStatus === 'string' ? event.actionStatus : null,
+        supportCount: typeof event.supportCount === 'number' ? event.supportCount : null,
+        coreType: typeof event.coreType === 'string' ? event.coreType : null,
+        minecraftVersion: typeof event.minecraftVersion === 'string' ? event.minecraftVersion : null,
+        loaderVersion: typeof event.loaderVersion === 'string' ? event.loaderVersion : null,
+        entrypointPath: typeof event.entrypointPath === 'string' ? event.entrypointPath : null,
+        attempt: typeof event.attempt === 'number' ? event.attempt : null,
+        maxAttempts: typeof event.maxAttempts === 'number' ? event.maxAttempts : null,
+        javaProfile: typeof event.javaProfile === 'string' ? event.javaProfile : null,
+        workspaceDir: typeof event.workspaceDir === 'string' ? event.workspaceDir : null
+    };
+}
+
 export function createBuildProgressReporter({
     emitter,
     runId
@@ -65,6 +89,10 @@ export function createBuildProgressReporter({
 
         onStageCompleted(event) {
             emitter.emit(BACKEND_EVENT_TYPES.stageCompleted, event, runId);
+        },
+
+        onStageActivity(event) {
+            emitter.emit(BACKEND_EVENT_TYPES.stageActivity, createStageActivityPayload(event), runId);
         },
 
         onModParsed(event) {

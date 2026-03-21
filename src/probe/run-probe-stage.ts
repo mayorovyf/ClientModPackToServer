@@ -3,6 +3,7 @@ const { loadProbeKnowledge, upsertProbeKnowledgeEntry } = require('./knowledge-s
 const { runProbeStep } = require('./runner');
 const { PROBE_MODES } = require('./constants');
 
+import type { BuildProgressReporter } from '../types/app';
 import type { ProbeKnowledgeEntry, ProbeSummary } from '../types/probe';
 import type { RunContext } from '../types/run';
 
@@ -55,12 +56,14 @@ async function runProbeStage({
     decisions,
     runContext,
     knowledgePath,
-    record = () => {}
+    record = () => {},
+    progressReporter = null
 }: {
     decisions: Array<Record<string, any>>;
     runContext: RunContext;
     knowledgePath: string;
     record?: (level: string, kind: string, message: string) => void;
+    progressReporter?: BuildProgressReporter | null;
 }): Promise<{
     summary: ProbeSummary;
     updatedKnowledge: {
@@ -114,6 +117,16 @@ async function runProbeStage({
         if (!decision || !decision.descriptor) {
             continue;
         }
+
+        progressReporter?.onStageActivity({
+            stage: 'probe',
+            activityType: 'probe-step',
+            message: `Probing ${step.fileName}`,
+            fileName: step.fileName,
+            index: summary.attempted + 1,
+            total: summary.planned,
+            supportCount: step.requiredSupportFiles.length
+        });
 
         const supportSourcePaths = step.requiredSupportFiles
             .map((fileName: string) => decisionMap.get(fileName))

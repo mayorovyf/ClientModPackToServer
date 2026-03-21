@@ -151,6 +151,15 @@ function applyWorkspaceDelta({
 
     if (runContext.dryRun) {
         const finalized = decisions.map((decision, index) => {
+            progressReporter?.onStageActivity({
+                stage: 'build',
+                activityType: shouldKeepDecision(decision) ? 'build-would-copy' : 'build-would-exclude',
+                message: `${shouldKeepDecision(decision) ? 'Would copy' : 'Would exclude'} ${decision.fileName} (${index + 1}/${total})`,
+                fileName: decision.fileName,
+                index: index + 1,
+                total,
+                decision: shouldKeepDecision(decision) ? 'keep' : 'exclude'
+            });
             const finalizedDecision = finalizeDecision(decision, shouldKeepDecision(decision)
                 ? {
                     actionStatus: 'would-copy',
@@ -200,6 +209,15 @@ function applyWorkspaceDelta({
         let finalizedDecision: Record<string, any>;
 
         if (!shouldKeepDecision(decision)) {
+            progressReporter?.onStageActivity({
+                stage: 'build',
+                activityType: 'build-exclude',
+                message: `Excluding ${decision.fileName} (${index + 1}/${total})`,
+                fileName: decision.fileName,
+                index: index + 1,
+                total,
+                decision: 'exclude'
+            });
             record('info', 'build', `Excluded: ${decision.fileName}`);
             finalizedDecision = finalizeDecision(decision, {
                 decision: 'exclude',
@@ -222,6 +240,15 @@ function applyWorkspaceDelta({
         }
 
         if (delta.modsToReuse.includes(decision.fileName) && fs.existsSync(destinationPath)) {
+            progressReporter?.onStageActivity({
+                stage: 'build',
+                activityType: 'build-reuse',
+                message: `Reusing ${decision.fileName} (${index + 1}/${total})`,
+                fileName: decision.fileName,
+                index: index + 1,
+                total,
+                decision: 'keep'
+            });
             stats.reused += 1;
             record('info', 'build', `Reused: ${decision.fileName}`);
             finalizedDecision = finalizeDecision(decision, {
@@ -238,6 +265,15 @@ function applyWorkspaceDelta({
         }
 
         if (delta.modsToRestoreFromStash.includes(decision.fileName)) {
+            progressReporter?.onStageActivity({
+                stage: 'build',
+                activityType: 'build-restore',
+                message: `Restoring ${decision.fileName} from stash (${index + 1}/${total})`,
+                fileName: decision.fileName,
+                index: index + 1,
+                total,
+                decision: 'keep'
+            });
             try {
                 restoreWorkspaceMod({
                     runContext,
@@ -275,6 +311,15 @@ function applyWorkspaceDelta({
         }
 
         try {
+            progressReporter?.onStageActivity({
+                stage: 'build',
+                activityType: 'build-copy',
+                message: `Copying ${decision.fileName} (${index + 1}/${total})`,
+                fileName: decision.fileName,
+                index: index + 1,
+                total,
+                decision: 'keep'
+            });
             const transferMode = linkOrCopyFile(decision.sourcePath, destinationPath);
 
             if (transferMode === 'linked') {

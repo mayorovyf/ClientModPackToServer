@@ -2,9 +2,10 @@ import React, { useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 
 import { useT } from '../i18n/use-t.js';
+import { normalizeHotkeyInput } from '../lib/normalize-hotkey-input.js';
 import { getBuildLogStatusLabel } from '../state/build-log.js';
 
-import type { RunSessionState } from '../state/app-state.js';
+import type { BuildLogMode, RunSessionState } from '../state/app-state.js';
 import type { BuildLogItem } from '../state/build-log.js';
 
 function getVisibleWindow(total: number, selectedIndex: number, maxVisible: number): { start: number; end: number } {
@@ -64,8 +65,70 @@ function formatTail(value: string | null, maxLength = 24): string {
     return normalized.length <= maxLength ? normalized : `...${normalized.slice(-(maxLength - 3))}`;
 }
 
+function getSessionStageLabel(session: RunSessionState, t: ReturnType<typeof useT>): string {
+    const stageId = String(session.currentStage || '').trim();
+    const loopStage = String(session.currentConvergenceStage || '').trim();
+    let stageLabel = t('common.placeholder.na');
+
+    switch (stageId) {
+        case 'preflight':
+            stageLabel = t('buildLog.plan.preflight');
+            break;
+        case 'classification':
+            stageLabel = t('buildLog.plan.classification');
+            break;
+        case 'dependency':
+            stageLabel = t('buildLog.plan.dependency');
+            break;
+        case 'arbiter':
+            stageLabel = t('buildLog.plan.arbiter');
+            break;
+        case 'deep-check':
+            stageLabel = t('buildLog.plan.deepCheck');
+            break;
+        case 'probe':
+            stageLabel = t('buildLog.plan.probe');
+            break;
+        case 'build':
+            stageLabel = t('buildLog.plan.build');
+            break;
+        case 'server-core':
+            stageLabel = t('buildLog.plan.serverCore');
+            break;
+        case 'validation':
+            stageLabel = t('buildLog.plan.validation');
+            break;
+        case 'report':
+            stageLabel = t('buildLog.plan.report');
+            break;
+        default:
+            stageLabel = stageId || t('common.placeholder.na');
+            break;
+    }
+
+    return loopStage ? `${stageLabel}/${loopStage}` : stageLabel;
+}
+
+function getCurrentActivityLabel(items: BuildLogItem[], t: ReturnType<typeof useT>): string {
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+        const item = items[index];
+
+        if (!item || item.status !== 'running') {
+            continue;
+        }
+
+        return item.subtitle
+            ? `${item.title}: ${item.subtitle}`
+            : item.title;
+    }
+
+    return t('buildLog.activityNone');
+}
+
 export function BuildLogScreen({
     items,
+    mode,
+    onModeChange,
     selectedItemId,
     onSelectedItemChange,
     session,
@@ -73,6 +136,8 @@ export function BuildLogScreen({
     height
 }: {
     items: BuildLogItem[];
+    mode: BuildLogMode;
+    onModeChange: (nextMode: BuildLogMode) => void;
     selectedItemId: string;
     onSelectedItemChange: (itemId: string) => void;
     session: RunSessionState;
@@ -81,9 +146,23 @@ export function BuildLogScreen({
 }): React.JSX.Element {
     const t = useT();
     const selectedIndex = Math.max(items.findIndex((item) => item.id === selectedItemId), 0);
+    const modeLabel = t(mode === 'compact' ? 'buildLog.mode.compact' : 'buildLog.mode.full');
+    const currentActivityLabel = getCurrentActivityLabel(items, t);
+    const stageLabel = getSessionStageLabel(session, t);
 
-    useInput((_input, key) => {
-        if (!isFocused || items.length === 0) {
+    useInput((input, key) => {
+        if (!isFocused) {
+            return;
+        }
+
+        const normalizedInput = normalizeHotkeyInput(input);
+
+        if (normalizedInput === 'l') {
+            onModeChange(mode === 'compact' ? 'full' : 'compact');
+            return;
+        }
+
+        if (items.length === 0) {
             return;
         }
 
@@ -100,7 +179,7 @@ export function BuildLogScreen({
     });
 
     const contentLines = Math.max(6, height - 4);
-    const headerLines = 3;
+    const headerLines = 5;
     const viewportLines = Math.max(2, contentLines - headerLines);
     const linesPerItem = 2;
     const visibleItemCount = Math.max(1, Math.floor(viewportLines / linesPerItem));
@@ -112,9 +191,9 @@ export function BuildLogScreen({
     const listHeight = visibleItemCount * linesPerItem;
     const statusLine = t('buildLog.statusLine', {
         status: getSessionStatusLabel(session.status, t),
-        runId: session.runId || t('common.placeholder.na'),
-        stage: session.currentStage || t('common.placeholder.na'),
-        candidate: formatTail(session.currentCandidateId, 22),
+        runId: formatTail(session.runId, 18),
+        stage: stageLabel,
+        candidate: formatTail(session.currentCandidateId, 18),
         iteration: session.currentIteration ?? t('common.placeholder.na'),
         loopStage: session.currentConvergenceStage || t('common.placeholder.na'),
         outcome: session.terminalOutcomeId || t('common.placeholder.na')
@@ -133,6 +212,8 @@ export function BuildLogScreen({
         >
             <Text color="yellowBright">{t('buildLog.title')}</Text>
             <Text dimColor wrap="truncate">{statusLine}</Text>
+            <Text dimColor wrap="truncate">{t('buildLog.modeLine', { mode: modeLabel })}</Text>
+            <Text dimColor wrap="truncate">{t('buildLog.activityLine', { activity: currentActivityLabel })}</Text>
             <Text dimColor wrap="truncate">
                 {items.length > 0
                     ? t('buildLog.range', { start: windowRange.start + 1, end: windowRange.end, total: items.length })

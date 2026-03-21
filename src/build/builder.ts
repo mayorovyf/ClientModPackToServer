@@ -350,6 +350,7 @@ function createNoopProgressReporter(): BuildProgressReporter {
     return {
         onStageStarted(_event) {},
         onStageCompleted(_event) {},
+        onStageActivity(_event) {},
         onModParsed(_event) {},
         onBuildActionCompleted(_event) {},
         onConvergenceCandidateStarted(_event) {},
@@ -490,6 +491,14 @@ function collectDecisions(
     const total = effectiveJarFiles.length;
 
     for (const [index, fileName] of effectiveJarFiles.entries()) {
+        progressReporter.onStageActivity({
+            stage: 'classification',
+            activityType: 'mod-parse',
+            message: `Parsing ${fileName} (${index + 1}/${total})`,
+            fileName,
+            index: index + 1,
+            total
+        });
         const decision = classifyModFile({
             fileName,
             sourcePath: path.join(modsPath, fileName),

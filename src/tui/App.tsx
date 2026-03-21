@@ -94,6 +94,7 @@ export function App(): React.JSX.Element {
     const [activePageByScreen, setActivePageByScreen] = useState<ActivePageByScreen>(persistedState.activePageByScreen);
     const [locale, setLocale] = useState<Locale>(persistedState.locale);
     const [uiMode, setUiMode] = useState<TuiMode>(persistedState.uiMode);
+    const [buildLogMode, setBuildLogMode] = useState(persistedState.buildLogMode);
     const [form, setForm] = useState<RunFormState>(persistedState.form);
     const [serverForm, setServerForm] = useState<ServerFormState>(persistedState.serverForm);
     const [focusedColumn, setFocusedColumn] = useState<FocusedColumn>('content');
@@ -144,11 +145,12 @@ export function App(): React.JSX.Element {
     const buildLogItems = useMemo(
         () => buildRunLogItems({
             form,
+            mode: buildLogMode,
             session,
             preflight: runPreflight.summary,
             t
         }),
-        [form, runPreflight.summary, session, t]
+        [buildLogMode, form, runPreflight.summary, session, t]
     );
     const selectedRunPreflightCheck = runPreflight.checks.find((check) => check.id === selectedRunPreflightCheckId)
         || runPreflight.checks[0]
@@ -289,6 +291,8 @@ export function App(): React.JSX.Element {
         setShowHints,
         session,
         compact: layout.compact,
+        buildLogMode,
+        setBuildLogMode,
         buildLogItems,
         selectedBuildLogItem,
         selectedBuildLogItemId,
@@ -407,12 +411,13 @@ export function App(): React.JSX.Element {
     useEffect(() => {
         try {
             savePersistedTuiState({
-                version: 2,
+                version: 3,
                 activeScreen,
                 activePageByScreen,
                 locale,
                 uiMode,
                 showHints,
+                buildLogMode,
                 form,
                 serverForm
             });
@@ -420,7 +425,7 @@ export function App(): React.JSX.Element {
         } catch (error) {
             setPersistenceError(error instanceof Error ? error.message : String(error));
         }
-    }, [activePageByScreen, activeScreen, form, locale, serverForm, showHints, uiMode]);
+    }, [activePageByScreen, activeScreen, buildLogMode, form, locale, serverForm, showHints, uiMode]);
 
     useEffect(() => {
         const lastItemId = buildLogItems[buildLogItems.length - 1]?.id ?? '';

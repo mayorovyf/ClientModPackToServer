@@ -57,6 +57,7 @@ export const en = {
     'sidebar.page': 'Page: {page}',
     'sidebar.hint.build.compact': 'Enter: edit',
     'sidebar.hint.build.full': 'Enter: edit',
+    'sidebar.hint.build.logMode': 'L: log mode',
     'sidebar.hint.presets.apply': 'Enter: apply',
     'sidebar.hint.presets.save': 'N: save',
     'sidebar.hint.presets.update': 'U: update',

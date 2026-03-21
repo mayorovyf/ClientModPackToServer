@@ -13,6 +13,12 @@ function getScreenSpecificHints(
 ): string[] {
     switch (activeScreen) {
         case 'build':
+            if (activePageId === 'launch') {
+                return compact
+                    ? [t('sidebar.hint.build.compact'), t('sidebar.hint.build.logMode')]
+                    : [t('sidebar.hint.build.full'), t('sidebar.hint.build.logMode')];
+            }
+
             if (activePageId === 'presets') {
                 return [
                     t('sidebar.hint.presets.apply'),

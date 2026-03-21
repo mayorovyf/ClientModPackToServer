@@ -5,17 +5,18 @@ import i18nTypesApi from '../../i18n/types.js';
 import { createDefaultActivePageByScreen, createDefaultRunFormState, createDefaultServerFormState, PAGE_ORDER_BY_SCREEN } from './app-state.js';
 
 import type { Locale } from '../../i18n/types.js';
-import type { ActivePageByScreen, RunFormState, ScreenId, ServerFormState, TuiMode } from './app-state.js';
+import type { ActivePageByScreen, BuildLogMode, RunFormState, ScreenId, ServerFormState, TuiMode } from './app-state.js';
 
 const { DEFAULT_LOCALE, normalizeLocale } = i18nTypesApi;
 
 export interface PersistedTuiState {
-    version: 2;
+    version: 3;
     activeScreen: ScreenId;
     activePageByScreen: ActivePageByScreen;
     locale: Locale;
     uiMode: TuiMode;
     showHints: boolean;
+    buildLogMode: BuildLogMode;
     form: RunFormState;
     serverForm: ServerFormState;
 }
@@ -26,12 +27,13 @@ const DEFAULT_TUI_SETTINGS_PATH = path.resolve(process.cwd(), 'data', 'tui-setti
 
 function createDefaultPersistedTuiState(): PersistedTuiState {
     return {
-        version: 2,
+        version: 3,
         activeScreen: 'build',
         activePageByScreen: createDefaultActivePageByScreen(),
         locale: DEFAULT_LOCALE,
         uiMode: 'simple',
         showHints: true,
+        buildLogMode: 'compact',
         form: createDefaultRunFormState(),
         serverForm: createDefaultServerFormState()
     };
@@ -63,6 +65,10 @@ function normalizeScreenId(value: unknown, pages: Partial<Record<string, string>
 
 function normalizeTuiMode(value: unknown): TuiMode {
     return VALID_UI_MODES.includes(value as TuiMode) ? (value as TuiMode) : 'simple';
+}
+
+function normalizeBuildLogMode(value: unknown): BuildLogMode {
+    return value === 'full' ? 'full' : 'compact';
 }
 
 function normalizeString(value: unknown): string {
@@ -210,12 +216,13 @@ export function loadPersistedTuiState(): PersistedTuiState {
         const normalizedPages = normalizeActivePageByScreen(parsed.activePageByScreen);
 
         return {
-            version: 2,
+            version: 3,
             activeScreen: normalizeScreenId(parsed.activeScreen, parsed.activePageByScreen),
             activePageByScreen: normalizedPages,
             locale: normalizeLocale(parsed.locale, defaults.locale),
             uiMode: normalizeTuiMode(parsed.uiMode),
             showHints: normalizeBoolean(parsed.showHints, defaults.showHints),
+            buildLogMode: normalizeBuildLogMode(parsed.buildLogMode),
             form: normalizeRunFormState(parsed.form),
             serverForm: normalizeServerFormState(parsed.serverForm)
         };
@@ -226,12 +233,13 @@ export function loadPersistedTuiState(): PersistedTuiState {
 
 export function savePersistedTuiState(state: PersistedTuiState): void {
     const normalizedState: PersistedTuiState = {
-        version: 2,
+        version: 3,
         activeScreen: normalizeScreenId(state.activeScreen, state.activePageByScreen as unknown as Partial<Record<string, string>>),
         activePageByScreen: normalizeActivePageByScreen(state.activePageByScreen),
         locale: normalizeLocale(state.locale, DEFAULT_LOCALE),
         uiMode: normalizeTuiMode(state.uiMode),
         showHints: normalizeBoolean(state.showHints, true),
+        buildLogMode: normalizeBuildLogMode(state.buildLogMode),
         form: normalizeRunFormState(state.form),
         serverForm: normalizeServerFormState(state.serverForm)
     };

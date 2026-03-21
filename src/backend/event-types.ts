@@ -4,6 +4,7 @@ export const BACKEND_EVENT_TYPES = Object.freeze({
     registryLoaded: 'registry.loaded',
     stageStarted: 'stage.started',
     stageCompleted: 'stage.completed',
+    stageActivity: 'stage.activity',
     modParsed: 'mod.parsed',
     classificationCompleted: 'classification.completed',
     dependencyAnalysisCompleted: 'dependency.analysis.completed',
